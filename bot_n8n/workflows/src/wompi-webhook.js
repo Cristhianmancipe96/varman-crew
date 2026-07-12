@@ -172,6 +172,13 @@ async function principal() {
     actualizado: new Date().toISOString()
   });
 
+  // Género del pedido (lo trae la compra WEB: dama/caballero). Los pedidos del
+  // bot no lo tienen → cadena vacía y el mensaje queda como antes.
+  const gen = String(pedido.data.genero || '').toLowerCase();
+  const genCap = gen ? gen.charAt(0).toUpperCase() + gen.slice(1) : '';
+  const generoDueno = gen ? ' · ' + genCap : '';   // "…Talla 39 · Dama"
+  const generoCli = gen ? ', ' + gen : '';          // "(talla 39, dama)"
+
   const salida = [];
   // 1) confirmación al CLIENTE (mensaje de tranquilidad). Mejor esfuerzo: si la
   //    ventana de 24h está cerrada el envío falla y se registra, no rompe nada.
@@ -183,7 +190,7 @@ async function principal() {
     const modelo = await modeloDeRef(pedido.data.ref);
     salida.push({ json: { messaging_product: 'whatsapp', to: clienteWa, type: 'text', text: {
       body: T(modelo ? TEXTOS.wompiConfirmadoClienteModelo : TEXTOS.wompiConfirmadoCliente, {
-        modelo, ref: pedido.data.ref || '?', talla: pedido.data.talla || '?'
+        modelo, ref: pedido.data.ref || '?', talla: pedido.data.talla || '?', genero: generoCli
       })
     } } });
   }
@@ -192,7 +199,7 @@ async function principal() {
   if (dueno) {
     salida.push({ json: { messaging_product: 'whatsapp', to: dueno, type: 'text', text: {
       body: T(TEXTOS.wompiConfirmadoDueno, {
-        ref: pedido.data.ref || '?', talla: pedido.data.talla || '?',
+        ref: pedido.data.ref || '?', talla: pedido.data.talla || '?', genero: generoDueno,
         total: fmtPrecio(pedido.data.total || 0),
         cliente: pedido.data.cliente_nombre || '(sin nombre)',
         wa: pedido.data.cliente_wa || '?', ruta: pedido.path

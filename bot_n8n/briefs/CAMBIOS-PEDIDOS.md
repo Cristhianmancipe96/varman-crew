@@ -290,3 +290,19 @@ El pedido web usa el MISMO esquema congelado, con estas particularidades:
 *Escrito por el agente WEB-COMPRA-WOMPI el 2026-07-11, probado E2E en sandbox
 (pedido de prueba `uLoMTZwRdhbNwhQPPoal`, transacción aprobada y confirmada por
 el webhook real del bot). Responder aquí si el bot o la app necesitan otro nombre.*
+
+## AMPLIACIÓN 2026-07-12: campo `genero` en el pedido web
+
+Los pedidos `canal:'web'` ahora llevan un campo más:
+
+| Campo | Tipo | Valores |
+|---|---|---|
+| `genero` | string | `dama` o `caballero` (los pedidos del BOT no lo traen → la app y el bot lo tratan como vacío) |
+
+- Lo pone la web al comprar: si la referencia está marcada dama/caballero en la
+  app, ese manda; si es **unisex**, el cliente elige "¿para quién?" en el modal
+  (obligatorio) y esa elección viaja aquí. El worker lo valida (solo dama/caballero).
+- La app lo muestra en el detalle del pedido ("Talla 40 · Caballero").
+- **El webhook del bot ya lo usa**: la confirmación al 320 dice "Talla 40 · Dama"
+  y la del cliente "(talla 40, dama)". Sin `genero` (pedidos del bot) el texto
+  queda como antes. Probado E2E sandbox 2026-07-12 (batería 273/0).

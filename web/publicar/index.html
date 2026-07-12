@@ -1106,6 +1106,52 @@ footer {
 .gen-opt .gen-x{ position:absolute; top:10px; right:14px; font-size:14px; opacity:0; transition:opacity var(--d-mid) var(--ease); }
 .gen-opt.active .gen-x{ opacity:.85; }
 @media (max-width:560px){ .gen-opt{ padding:14px 16px 11px; min-height:64px; } }
+
+/* ── Animación TURBINA al presionar (barrido cónico girando + empuje) ─────
+   La placa se hunde un instante y un anillo cónico de su color gira de golpe
+   como las aspas de una turbina arrancando; luego la palabra se "desplaza". */
+.gen-opt::after{
+  content:''; position:absolute; z-index:2; pointer-events:none;
+  width:150%; aspect-ratio:1; left:50%; top:50%; border-radius:50%;
+  transform:translate(-50%,-50%) scale(.2); opacity:0;
+  background:conic-gradient(from 0deg,
+    transparent 0deg, color-mix(in oklab, var(--ga), transparent 55%) 35deg,
+    transparent 70deg, color-mix(in oklab, var(--ga), transparent 55%) 105deg,
+    transparent 140deg, color-mix(in oklab, var(--ga), transparent 55%) 175deg,
+    transparent 210deg, color-mix(in oklab, var(--ga), transparent 55%) 245deg,
+    transparent 280deg, color-mix(in oklab, var(--ga), transparent 55%) 315deg,
+    transparent 350deg);
+  -webkit-mask:radial-gradient(circle, transparent 30%, #000 42%, #000 62%, transparent 72%);
+          mask:radial-gradient(circle, transparent 30%, #000 42%, #000 62%, transparent 72%);
+}
+.gen-opt.turbina::after{ animation:genTurbina .62s cubic-bezier(0.16,1,0.3,1); }
+.gen-opt.turbina .gen-word{ animation:genEmpuje .62s cubic-bezier(0.16,1,0.3,1); }
+.gen-opt:active{ transform:scale(.97); }
+@keyframes genTurbina{
+  0%{ transform:translate(-50%,-50%) scale(.2) rotate(0deg); opacity:0; }
+  22%{ opacity:.9; }
+  100%{ transform:translate(-50%,-50%) scale(1) rotate(320deg); opacity:0; }
+}
+@keyframes genEmpuje{
+  0%{ transform:translateX(0); }
+  32%{ transform:translateX(6px); letter-spacing:.12em; }
+  100%{ transform:translateX(0); }
+}
+/* ── Tinte SUTIL del fondo hacia el género elegido (la marca sigue naranja;
+   solo el fondo y las superficies giran un poco de tono) ── */
+body{ transition:background-color .5s var(--ease); }
+html[data-genero="dama"]{
+  --bg: oklch(0.10 0.022 356); --surf-1: oklch(0.13 0.020 356);
+  --surf-2: oklch(0.16 0.018 356); --surf-3: oklch(0.19 0.016 356);
+}
+html[data-genero="caballero"]{
+  --bg: oklch(0.10 0.020 240); --surf-1: oklch(0.13 0.018 240);
+  --surf-2: oklch(0.16 0.016 240); --surf-3: oklch(0.19 0.015 240);
+}
+@media (prefers-reduced-motion: reduce){
+  .gen-opt.turbina::after, .gen-opt.turbina .gen-word{ animation:none; }
+  body{ transition:none; }
+}
 /* sub-enlaces Dama/Caballero del menú móvil */
 .mobile-menu a.mob-sub { font-size: 15px; padding-left: 44px; color: var(--ink-2); }
 /* ── Compra web (Wompi): talla, cantidad y datos de envío en el modal ── */
@@ -1123,6 +1169,13 @@ footer {
 .vm-sys{display:inline-flex;gap:0;border:1.5px solid var(--border,rgba(255,255,255,.12));border-radius:9px;overflow:hidden;}
 .vm-sys-b{min-width:38px;height:26px;padding:0 8px;border:none;background:transparent;color:var(--ink-2,#b8b8c0);font-weight:800;font-size:11px;letter-spacing:.06em;cursor:pointer;transition:background .15s ease,color .15s ease;}
 .vm-sys-b.on{background:var(--brand,#ff6b00);color:var(--ink-on-brand,#111);}
+.vm-gensel{margin-bottom:14px;}
+.vm-gensel-row{display:flex;gap:8px;}
+.vm-gensel-b{flex:1;height:44px;border-radius:11px;border:1.5px solid var(--border,rgba(255,255,255,.12));background:transparent;color:var(--ink,#fff);font-family:'Bebas Neue',sans-serif;font-size:19px;letter-spacing:.06em;cursor:pointer;transition:border-color .15s ease,background .15s ease,color .15s ease;}
+.vm-gensel-b[data-gsel="dama"]{--gsc:oklch(0.70 0.17 356);}
+.vm-gensel-b[data-gsel="caballero"]{--gsc:oklch(0.66 0.14 240);}
+.vm-gensel-b:hover{border-color:var(--gsc);}
+.vm-gensel-b.on{background:var(--gsc);border-color:var(--gsc);color:oklch(0.13 0.01 0);}
 .vm-talla-eq{font-size:12px;color:var(--ink-2,#b8b8c0);margin-top:8px;min-height:16px;}
 .vm-talla-eq b{color:var(--ink,#fff);}
 /* fila del teléfono: prefijo del país + número */
@@ -2173,10 +2226,17 @@ function setGenero(g) {
   applyFilter(catActiva());
 }
 window.vmSetGenero = setGenero;
-// botones del catálogo: se prende y se apaga (apagados ambos = mostrar todo)
+// botones del catálogo: se prende y se apaga (apagados ambos = mostrar todo).
+// Al encender una placa dispara la animación de turbina (una sola corrida).
+function dispararTurbina(btn){
+  btn.classList.remove('turbina'); void btn.offsetWidth; btn.classList.add('turbina');
+  setTimeout(function(){ btn.classList.remove('turbina'); }, 700);
+}
 document.querySelectorAll('.g-btn').forEach(btn => {
   btn.addEventListener('click', () => {
-    setGenero(vmGenero === btn.dataset.gfilter ? 'todos' : btn.dataset.gfilter);
+    const encender = vmGenero !== btn.dataset.gfilter;
+    if (encender) dispararTurbina(btn);
+    setGenero(encender ? btn.dataset.gfilter : 'todos');
   });
 });
 // atajos del menú hamburguesa (→ Dama / → Caballero)
@@ -2297,6 +2357,15 @@ if (contactForm && submitBtn) {
       <p class="vm-modal-desc"></p>
       <!-- Compra web (Wompi): visible solo con COMPRA_WOMPI = true -->
       <div class="vm-compra" id="vm-compra" hidden>
+        <!-- Solo para referencias UNISEX: el cliente elige para quién es.
+             Cambia la conversión de tallas y viaja en el pedido. -->
+        <div class="vm-gensel" id="vm-gensel" hidden>
+          <div class="vm-compra-lbl"><span>¿Para quién?</span></div>
+          <div class="vm-gensel-row" role="group" aria-label="Dama o caballero">
+            <button type="button" class="vm-gensel-b" data-gsel="dama" aria-pressed="false">Dama</button>
+            <button type="button" class="vm-gensel-b" data-gsel="caballero" aria-pressed="false">Caballero</button>
+          </div>
+        </div>
         <div class="vm-compra-lbl">
           <span>Talla</span>
           <span class="vm-sys" role="group" aria-label="Sistema de tallas">
@@ -2504,8 +2573,12 @@ document.addEventListener('click', function(e){
   if (comoComprar) comoComprar.style.display = 'none';
 
   var selTalla = '', cant = 1, refSel = '', precioSel = 0;
-  var generoSel = '';        // genero del producto abierto: cambia la conversión
+  var generoSel = '';        // genero MARCADO en la app (dama/caballero/'' = unisex)
+  var generoPick = '';       // en unisex, para quién lo elige el CLIENTE
+  var esUnisex = false;      // el producto abierto no trae género → hay que preguntar
   var sistema = 'co';        // CO (nacional) / EU / US — solo cambia la ETIQUETA
+  // género que MANDA (marcado en la app, o el que elige el cliente si es unisex)
+  function generoFinal(){ return generoSel === 'dama' || generoSel === 'caballero' ? generoSel : generoPick; }
   var tallasAct = [];        // tallas (CO) del producto abierto
   var enviando = false;      // guard: una sola petición de pago a la vez
   var formAbiertoEn = 0;     // guard: ignora el doble clic al abrir el formulario
@@ -2516,7 +2589,7 @@ document.addEventListener('click', function(e){
   //  · dama:          EU = CO + 1 (EU 35 = CO 34), tabla US de mujer
   var EQ_US_H = { 35:'5', 36:'6', 37:'6.5', 38:'7.5', 39:'8', 40:'9', 41:'10', 42:'10.5', 43:'11', 44:'12', 45:'13', 46:'13.5' };
   var EQ_US_D = { 34:'5', 35:'6', 36:'6.5', 37:'7.5', 38:'8.5', 39:'9', 40:'10', 41:'10.5', 42:'11' };
-  function esDama(){ return generoSel === 'dama'; }
+  function esDama(){ return generoFinal() === 'dama'; }
   function tallaEU(n){ return n + (esDama() ? 1 : 2); }
   function tallaUS(n){ return (esDama() ? EQ_US_D : EQ_US_H)[n] || '—'; }
   function etiquetaTalla(t){
@@ -2559,6 +2632,24 @@ document.addEventListener('click', function(e){
     return out.length ? out : null;
   }
 
+  var genselBox = $('vm-gensel');
+  // pinta el acento del modal según el género vigente (marca o elección)
+  function acentoModal(){
+    var g = generoFinal();
+    var modalBox = document.querySelector('.vm-modal-box');
+    if (modalBox) modalBox.style.setProperty('--gacc',
+      g === 'dama' ? 'oklch(0.70 0.17 356)'
+      : g === 'caballero' ? 'oklch(0.66 0.14 240)'
+      : 'oklch(0.75 0.14 160)');
+  }
+  // recalcula las tallas del producto según el género vigente (para unisex sin
+  // tallas propias: dama 34-41, hombre 35-45). Conserva la talla si sigue válida.
+  function recalcularTallas(tallasProp){
+    tallasAct = expandTallas(tallasProp) || expandTallas(esDama() ? TALLAS_DEF_DAMA : TALLAS_DEF);
+    if (tallasAct.indexOf(selTalla) === -1) selTalla = '';
+    pintarChips();
+  }
+
   // La llama openCard() al abrir el modal de un producto
   window.vmPrepararCompra = function(card){
     var b = card.querySelector('.js-wa');
@@ -2566,22 +2657,35 @@ document.addEventListener('click', function(e){
     refSel = String((b && b.getAttribute('data-ref')) || '').replace(/[^\w-]/g, '');
     precioSel = parseInt(String((b && b.getAttribute('data-precio')) || '').replace(/\D/g, ''), 10) || 0;
     generoSel = String(card.getAttribute('data-genero') || '').toLowerCase();
-    tallasAct = expandTallas(card.getAttribute('data-tallas'))
-      || expandTallas(esDama() ? TALLAS_DEF_DAMA : TALLAS_DEF);
-    // el modal toma el acento del género (mismos colores de las tarjetas)
-    var modalBox = document.querySelector('.vm-modal-box');
-    if (modalBox) modalBox.style.setProperty('--gacc',
-      generoSel === 'dama' ? 'oklch(0.70 0.17 356)'
-      : generoSel === 'caballero' ? 'oklch(0.66 0.14 240)'
-      : 'oklch(0.75 0.14 160)');
+    esUnisex = !(generoSel === 'dama' || generoSel === 'caballero');
+    generoPick = '';
+    var tallasProp = card.getAttribute('data-tallas');
+    // selector "¿para quién?": solo en unisex; arranca sin elegir
+    if (genselBox){
+      genselBox.hidden = !esUnisex;
+      genselBox.querySelectorAll('.vm-gensel-b').forEach(function(x){ x.classList.remove('on'); x.setAttribute('aria-pressed','false'); });
+      genselBox.dataset.tallasProp = tallasProp || '';
+    }
     selTalla = ''; cant = 1; cantEl.textContent = '1';
     enviando = false;
-    pintarChips();
+    recalcularTallas(tallasProp);
+    acentoModal();
     form.classList.remove('abierto');
     box.hidden = false;
     limpiarErr(); total();
     setBtn('<i class="ti ti-shopping-bag"></i> Comprar', false);
   };
+
+  // botones "¿para quién?" (solo en productos unisex)
+  if (genselBox) genselBox.addEventListener('click', function(e){
+    var g = e.target.closest('.vm-gensel-b'); if (!g) return;
+    generoPick = g.getAttribute('data-gsel');
+    genselBox.querySelectorAll('.vm-gensel-b').forEach(function(x){
+      var on = x === g; x.classList.toggle('on', on); x.setAttribute('aria-pressed', on);
+    });
+    recalcularTallas(genselBox.dataset.tallasProp || '');
+    acentoModal(); limpiarErr(); total();
+  });
 
   chips.addEventListener('click', function(e){
     var c = e.target.closest('.vm-talla'); if (!c) return;
@@ -2607,6 +2711,7 @@ document.addEventListener('click', function(e){
   function comprarPaso(){
     if (enviando) return; // ya hay una petición en vuelo (Enter + clic, etc.)
     limpiarErr();
+    if (esUnisex && !generoPick){ mostrarErr('Elige si es para dama o caballero \u{1F45F}'); return; }
     if (!selTalla){ mostrarErr('Elige tu talla primero \u{1F45F}'); return; }
     if (!form.classList.contains('abierto')){
       form.classList.add('abierto');
@@ -2632,7 +2737,7 @@ document.addEventListener('click', function(e){
     fetch('/api/comprar', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ref: refSel, talla: selTalla, cantidad: cant, nombre: nombre, celular: pref + cel, direccion: dir })
+      body: JSON.stringify({ ref: refSel, talla: selTalla, cantidad: cant, nombre: nombre, celular: pref + cel, direccion: dir, genero: generoFinal() })
     }).then(function(r){ return r.json().then(function(j){ return { ok: r.ok, j: j }; }); })
       .then(function(res){
         if (res.ok && res.j && res.j.url){ location.assign(res.j.url); return; }

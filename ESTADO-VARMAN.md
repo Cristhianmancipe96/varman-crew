@@ -70,6 +70,13 @@ Brief `web/briefs/BRIEF-WEB-COMPRA-WOMPI.md`; nota `web/NOTA-WEB-COMPRA-WOMPI-20
   - Contrato `canal:'web'` documentado en `bot_n8n/briefs/CAMBIOS-PEDIDOS.md`.
 - **Tallas:** hombre/unisex EU=CO+2 (US10=EU43=CO41); dama EU=CO+1 (EU35=CO34). En la app las
   tallas se escriben SIEMPRE en talla colombiana.
+- **Género en el pedido (2026-07-12):** el pedido web lleva `genero` (dama/caballero). Si la
+  ref es unisex, el cliente elige "¿para quién?" en el modal (obligatorio); el aviso del bot al
+  320 y al cliente ya lo dicen ("Talla 40 · Dama"). Contrato en `CAMBIOS-PEDIDOS.md`, batería 273/0.
+- **Diseño (2026-07-12):** placas Dama/Caballero con animación de turbina al pulsar + el fondo
+  de la página se tiñe un poco hacia el color elegido (la marca sigue naranja); acento de color
+  por tarjeta. Todo respeta `prefers-reduced-motion`. **Falta que el dueño suba el bot v6.3 nuevo**
+  (Escritorio) para que los avisos de Wompi digan el género.
 - **Probado E2E en sandbox:** compra → pago aprobado (4242…) → webhook confirmó el pedido solo.
 - **Falta SOLO del dueño:** poner en Cloudflare (proyecto varmancrew → Settings → Variables)
   `WOMPI_PRV_KEY` (Secret), `FIREBASE_SA_B64` (Secret), `WOMPI_ENV=test` → **re-subir web\publicar**.

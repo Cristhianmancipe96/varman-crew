@@ -165,9 +165,9 @@ const TEXTOS = {
   wompiLinkDesc: 'Pedido Ref {ref} talla {talla} en VarMan Crew',
   wompiLinkCliente: '¡Listo! 💳 Te comparto un *link de pago seguro por Wompi* para que pagues con tarjeta, PSE o Nequi por *{total}*:\n\n👉 {url}\n\nApenas se acredite el pago, tu pedido queda *confirmado automáticamente* y te avisamos por aquí 🎉. Si prefieres otro medio, escribe *cancelar* y volvemos a empezar.',
   wompiAvisoDueno: '🛒 *NUEVO PEDIDO (link Wompi enviado, pago pendiente)*\n\nRef: {ref} · Talla {talla} · Cantidad: {cantidad}\nTotal: {total} por Wompi\nCliente: {cliente} · +{wa}\n\nSe confirmará solo cuando el cliente pague (webhook). Pedido guardado: {ruta}',
-  wompiConfirmadoDueno: '✅ *PAGO CONFIRMADO (Wompi)*\n\nRef: {ref} · Talla {talla}\nTotal: {total}\nCliente: {cliente} · +{wa}\n\nYa puedes alistar el envío. Pedido: {ruta}',
+  wompiConfirmadoDueno: '✅ *PAGO CONFIRMADO (Wompi)*\n\nRef: {ref} · Talla {talla}{genero}\nTotal: {total}\nCliente: {cliente} · +{wa}\n\nYa puedes alistar el envío. Pedido: {ruta}',
   // mensaje de tranquilidad al CLIENTE cuando el webhook confirma el pago
-  wompiConfirmadoCliente: '¡Pago confirmado! ✅🎉\n\nYa recibimos tu pago de la *Ref {ref}* (talla {talla}) y estamos *alistando tu pedido* con todo el cuidado 📦. Va empacado en su *caja original* y bien protegido para el envío.\n\nApenas salga te compartimos por aquí la *guía de rastreo* para que sigas tu paquete. ¡Gracias por confiar en VarMan Crew! 👟🧡',
+  wompiConfirmadoCliente: '¡Pago confirmado! ✅🎉\n\nYa recibimos tu pago de la *Ref {ref}* (talla {talla}{genero}) y estamos *alistando tu pedido* con todo el cuidado 📦. Va empacado en su *caja original* y bien protegido para el envío.\n\nApenas salga te compartimos por aquí la *guía de rastreo* para que sigas tu paquete. ¡Gracias por confiar en VarMan Crew! 👟🧡',
   wompiFallo: 'Uy, no pude generar el link de pago en este momento 🙈. Puedes pagar por otro medio 👇',
 
   // --- [NOMBRE-MODELO] (flag BOT_NOMBRE_MODELO): versiones que muestran el ---
@@ -178,7 +178,7 @@ const TEXTOS = {
   pedidoRecibidoModelo: '¡Pedido recibido! 🎉\n\n*{modelo}* · Talla {talla} · {total}\n\nVamos a verificar tu pago y te confirmamos el envío por aquí mismo. ¡Gracias por comprar en VarMan Crew! 👟',
   contraentregaClienteModelo: '¡Listo! 🛵 Tu pedido de *{modelo}* queda con *pago contra entrega* en Bogotá por *{total}*. Lo alistamos y coordinamos la entrega contigo; pagas cuando lo recibas. ¡Gracias por comprar en VarMan Crew! 👟',
   estadoPedidoInfoModelo: '📦 Tu último pedido:\n\n*{modelo}* · Talla {talla} · {total}\nHecho el {fecha}\n\nEstado: *{estado}*\n\n{explicacion}',
-  wompiConfirmadoClienteModelo: '¡Pago confirmado! ✅🎉\n\nYa recibimos tu pago de tus *{modelo}* (talla {talla}) y estamos *alistando tu pedido* con todo el cuidado 📦. Va empacado en su *caja original* y bien protegido para el envío.\n\nApenas salga te compartimos por aquí la *guía de rastreo* para que sigas tu paquete. ¡Gracias por confiar en VarMan Crew! 👟🧡',
+  wompiConfirmadoClienteModelo: '¡Pago confirmado! ✅🎉\n\nYa recibimos tu pago de tus *{modelo}* (talla {talla}{genero}) y estamos *alistando tu pedido* con todo el cuidado 📦. Va empacado en su *caja original* y bien protegido para el envío.\n\nApenas salga te compartimos por aquí la *guía de rastreo* para que sigas tu paquete. ¡Gracias por confiar en VarMan Crew! 👟🧡',
 
   // --- cierre del pedido ---
   pedidoRecibido: '¡Pedido recibido! 🎉\n\n*Referencia {ref}* · Talla {talla} · {total}\n\nVamos a verificar tu pago y te confirmamos el envío por aquí mismo. ¡Gracias por comprar en VarMan Crew! 👟',

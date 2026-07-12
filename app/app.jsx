@@ -4789,7 +4789,7 @@ function Pedidos({ pedidos, products, actualizarPedido, showToast, esSocio = fal
             <div style={{ background: C.card, border: `1.5px solid ${C.line}`, borderRadius: 14, padding: "14px 16px", marginBottom: 10 }}>
               <div style={{ fontWeight: 800, fontSize: 16 }}>{abierto.cliente_nombre || "(sin nombre)"}</div>
               <div style={{ fontSize: 13, color: C.ink2, marginTop: 6, lineHeight: 1.7 }}>
-                <b>Referencia {abierto.ref || "?"}</b> · Talla {abierto.talla || "?"} · {Number(abierto.cantidad) || 1} par
+                <b>Referencia {abierto.ref || "?"}</b> · Talla {abierto.talla || "?"}{abierto.genero ? " · " + (abierto.genero.charAt(0).toUpperCase() + abierto.genero.slice(1)) : ""} · {Number(abierto.cantidad) || 1} par
                 <br />
                 Total: <b>{fmt(abierto.total)}</b>{abierto.metodo_pago ? <> por <b>{abierto.metodo_pago}</b></> : null}
               </div>

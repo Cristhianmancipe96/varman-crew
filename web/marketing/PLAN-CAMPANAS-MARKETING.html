@@ -1,0 +1,570 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plan de campañas de marketing — VarMan Crew</title>
+<style>
+  :root{
+    --naranja:#F26A1B;
+    --naranja-oscuro:#c9530d;
+    --tinta:#1c1a17;
+    --gris:#6b6660;
+    --gris-claro:#f4f1 ; /* fallback */
+    --fondo:#faf7f3;
+    --tarjeta:#ffffff;
+    --linea:#e7e1d8;
+    --verde:#1f8a5b;
+    --ambar:#b9781a;
+    --rojo:#c0392b;
+    --radio:14px;
+    --sombra:0 1px 2px rgba(0,0,0,.05),0 8px 24px rgba(0,0,0,.05);
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    color:var(--tinta);background:var(--fondo);line-height:1.55;
+    -webkit-font-smoothing:antialiased;
+  }
+  a{color:var(--naranja-oscuro)}
+  .wrap{max-width:1120px;margin:0 auto;padding:0 20px}
+
+  /* Header */
+  header.hero{
+    background:linear-gradient(135deg,var(--naranja) 0%,var(--naranja-oscuro) 100%);
+    color:#fff;padding:34px 0 30px;position:relative;overflow:hidden;
+  }
+  header.hero::after{content:"👟";position:absolute;right:-10px;top:-20px;font-size:180px;opacity:.10;transform:rotate(-15deg)}
+  .kicker{font-size:13px;letter-spacing:.14em;text-transform:uppercase;font-weight:700;opacity:.9}
+  header.hero h1{margin:6px 0 8px;font-size:clamp(26px,4vw,40px);line-height:1.1}
+  header.hero p.sub{margin:0;font-size:16px;max-width:640px;opacity:.95}
+  .meta-pills{margin-top:18px;display:flex;flex-wrap:wrap;gap:8px}
+  .pill{background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.28);
+    padding:5px 12px;border-radius:999px;font-size:13px;font-weight:600}
+
+  /* Sticky nav */
+  nav.toc{position:sticky;top:0;z-index:20;background:rgba(250,247,243,.92);
+    backdrop-filter:blur(8px);border-bottom:1px solid var(--linea)}
+  nav.toc .wrap{display:flex;gap:6px;overflow-x:auto;padding:10px 20px}
+  nav.toc a{white-space:nowrap;font-size:13.5px;font-weight:600;color:var(--gris);
+    text-decoration:none;padding:6px 11px;border-radius:8px}
+  nav.toc a:hover{background:#fff;color:var(--naranja-oscuro)}
+
+  main{padding:30px 0 60px}
+  section{margin:0 0 34px;scroll-margin-top:64px}
+  h2{font-size:23px;margin:0 0 4px;display:flex;align-items:center;gap:10px}
+  h2 .num{display:inline-flex;align-items:center;justify-content:center;
+    width:30px;height:30px;border-radius:9px;background:var(--naranja);color:#fff;
+    font-size:15px;font-weight:800;flex:none}
+  .lead{color:var(--gris);margin:2px 0 16px;max-width:760px}
+  h3{font-size:16px;margin:20px 0 8px}
+
+  .card{background:var(--tarjeta);border:1px solid var(--linea);border-radius:var(--radio);
+    padding:18px 20px;box-shadow:var(--sombra)}
+  .grid{display:grid;gap:14px}
+  .g2{grid-template-columns:repeat(2,1fr)}
+  .g3{grid-template-columns:repeat(3,1fr)}
+  @media(max-width:820px){.g2,.g3{grid-template-columns:1fr}}
+
+  /* Callout / PM note */
+  .nota{border-left:4px solid var(--naranja);background:#fff6ee;border-radius:10px;
+    padding:14px 16px;margin:0 0 22px}
+  .nota b{color:var(--naranja-oscuro)}
+
+  table{width:100%;border-collapse:collapse;font-size:14.5px;background:#fff;
+    border:1px solid var(--linea);border-radius:12px;overflow:hidden}
+  th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--linea);vertical-align:top}
+  th{background:#f6f0e9;font-size:12.5px;text-transform:uppercase;letter-spacing:.04em;color:#8a7f72}
+  tr:last-child td{border-bottom:none}
+  .tabla-scroll{overflow-x:auto}
+
+  ul.check{list-style:none;padding:0;margin:0}
+  ul.check li{position:relative;padding:6px 0 6px 28px;border-bottom:1px dashed var(--linea)}
+  ul.check li:last-child{border-bottom:none}
+  ul.check li::before{content:"☐";position:absolute;left:0;top:5px;font-size:16px;color:var(--naranja)}
+
+  ol.pasos{margin:0;padding-left:0;counter-reset:p;list-style:none}
+  ol.pasos li{position:relative;padding:8px 0 8px 40px;border-bottom:1px solid var(--linea)}
+  ol.pasos li:last-child{border-bottom:none}
+  ol.pasos li::before{counter-increment:p;content:counter(p);position:absolute;left:0;top:8px;
+    width:26px;height:26px;background:var(--naranja);color:#fff;border-radius:8px;
+    display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px}
+
+  .tag{display:inline-block;font-size:11.5px;font-weight:700;padding:2px 9px;border-radius:999px;
+    text-transform:uppercase;letter-spacing:.03em}
+  .tag.fase1{background:#fdecdf;color:var(--naranja-oscuro)}
+  .tag.fase2{background:#e6f0ff;color:#2a5ca8}
+  .tag.org{background:#e4f6ec;color:var(--verde)}
+
+  /* Timeline */
+  .timeline{position:relative;margin:6px 0 0;padding-left:26px}
+  .timeline::before{content:"";position:absolute;left:8px;top:6px;bottom:6px;width:2px;background:var(--linea)}
+  .hito{position:relative;padding:8px 0 14px}
+  .hito::before{content:"";position:absolute;left:-22px;top:12px;width:12px;height:12px;border-radius:50%;
+    background:var(--naranja);border:3px solid #fff;box-shadow:0 0 0 2px var(--naranja)}
+  .hito .fecha{font-weight:800;color:var(--naranja-oscuro);font-size:14px}
+  .hito .qq{font-size:14.5px}
+
+  /* Anuncio cards */
+  .anuncio{background:#fff;border:1px solid var(--linea);border-radius:12px;padding:14px 16px}
+  .anuncio .cab{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:6px}
+  .anuncio .cod{font-weight:800;color:var(--naranja-oscuro)}
+  .anuncio .campo{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#a99b8b;font-weight:700;margin-top:8px}
+  .anuncio .txt{font-size:14px}
+  .anuncio .titulo{font-weight:700}
+  .anuncio .boton{display:inline-block;margin-top:8px;background:#25D366;color:#fff;font-weight:700;
+    font-size:12.5px;padding:5px 12px;border-radius:8px}
+
+  .guion{background:#fff;border:1px solid var(--linea);border-radius:12px;padding:14px 16px}
+  .guion h4{margin:0 0 2px;font-size:15px}
+  .guion .fmt{font-size:12px;color:var(--gris);margin-bottom:8px}
+  .guion .gancho{background:#111;color:#fff;border-radius:8px;padding:8px 10px;font-size:13.5px;margin:8px 0}
+  .guion .gancho b{color:#ffcf9f}
+  .guion .cta{font-size:12.5px;font-weight:700;color:var(--verde);margin-top:8px}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px;
+    background:#f3ede5;padding:1px 6px;border-radius:5px}
+
+  .semaforo{display:flex;flex-direction:column;gap:6px}
+  .semaforo div{padding:8px 12px;border-radius:9px;font-size:14px}
+  .s-ok{background:#e4f6ec;color:#146c43}
+  .s-med{background:#fff4e0;color:#8a5a12}
+  .s-mal{background:#fdeaea;color:#9c2c22}
+
+  .cols{columns:2;column-gap:22px}
+  @media(max-width:820px){.cols{columns:1}}
+  .cols li{break-inside:avoid;margin-bottom:6px}
+
+  footer{border-top:1px solid var(--linea);padding:22px 0;color:var(--gris);font-size:13px}
+  .fuentes{font-size:12.5px;color:#9a9086;margin-top:6px}
+  .big{font-size:16px}
+  strong.k{color:var(--naranja-oscuro)}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="kicker">VarMan Crew · Project Manager</div>
+    <h1>Plan de campañas de marketing</h1>
+    <p class="sub">Facebook + Instagram con pauta paga, TikTok con contenido orgánico. Todo apunta al bot de WhatsApp que ya vende. Julio 2026.</p>
+    <div class="meta-pills">
+      <span class="pill">🎯 Meta con plata, TikTok con contenido</span>
+      <span class="pill">💬 Click-to-WhatsApp al bot</span>
+      <span class="pill">💰 15–20k COP/día</span>
+      <span class="pill">📅 Pauta ON: 16 jul</span>
+    </div>
+  </div>
+</header>
+
+<nav class="toc">
+  <div class="wrap">
+    <a href="#estrategia">Estrategia</a>
+    <a href="#fases">Fases</a>
+    <a href="#cronograma">Cronograma</a>
+    <a href="#presupuesto">Presupuesto</a>
+    <a href="#prereq">Antes de gastar</a>
+    <a href="#config">Config. Meta</a>
+    <a href="#metricas">Métricas</a>
+    <a href="#anuncios">Textos de anuncios</a>
+    <a href="#guiones">Guiones TikTok</a>
+    <a href="#marca">Estilo de marca</a>
+    <a href="#calendario">Calendario</a>
+    <a href="#pendientes">Pendientes</a>
+  </div>
+</nav>
+
+<main class="wrap">
+
+  <div class="nota">
+    <b>Nota del PM (hoy 12 jul):</b> este plan se armó el 7–8 jul y está completo y listo. Las fechas ya están encima:
+    el <b>lanzamiento coordinado es 14–15 jul</b> y la <b>pauta paga arranca el 16 jul</b>. Nada de pauta se enciende
+    hasta que <b>“EL CORTE”</b> esté hecho (los botones de la web y el FAB apuntan al número del bot) y el checklist de
+    prerequisitos esté al 100%. La decisión final de presupuesto y de encender es tuya; yo preparo, propongo y te acompaño
+    pantalla por pantalla.
+  </div>
+
+  <!-- ESTRATEGIA -->
+  <section id="estrategia">
+    <h2><span class="num">1</span> La estrategia en una frase</h2>
+    <p class="lead"><strong class="k">Meta con plata, TikTok con contenido.</strong> Se pauta pago solo en Facebook+Instagram
+    (una campaña cubre ambas) para conseguir ventas ya, y TikTok se trabaja gratis con video hasta tener datos. Todo el pago
+    empuja gente al <strong>chat de WhatsApp del bot</strong>, que es donde el sistema ya sabe vender.</p>
+
+    <h3>Tus 4 metas y dónde vive cada una</h3>
+    <p class="lead" style="margin-top:0">Regla de oro: repartir un presupuesto chico entre varias campañas hace que <b>ninguna aprenda</b>
+    (Meta necesita ~50 resultados/semana para optimizar). Por eso van <b>en orden</b>, no todas a la vez.</p>
+    <div class="tabla-scroll">
+    <table>
+      <tr><th>Meta</th><th>Cómo se logra</th><th>Cuándo</th></tr>
+      <tr><td><b>Clientes / ventas</b></td><td>Campaña de <b>Mensajes</b> (click-to-WhatsApp al bot)</td><td><span class="tag fase1">Fase 1 · ahora</span></td></tr>
+      <tr><td><b>Vender por redes</b></td><td>El mismo anuncio abre el chat del bot; + orgánico</td><td><span class="tag fase1">Fase 1</span></td></tr>
+      <tr><td><b>Tráfico a la web / dar a conocer</b></td><td>Campaña de <b>Tráfico</b> a varmancrew.com</td><td><span class="tag fase2">Fase 2 · semana 2</span></td></tr>
+      <tr><td><b>Sumar seguidores</b></td><td><b>Orgánico</b> (calendario) + rebote del tráfico</td><td><span class="tag org">Continuo · sin pagar</span></td></tr>
+    </table>
+    </div>
+  </section>
+
+  <!-- FASES -->
+  <section id="fases">
+    <h2><span class="num">2</span> Las fases</h2>
+    <p class="lead">Arranca <b>solo con Mensajes</b>, déjalo aprender 7 días sin tocar, y recién ahí suma Tráfico.</p>
+    <div class="grid g3">
+      <div class="card">
+        <span class="tag fase1">Fase 1 · la que vende</span>
+        <h3 style="margin-top:10px">Campaña de MENSAJES</h3>
+        <p style="font-size:14.5px;margin:0">Click-to-WhatsApp: el anuncio abre directo un chat con el bot. 1 solo conjunto de anuncios con 3 creativos (D1, C1, U1). Meta reparte el presupuesto y aprende cuál vende.</p>
+      </div>
+      <div class="card">
+        <span class="tag fase2">Fase 2 · semana 2</span>
+        <h3 style="margin-top:10px">Campaña de TRÁFICO</h3>
+        <p style="font-size:14.5px;margin:0">Solo cuando Mensajes ya rinde y con <b>presupuesto aparte</b>. Lleva gente a varmancrew.com con CTA “Ver catálogo”. Da a conocer la marca y arrastra seguidores de rebote.</p>
+      </div>
+      <div class="card">
+        <span class="tag org">Continuo · gratis</span>
+        <h3 style="margin-top:10px">Seguidores (orgánico)</h3>
+        <p style="font-size:14.5px;margin:0">El calendario de contenido es la máquina de seguidores: 3–4 videos/semana, 1 video → 3 plataformas. TikTok “Promote” <b>solo</b> sobre un video que ya despegó. Nunca pagar “Me gusta de la página”.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- CRONOGRAMA -->
+  <section id="cronograma">
+    <h2><span class="num">3</span> Cronograma y hitos</h2>
+    <p class="lead">Los hitos fijos no se mueven; lo que se recorta si una semana se complica son los videos de “remake”.</p>
+    <div class="timeline">
+      <div class="hito"><div class="fecha">8 – 13 jul</div><div class="qq">Arranque <b>orgánico</b>: crear TikTok @varmancrew + primeros 3 videos + reels espejo en IG.</div></div>
+      <div class="hito"><div class="fecha">14 – 15 jul · EL CORTE</div><div class="qq">Lanzamiento coordinado en las 3 plataformas: “ya puedes pedir por WhatsApp”. Se cambian bios/botones al número del bot.</div></div>
+      <div class="hito"><div class="fecha">16 jul · PAUTA ON</div><div class="qq">Campaña de Mensajes en Meta (D1, C1, U1). Sesión contigo en pantalla siguiendo la guía. Checklist al 100% antes de crear nada.</div></div>
+      <div class="hito"><div class="fecha">18 – 22 jul</div><div class="qq">Fase de aprendizaje: <b>no tocar la campaña</b>. Mirar métricas 1 vez al día, sin editar.</div></div>
+      <div class="hito"><div class="fecha">23 jul · REVISIÓN semana 1</div><div class="qq">Costo por conversación, CTR, frecuencia. Rotar al anuncio de reserva (D2/C2/U2) si algún creativo pasó los umbrales. Decidir si se agrega Tráfico.</div></div>
+      <div class="hito"><div class="fecha">~30 jul · DECISIÓN TikTok pago</div><div class="qq">Promote sobre el mejor video orgánico, o Ads Manager solo si el presupuesto total sube a ≥50k/día. Comparar contra el costo por conversación de Meta.</div></div>
+    </div>
+  </section>
+
+  <!-- PRESUPUESTO -->
+  <section id="presupuesto">
+    <h2><span class="num">4</span> Presupuesto sugerido</h2>
+    <p class="lead">La cifra final la decides tú. Esto es lo mínimo que funciona sin desperdiciar el aprendizaje.</p>
+    <div class="grid g3">
+      <div class="card"><div style="font-size:13px;color:var(--gris);font-weight:700">SEMANA 1</div>
+        <div class="big" style="font-size:24px;font-weight:800;color:var(--naranja-oscuro)">15–20k <span style="font-size:14px;color:var(--gris)">COP/día</span></div>
+        <p style="font-size:14px;margin:6px 0 0">Solo Mensajes. ~105–140k total. Es el costo de <b>aprender qué vende</b>. 7 días seguidos sin tocar.</p>
+      </div>
+      <div class="card"><div style="font-size:13px;color:var(--gris);font-weight:700">SEMANA 2</div>
+        <div class="big" style="font-size:24px;font-weight:800;color:var(--naranja-oscuro)">+8–10k <span style="font-size:14px;color:var(--gris)">COP/día</span></div>
+        <p style="font-size:14px;margin:6px 0 0">Si Mensajes es rentable: sumar Tráfico <b>o</b> subir Mensajes +20%. Nunca quitarle plata a Mensajes.</p>
+      </div>
+      <div class="card"><div style="font-size:13px;color:var(--gris);font-weight:700">SUBIDAS</div>
+        <div class="big" style="font-size:24px;font-weight:800;color:var(--naranja-oscuro)">+20% <span style="font-size:14px;color:var(--gris)">cada 2–3 días</span></div>
+        <p style="font-size:14px;margin:6px 0 0">Solo si un pedido deja más ganancia que su costo de pauta. Presupuesto <b>diario</b>, no total.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- PREREQUISITOS -->
+  <section id="prereq">
+    <h2><span class="num">5</span> Antes de gastar un peso</h2>
+    <p class="lead">Sin esto no se arranca. Cada clic pagado que caiga en un bot caído o un catálogo sin precios es plata perdida.</p>
+    <div class="card">
+      <ul class="check">
+        <li><b>EL CORTE hecho:</b> el FAB y los botones de la web abren el número del bot (+57 304 291 6972).</li>
+        <li><b>WABA del bot vinculada al negocio</b> (Business Settings → Cuentas de WhatsApp) y en el mismo portafolio que la cuenta publicitaria.</li>
+        <li><b>El bot responde bien</b> a un pedido completo de prueba: catálogo → talla → pago → confirmación.</li>
+        <li><b>Cambios de la web publicados</b> en Cloudflare Pages (incluida la sección “¿Cómo comprar?”).</li>
+        <li><b>Fotos y precios reales</b> cargados en la pestaña Tienda de la app (no anunciar lo agotado).</li>
+        <li><b>Método de pago</b> cargado en el Administrador de Anuncios (tarjeta; Meta cobra en COP).</li>
+        <li><b>Página de Facebook</b> con el botón de WhatsApp apuntando al bot y <span class="mono">/privacidad</span> viva.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- CONFIG META -->
+  <section id="config">
+    <h2><span class="num">6</span> Configurar la campaña de Mensajes (Fase 1)</h2>
+    <p class="lead">En <span class="mono">adsmanager.facebook.com → Crear</span>. Lo hacemos juntos: me mandas un pantallazo en cada paso y te confirmo antes de <i>Publicar</i>.</p>
+    <div class="card">
+      <ol class="pasos">
+        <li><b>Objetivo:</b> <i>Interacción</i> (Meta lo recomienda para click-to-WhatsApp).</li>
+        <li><b>Ubicación de conversión:</b> Apps de mensajes → <b>WhatsApp</b>.</li>
+        <li><b>Detalles de conversión:</b> “Hacer clic para enviar mensaje” → tu Página de Facebook → WhatsApp → número <b>304</b>.</li>
+        <li><b>Presupuesto:</b> 15–20k COP/día a nivel del <b>conjunto de anuncios</b>. ≥7 días seguidos sin tocar (los primeros 3–4 son aprendizaje).</li>
+        <li><b>Público:</b> Colombia · 18–40 · todos los géneros · intereses: sneakers, zapatillas, streetwear, moda urbana, Nike/Adidas/Jordan (interés). Deja <b>Advantage</b> activado.</li>
+        <li><b>Ubicaciones:</b> automáticas (feed + stories + reels de FB e IG).</li>
+        <li><b>Creativos:</b> 3 anuncios en el MISMO conjunto — D1, C1, U1. Fotos reales on-feet con medias blancas. Sin logos de terceros protagonistas.</li>
+        <li><b>Mensaje prellenado:</b> una acción, no “quiero info”. Ej: <i>“¡Hola! Vi su anuncio y quiero pedir unos tenis 👟”</i> — cae directo al flujo del bot y queda la <span class="mono">fuente</span>.</li>
+        <li><b>Publicar.</b></li>
+      </ol>
+    </div>
+    <div class="nota" style="margin-top:14px">
+      <b>Estructura más simple que funciona:</b> 1 campaña → 1 conjunto de anuncios (el presupuesto va aquí) → 3 anuncios (D1, C1, U1).
+      Los D2/C2/U2 quedan de <b>reserva</b> para reemplazar al que peor rinda o cuando un anuncio se “canse” (frecuencia &gt; 3).
+    </div>
+  </section>
+
+  <!-- METRICAS -->
+  <section id="metricas">
+    <h2><span class="num">7</span> Qué mirar la primera semana</h2>
+    <p class="lead">Entrar <b>1 vez al día</b> (no cada hora). En orden de importancia:</p>
+    <div class="grid g2">
+      <div class="card">
+        <h3 style="margin-top:0">Costo por conversación iniciada</h3>
+        <div class="semaforo">
+          <div class="s-ok">&lt; 3.000 COP · excelente, dejar correr</div>
+          <div class="s-med">3.000 – 6.000 COP · normal; a fin de semana apaga el más caro y prueba un reserva</div>
+          <div class="s-mal">&gt; 8.000 COP sostenido (4–5 días) · casi siempre es la FOTO → cambia la foto antes que el texto</div>
+        </div>
+      </div>
+      <div class="card">
+        <h3 style="margin-top:0">Las otras columnas</h3>
+        <table style="border:none">
+          <tr><td><b>Conversaciones iniciadas</b></td><td>la métrica reina: abrieron el chat Y escribieron</td></tr>
+          <tr><td><b>CTR (todos)</b></td><td>&gt;1% bien · &lt;0,6% la foto no llama</td></tr>
+          <tr><td><b>Frecuencia</b></td><td>si pasa de 3, la gente se cansó → rotar al reserva</td></tr>
+          <tr><td><b>CPM</b></td><td>solo referencia (CO: 8–25k). Baja solo al salir de aprendizaje</td></tr>
+        </table>
+      </div>
+    </div>
+    <div class="nota" style="margin-top:14px">
+      <b>La métrica REAL no está en Meta:</b> <span class="mono">plata gastada ÷ pedidos verificados (app) = costo por pedido</span>.
+      Si un pedido deja más ganancia que su costo de pauta → subir presupuesto <b>+20% cada 2–3 días</b>. (Por eso el bot debe guardar la
+      <span class="mono">fuente</span> del anuncio en cada pedido.)
+    </div>
+  </section>
+
+  <!-- ANUNCIOS -->
+  <section id="anuncios">
+    <h2><span class="num">8</span> Textos de anuncios (listos para copiar)</h2>
+    <p class="lead">Cada uno trae los 3 campos que pide Meta Ads. <b>Sin precios</b> hasta confirmarlos en la app; <b>sin nombrar marcas</b> de terceros; fotos reales sin texto encima.</p>
+
+    <h3>Click-to-WhatsApp · Mensajes</h3>
+    <div class="grid g3">
+      <div class="anuncio">
+        <div class="cab"><span class="cod">D1 · Deportivas</span></div>
+        <div class="campo">Texto principal</div>
+        <div class="txt">¿Buscando tenis deportivos que aguanten el día entero y se vean bien con lo que sea? 👟 En VarMan Crew los tenemos. Escríbenos por WhatsApp, dinos tu talla y te mostramos lo que hay disponible AHORA. Envíos a toda Colombia 🇨🇴 y pagas por Nequi o Daviplata.</div>
+        <div class="campo">Título</div><div class="txt titulo">Tus próximos tenis están aquí</div>
+        <span class="boton">Enviar mensaje de WhatsApp</span>
+      </div>
+      <div class="anuncio">
+        <div class="cab"><span class="cod">C1 · Casuales</span></div>
+        <div class="campo">Texto principal</div>
+        <div class="txt">Unos tenis que sirvan pa' la oficina, la cita y el parche del fin de semana 🔥 Los casuales de VarMan Crew son eso: cómodos, limpios, con estilo. Escríbenos por WhatsApp y te mandamos fotos de lo disponible en tu talla. Pago fácil por Nequi, Daviplata o Bre-B.</div>
+        <div class="campo">Título</div><div class="txt titulo">Un solo par, todos los planes</div>
+        <span class="boton">Enviar mensaje de WhatsApp</span>
+      </div>
+      <div class="anuncio">
+        <div class="cab"><span class="cod">U1 · Urbanas</span></div>
+        <div class="campo">Texto principal</div>
+        <div class="txt">El estilo urbano no se explica — se lleva puesto 🖤 Sneakers urbanas VarMan Crew: para los que se mueven con actitud. Mira las fotos, elige tu favorita y pídela por WhatsApp. Te confirmamos disponibilidad al instante y te llega donde estés.</div>
+        <div class="campo">Título</div><div class="txt titulo">Sneakers con actitud</div>
+        <span class="boton">Enviar mensaje de WhatsApp</span>
+      </div>
+    </div>
+
+    <h3 style="margin-top:18px">De reserva (semana 2 / rotación)</h3>
+    <div class="grid g3">
+      <div class="anuncio">
+        <div class="cab"><span class="cod">D2 · Talla difícil</span></div>
+        <div class="txt">¿Cansado de que nunca haya tu talla? 😤 Escríbenos por WhatsApp con la referencia que te guste y te confirmamos tallas y disponibilidad al momento — sin vueltas. VarMan Crew: deportivos con estilo, envíos a toda Colombia.</div>
+        <div class="campo">Título</div><div class="txt titulo">Pregunta tu talla por WhatsApp</div>
+      </div>
+      <div class="anuncio">
+        <div class="cab"><span class="cod">C2 · Regalo seguro</span></div>
+        <div class="txt">¿Regalo para alguien especial (o para ti, que también cuenta 😎)? Unos buenos tenis nunca fallan. Escríbenos por WhatsApp, cuéntanos el estilo y el presupuesto, y te ayudamos a elegir. Te lo enviamos a cualquier parte de Colombia 📦</div>
+        <div class="campo">Título</div><div class="txt titulo">El regalo que sí van a usar</div>
+      </div>
+      <div class="anuncio">
+        <div class="cab"><span class="cod">U2 · Pocas unidades</span></div>
+        <div class="txt">Las urbanas que ves aquí no son de centro comercial: referencias seleccionadas, pocas unidades por talla 👀 Si te gustó una, escríbenos YA por WhatsApp antes de que vuele. Pagas por Nequi o Daviplata y te la enviamos a toda Colombia.</div>
+        <div class="campo">Título</div><div class="txt titulo">Cuando se acaba, se acabó</div>
+      </div>
+    </div>
+
+    <h3 style="margin-top:18px">Tráfico a la web (Fase 2)</h3>
+    <div class="grid g3">
+      <div class="anuncio">
+        <div class="cab"><span class="cod">W1 · Catálogo</span></div>
+        <div class="txt">Todo el catálogo VarMan Crew en un solo lugar: deportivas, casuales y urbanas, con fotos reales y precios claros 👟🔥 Míralo tranquilo desde el celular y, cuando encuentres los tuyos, pides por WhatsApp con un toque.</div>
+        <div class="campo">Título</div><div class="txt titulo">Mira el catálogo completo</div>
+        <div class="campo">Destino</div><div class="txt"><span class="mono">varmancrew.pages.dev</span></div>
+      </div>
+      <div class="anuncio">
+        <div class="cab"><span class="cod">W2 · Cómo comprar</span></div>
+        <div class="txt">Comprar tenis por internet sin miedo: ✅ eliges ✅ pides por WhatsApp ✅ pagas por Nequi, Daviplata o Bre-B ✅ te llega a la puerta. Así de simple es VarMan Crew. Entra y mira lo que hay en tu estilo.</div>
+        <div class="campo">Título</div><div class="txt titulo">Así de fácil se compra aquí</div>
+        <div class="campo">Destino</div><div class="txt"><span class="mono">varmancrew.pages.dev/#como-comprar</span></div>
+      </div>
+      <div class="anuncio">
+        <div class="cab"><span class="cod">W3 · Novedades</span></div>
+        <div class="txt">Acabamos de actualizar el catálogo 👀 Nuevas referencias en deportivas, casuales y urbanas — algunas con poquitas unidades por talla. Dale un vistazo antes de que se agoten las tuyas.</div>
+        <div class="campo">Título</div><div class="txt titulo">Nuevas referencias disponibles</div>
+        <div class="campo">Destino</div><div class="txt"><span class="mono">varmancrew.pages.dev/#catalogo</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- GUIONES -->
+  <section id="guiones">
+    <h2><span class="num">9</span> Guiones TikTok / Reels (primeros 6 videos)</h2>
+    <p class="lead">Vertical 9:16, 10–20 seg, grabado con el celular. El mismo video sube a TikTok, se publica como Reel en IG y se comparte en FB. El <b>gancho de los primeros 2 seg</b> es lo más importante.</p>
+    <div class="grid g2">
+      <div class="guion">
+        <h4>D-V1 · Llegada de mercancía</h4><div class="fmt">Deportivas · unboxing/llegada</div>
+        <div class="gancho"><b>Gancho:</b> la caja cae sobre la mesa con sonido de golpe. Texto: “LLEGARON 📦”</div>
+        <div style="font-size:13.5px">Abrir la caja rápido → sacar un par y girarlo cerca del lente → 2–3 pares en fila con paneo lento → toma final del más llamativo.</div>
+        <div class="cta">CTA: “Escríbenos por WhatsApp — link en bio”</div>
+      </div>
+      <div class="guion">
+        <h4>D-V2 · Talla y textura en mano</h4><div class="fmt">Deportivas · detalle en mano</div>
+        <div class="gancho"><b>Gancho:</b> el tenis muy cerca del lente, girando. Texto: “¿Se ve igual de bien en persona? 👀”</div>
+        <div style="font-size:13.5px">Textura y costuras → doblar la suela (flexibilidad) → plantilla y etiqueta de talla → un pie puesto caminando hacia la cámara.</div>
+        <div class="cta">CTA: “Pregunta tu talla por WhatsApp”</div>
+      </div>
+      <div class="guion">
+        <h4>C-V1 · 3 formas de combinar</h4><div class="fmt">Casuales · outfits</div>
+        <div class="gancho"><b>Gancho:</b> el tenis solo en el piso, una mano lo señala. Texto: “1 par, 3 planes 🔥”</div>
+        <div style="font-size:13.5px">Look 1 “pal trabajo” → Look 2 “pa' la cita” → Look 3 “pal parche” (ropa extendida flat-lay, corte seco al beat). No hace falta modelo.</div>
+        <div class="cta">CTA: “Escríbenos y te mandamos fotos en tu talla”</div>
+      </div>
+      <div class="guion">
+        <h4>C-V2 · POV empacando tu pedido</h4><div class="fmt">Casuales · POV empaque</div>
+        <div class="gancho"><b>Gancho:</b> manos sellando la caja, cámara desde arriba. Texto: “POV: pediste tus tenis anoche 📦”</div>
+        <div style="font-size:13.5px">Limpiar el tenis con un paño → meterlo con papel → escribir la guía de envío → caja sellada con dos golpecitos. (Vale un pedido de prueba.)</div>
+        <div class="cta">CTA: “Pide los tuyos por WhatsApp”</div>
+      </div>
+      <div class="guion">
+        <h4>U-V1 · Trend adaptado</h4><div class="fmt">Urbanas · trend de audio</div>
+        <div class="gancho"><b>Gancho:</b> el tenis entra a cuadro en el beat del audio. Texto: “el que sabe, sabe 🖤”</div>
+        <div style="font-size:13.5px">Cortes secos al ritmo (frente / lado / arriba) → puesto, caminando a nivel del piso → freeze en la mejor toma. Estructura sirve para cualquier audio viral.</div>
+        <div class="cta">CTA: “Escríbenos antes de que se acabe tu talla”</div>
+      </div>
+      <div class="guion">
+        <h4>U-V2 · Reveal urbanas</h4><div class="fmt">Urbanas · unboxing/reveal</div>
+        <div class="gancho"><b>Gancho:</b> la tapa tapa el lente y al bajar revela el tenis. Texto: “esto no lo consigues en el centro comercial 👀”</div>
+        <div style="font-size:13.5px">Sacarlo con las dos manos despacio → primer plano de detalles (cordones, suela, colores) → junto a 1–2 pares urbanos → toma cerrada.</div>
+        <div class="cta">CTA: “Pídela por WhatsApp — link en bio”</div>
+      </div>
+    </div>
+    <p class="fuentes">+ 3 captions extra para posts de feed de IG (lanzamiento, carrusel de categorías, compra segura) en <span class="mono">TEXTOS-TIKTOK-REELS.md</span>.</p>
+  </section>
+
+  <!-- MARCA -->
+  <section id="marca">
+    <h2><span class="num">10</span> Estilo de marca + advertencia clave</h2>
+    <div class="grid g2">
+      <div class="card">
+        <h3 style="margin-top:0">Lo que ya funciona (mantener)</h3>
+        <ul style="margin:0;padding-left:18px;font-size:14.5px">
+          <li><b>Color:</b> naranja intenso (logo circular con script blanco).</li>
+          <li><b>Marca de agua:</b> logo script blanco, esquina inferior — SIEMPRE, también en video.</li>
+          <li><b>Foto:</b> primeros planos de producto real, luz natural, exteriores urbanos (ladrillo, rejas verdes, parque). Nada de estudio.</li>
+          <li><b>Lo más vendedor:</b> fotos <b>on-feet</b> con medias blancas → mejor creativo para la pauta.</li>
+          <li><b>Tono:</b> “Lleva contigo la frescura del Crew”, importados, fotos reales, envíos nacionales 🇨🇴.</li>
+        </ul>
+      </div>
+      <div class="card" style="border-color:#e9c9a6;background:#fff8f0">
+        <h3 style="margin-top:0;color:var(--naranja-oscuro)">⚠️ Producto de marca y pauta paga</h3>
+        <p style="font-size:14.5px;margin:0 0 8px">El catálogo tiene producto con branding de terceros (Adidas, Nike, New Balance, Asics, LV). En orgánico es decisión del negocio, pero en <b>pauta paga</b> los anuncios con logos de terceros (sobre todo lujo tipo LV) tienen alto riesgo de <b>rechazo o baneo de la cuenta publicitaria</b>.</p>
+        <ul style="margin:0;padding-left:18px;font-size:14px">
+          <li>Creativos: logo de terceros NO protagonista (ángulos, on-feet, textura). <b>Nunca producto tipo LV.</b></li>
+          <li>No escribir nombres de marcas de terceros en los textos.</li>
+          <li>Recomendación del PM: probar la 1ª campaña con modelos sin branding visible.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="nota" style="margin-top:14px">
+      <b>Ojo con el número:</b> las bios y botones actuales (TikTok, FB) apuntan al <b>320 225 0619</b>. El día del CORTE hay que
+      cambiar botón de WhatsApp de FB, bio de TikTok, bio de IG y links → <b>número del bot (304)</b>.
+    </div>
+  </section>
+
+  <!-- CALENDARIO -->
+  <section id="calendario">
+    <h2><span class="num">11</span> Calendario de contenido (8–31 jul)</h2>
+    <p class="lead">Máx 1 video/día; cada video se recicla TikTok → Reel IG → FB. 13 videos en el mes. Los días sin video son historias, interacción o descanso.</p>
+
+    <h3>Semana 1 — Arranque orgánico (8–13 jul)</h3>
+    <div class="tabla-scroll"><table>
+      <tr><th>Fecha</th><th>Plataforma</th><th>Contenido</th></tr>
+      <tr><td>Mié 8</td><td>TikTok+IG+FB</td><td>Crear cuenta TikTok @varmancrew · publicar <b>D-V1</b> (llegada deportivas)</td></tr>
+      <tr><td>Jue 9</td><td>IG</td><td>2–3 historias (tenis del día, tras cámaras). Responder todo DM</td></tr>
+      <tr><td>Vie 10</td><td>TikTok+IG+FB</td><td><b>C-V1</b> (3 formas de combinar casuales)</td></tr>
+      <tr><td>Sáb 11</td><td>IG+TikTok</td><td>Historias + responder comentarios. Anotar qué video va mejor</td></tr>
+      <tr><td>Dom 12</td><td>TikTok+IG+FB</td><td><b>U-V1</b> (trend adaptado urbanas). Revisar audios de tendencia el mismo día</td></tr>
+      <tr><td>Lun 13</td><td>IG+FB</td><td>Historias “se viene algo 👀”. Preparar EL CORTE (checklist)</td></tr>
+    </table></div>
+
+    <h3>Semana 2 — Lanzamiento y pauta ON (14–20 jul)</h3>
+    <div class="tabla-scroll"><table>
+      <tr><th>Fecha</th><th>Plataforma</th><th>Contenido</th></tr>
+      <tr><td><b>Mar 14</b></td><td>TikTok+IG+FB</td><td><b>EL CORTE</b> + post de lanzamiento coordinado: “ya puedes pedir por WhatsApp”. Cambiar CTA a “escríbenos por WhatsApp”</td></tr>
+      <tr><td>Mié 15</td><td>TikTok+IG+FB</td><td><b>D-V2</b> (talla y textura en mano). Historias recordando el lanzamiento</td></tr>
+      <tr><td><b>Jue 16</b></td><td>Meta</td><td><b>PAUTA ON</b>: campaña Mensajes (D1, C1, U1), sesión contigo en pantalla. Orgánico: solo historias</td></tr>
+      <tr><td>Vie 17</td><td>TikTok+IG+FB</td><td><b>C-V2</b> (POV empacando). Si hay pedidos reales, empacar uno real</td></tr>
+      <tr><td>Sáb 18</td><td>IG</td><td>Historias de empaques/envíos. No tocar la campaña (aprendizaje)</td></tr>
+      <tr><td>Dom 19</td><td>TikTok+IG+FB</td><td><b>U-V2</b> (reveal urbanas)</td></tr>
+      <tr><td>Lun 20</td><td>FB+IG</td><td>Post de feed con caption 2 (carrusel de categorías). Festivo → buen día</td></tr>
+    </table></div>
+
+    <h3>Semana 3 — Revisión y optimización (21–27 jul)</h3>
+    <div class="tabla-scroll"><table>
+      <tr><th>Fecha</th><th>Plataforma</th><th>Contenido</th></tr>
+      <tr><td>Mar 21</td><td>TikTok+IG+FB</td><td>Repetir el formato del video orgánico que mejor funcionó, con otra referencia</td></tr>
+      <tr><td>Mié 22</td><td>IG</td><td>Historias: reposteo de mejores comentarios. Preparar números para la revisión</td></tr>
+      <tr><td><b>Jue 23</b></td><td>Meta</td><td><b>REVISIÓN semana 1</b>: costo/conversación, CTR, frecuencia. Rotar reservas. Decidir Tráfico</td></tr>
+      <tr><td>Vie 24</td><td>TikTok+IG+FB</td><td>Remake del segundo mejor formato con otra referencia</td></tr>
+      <tr><td>Sáb 25</td><td>IG+FB</td><td>Historias + compartir el mejor video en FB</td></tr>
+      <tr><td>Dom 26</td><td>TikTok+IG+FB</td><td>Nuevo trend adaptado (estructura U-V1 con audio viral de la semana)</td></tr>
+      <tr><td>Lun 27</td><td>TikTok</td><td>Revisar qué video despegó más → candidato a Promote</td></tr>
+    </table></div>
+
+    <h3>Semana 4 — Decisión TikTok pago y cierre (28–31 jul)</h3>
+    <div class="tabla-scroll"><table>
+      <tr><th>Fecha</th><th>Plataforma</th><th>Contenido</th></tr>
+      <tr><td>Mar 28</td><td>TikTok+IG+FB</td><td>POV empacando los pedidos de la semana (mostrar pedidos reales genera confianza)</td></tr>
+      <tr><td>Mié 29</td><td>IG+FB</td><td>Post de feed con caption 3 (compra segura / cómo comprar)</td></tr>
+      <tr><td><b>Jue 30</b></td><td>TikTok+Meta</td><td><b>DECISIÓN TikTok pago</b>: Promote sobre el video candidato, o esperar. Comparar contra costo/conversación de Meta</td></tr>
+      <tr><td>Vie 31</td><td>TikTok+IG+FB</td><td>Video de cierre: “lo que más nos pidieron en julio 👟” + historias de agradecimiento</td></tr>
+    </table></div>
+  </section>
+
+  <!-- PENDIENTES -->
+  <section id="pendientes">
+    <h2><span class="num">12</span> Pendientes y errores a evitar</h2>
+    <div class="grid g2">
+      <div class="card">
+        <h3 style="margin-top:0">Pendientes para arrancar</h3>
+        <ul style="margin:0;padding-left:18px;font-size:14.5px">
+          <li><b>Cristhian:</b> abrir cuenta de negocio TikTok @varmancrew y grabar D-V1.</li>
+          <li><b>Precios:</b> confirmarlos en la app → recién ahí se puede poner “Desde $XXX.XXX” en anuncios y captions.</li>
+          <li><b>Bot (coordinar):</b> guardar el campo <span class="mono">referral</span> del click-to-WhatsApp en el pedido (<span class="mono">fuente</span>) para saber qué anuncio VENDE.</li>
+          <li><b>Audios:</b> elegir los de tendencia el mismo día de cada grabación, no antes.</li>
+          <li><b>Checklist Meta:</b> se completa en la sesión contigo en pantalla el 16 jul.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3 style="margin-top:0">Errores de novato a evitar</h3>
+        <ul style="margin:0;padding-left:18px;font-size:14.5px">
+          <li>Editar la campaña a diario → reinicia el aprendizaje eterno.</li>
+          <li>Repartir el presupuesto en muchas campañas chicas → ninguna aprende.</li>
+          <li>Poner texto encima de las fotos → Meta las muestra menos.</li>
+          <li>Anunciar referencias/tallas agotadas → revisar stock en la app antes.</li>
+          <li>Responder tarde: si el bot se cae, el cliente pagado se enfría en minutos.</li>
+          <li>Pagar “Me gusta de la página”: likes no son ventas.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <div><b>Plan de campañas de marketing — VarMan Crew.</b> Armado a partir de 8 documentos en <span class="mono">web/marketing/</span>.</div>
+    <div class="fuentes">Fuentes: BRIEF-AGENTE-MARKETING (7 jul) · GUIA-PASO-A-PASO-CAMPANAS (8 jul) · GUIA-PRIMERA-CAMPANA · TEXTOS-ANUNCIOS · TEXTOS-TIKTOK-REELS · CALENDARIO-CONTENIDO-JUL · ESTILO-MARCA-REDES · NOTA-AGENTE-MKT. Vista de revisión generada por el PM el 12 jul 2026.</div>
+  </div>
+</footer>
+
+</body>
+</html>

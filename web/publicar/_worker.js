@@ -178,6 +178,7 @@ async function apiComprar(request, env) {
   const nombre = String(b.nombre || '').trim().slice(0, 80);
   const celular = String(b.celular || '').replace(/\D/g, '');
   const direccion = String(b.direccion || '').trim().slice(0, 400);
+  const generoIn = String(b.genero || '').toLowerCase().trim(); // dama/caballero/''
 
   if (!/^\d{1,4}$/.test(ref)) return jsonResp({ error: 'referencia inválida' }, 400);
   if (cantidad < 1 || cantidad > 5) return jsonResp({ error: 'cantidad inválida' }, 400);
@@ -192,7 +193,13 @@ async function apiComprar(request, env) {
   // Precio y tallas REALES desde el catálogo (nunca del navegador)
   const prod = await refDeCatalogo(ref);
   if (!prod) return jsonResp({ error: 'la referencia ya no está disponible' }, 400);
-  const esDama = String(prod.genero || '').toLowerCase() === 'dama';
+  // Género REAL: el marcado en la app manda; si la ref es unisex, se usa la
+  // elección del cliente (debe ser dama o caballero). Nunca se confía a ciegas.
+  const generoRef = String(prod.genero || '').toLowerCase();
+  const genero = (generoRef === 'dama' || generoRef === 'caballero') ? generoRef
+    : (generoIn === 'dama' || generoIn === 'caballero') ? generoIn : '';
+  if (!genero) return jsonResp({ error: 'elige si es para dama o caballero' }, 400);
+  const esDama = genero === 'dama';
   const tallasOk = expandTallas(prod.tallas) || expandTallas(esDama ? TALLAS_DEF_DAMA : TALLAS_DEF);
   if (tallasOk.indexOf(talla) === -1) return jsonResp({ error: 'talla no disponible' }, 400);
   const precio = Math.round(Number(prod.precio) || 0);
@@ -217,6 +224,7 @@ async function apiComprar(request, env) {
     metodo_pago: 'Wompi',
     estado: 'pago_pendiente',
     canal: 'web',
+    genero,                          // dama / caballero (lo usa el aviso del bot)
     fuente: 'organico',
     creado: new Date().toISOString(),
     wompi_payment_link_id: link.id,

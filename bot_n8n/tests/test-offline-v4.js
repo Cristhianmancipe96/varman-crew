@@ -633,6 +633,17 @@ function check(nombre, cond, extra) {
     wOut.length === 0 && wTardio && wTardio.estado === 'enviado',
     { wOut: wOut.length, estado: wTardio && wTardio.estado });
 
+  // 19d-ter (2026-07-12) — pedido de la WEB con genero: la confirmación al 320
+  // y al cliente DICE dama/caballero; y nunca queda el placeholder "{genero}".
+  await fsSet(wompiPedidoPath, Object.assign({}, wPedido, { estado: 'pago_pendiente', genero: 'dama' }));
+  wOut = await correrWompi(wEvt);
+  const wDueno = (wOut.find((m) => m.to === DUENO) || {}).text || {};
+  const wCli = (wOut.find((m) => m.to === TEST_WA) || {}).text || {};
+  check('webhook Wompi: el aviso al 320 dice el género (Dama)',
+    /· Dama/.test(wDueno.body || '') && !/\{genero\}/.test(wDueno.body || ''), wDueno.body);
+  check('webhook Wompi: la confirmación al cliente dice el género (dama)',
+    /, dama\)/.test(wCli.body || '') && !/\{genero\}/.test(wCli.body || ''), wCli.body);
+
   // 19e — SEGURIDAD: firma inválida NO confirma ni avisa
   await fsSet(wompiPedidoPath, Object.assign({}, wPedido, { estado: 'pago_pendiente' }));
   const wEvtMal = JSON.parse(JSON.stringify(wEvt));
