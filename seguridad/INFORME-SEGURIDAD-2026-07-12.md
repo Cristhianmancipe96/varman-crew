@@ -130,7 +130,27 @@ Pruebas reales (solo lecturas y payloads inválidos, sin efectos):
   editor n8n públicamente — refuerza la recomendación C1 (contraseña fuerte +
   2FA; opcional restringir por IP).
 
----
-*Ciclos A–D — 2026-07-12. Cobertura completa: código de las 3 piezas, reglas de
-datos, infraestructura y producción en vivo. Siguiente: revisión de versiones y
-CVEs de las dependencias fijadas (n8n 2.28.6, caddy:2, GSAP 3.12.5, Firebase SDK).*
+## Ciclo E — CVEs de las dependencias fijadas (2026-07-12)
+
+- **🟢 n8n 2.28.6 está parchado.** Los CVEs críticos conocidos de n8n (el RCE
+  CVE-2026-25049, CVSS 9.4, corregido en 2.5.2; nodos Merge/Git corregidos en
+  2.4.0 y 1.123.x) son TODOS anteriores a la 2.28.6 que fija el compose. Además
+  explotarlos requiere una cuenta con acceso al editor → la defensa principal
+  sigue siendo la recomendación C1 (contraseña fuerte + 2FA).
+- **🟢 GSAP 3.12.5** se carga desde cdnjs **con SRI** (`integrity=`): si el CDN
+  fuera comprometido, el navegador rechaza el script alterado.
+- **🟡 Firebase JS SDK 10.12.5** (app): sin CVEs conocidos relevantes, pero es
+  de mediados de 2024 — subir de versión en un mantenimiento tranquilo.
+- **🟡 React/Babel en `vendor/`** son builds de desarrollo (sin riesgo de
+  seguridad; solo hacen la app más lenta de cargar — optimización futura).
+
+## Resumen ejecutivo (ciclos A–E, cobertura completa)
+
+| Pieza | Estado |
+|---|---|
+| Web + pago | 🟢 endurecida y verificada EN PRODUCCIÓN (headers, validación, precio server-side) |
+| App + Firestore | 🟢 reglas endurecidas — **pendiente pegarlas en la consola de Firebase** |
+| Bot + VM | 🟢 firma webhook, puertos, backups cifrados, versión parchada — pendiente contraseña fuerte/2FA en n8n |
+| Acciones del dueño | 1) pegar reglas Firestore · 2) rate-limit en Cloudflare · 3) contraseña n8n · 4) chip del webhook idempotente |
+
+*Fuentes CVE: [NVD CVE-2026-25049](https://nvd.nist.gov/vuln/detail/CVE-2026-25049) · [The Hacker News](https://thehackernews.com/2026/02/critical-n8n-flaw-cve-2026-25049.html) · [Cyber.gc.ca AL26-001](https://www.cyber.gc.ca/en/alerts-advisories/al26-001-vulnerabilities-affecting-n8n-cve-2026-21858-cve-2026-21877-and-cve-2025-68613) · [Boletines n8n](https://community.n8n.io/t/security-bulletin-february-25-2026/270324)*
