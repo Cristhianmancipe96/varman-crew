@@ -623,6 +623,16 @@ function check(nombre, cond, extra) {
   wOut = await correrWompi(wEvt);
   check('webhook Wompi: reintento NO re-avisa (idempotente)', wOut.length === 0, wOut);
 
+  // 19d-bis (2026-07-12) — un reintento TARDÍO no pisa estados posteriores:
+  // si el equipo ya pasó el pedido a 'enviado', el evento no lo regresa a
+  // 'pago_confirmado' ni re-avisa (igual para verificado/entregado/cancelado).
+  await fsSet(wompiPedidoPath, Object.assign({}, wPedido, { estado: 'enviado' }));
+  wOut = await correrWompi(wEvt);
+  let wTardio = await fsGet(wompiPedidoPath);
+  check('webhook Wompi: reintento tardío NO regresa un pedido ya enviado',
+    wOut.length === 0 && wTardio && wTardio.estado === 'enviado',
+    { wOut: wOut.length, estado: wTardio && wTardio.estado });
+
   // 19e — SEGURIDAD: firma inválida NO confirma ni avisa
   await fsSet(wompiPedidoPath, Object.assign({}, wPedido, { estado: 'pago_pendiente' }));
   const wEvtMal = JSON.parse(JSON.stringify(wEvt));

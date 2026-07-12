@@ -158,8 +158,12 @@ async function principal() {
   const pedido = await buscarPedidoPorLink(tok, linkId);
   if (!pedido) { await logError(tok, 'wompi-webhook-sin-pedido', new Error('no hay pedido para el link'), 'link=' + linkId); return []; }
 
-  // idempotencia: si ya está confirmado (reintento de Wompi), no re-avisar
-  if (pedido.data.estado === 'pago_confirmado') return [];
+  // idempotencia: si ya está confirmado (reintento de Wompi), no re-avisar.
+  // 2026-07-12 (revisión de seguridad): tampoco tocar estados POSTERIORES —
+  // un reintento tardío no debe regresar a 'pago_confirmado' un pedido que el
+  // equipo ya pasó a verificado/enviado/entregado (ni revivir un cancelado).
+  const ESTADOS_NO_TOCAR = ['pago_confirmado', 'verificado', 'enviado', 'entregado', 'cancelado'];
+  if (ESTADOS_NO_TOCAR.indexOf(String(pedido.data.estado || '')) !== -1) return [];
 
   await fsMerge(tok, pedido.path, {
     estado: 'pago_confirmado',
