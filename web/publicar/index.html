@@ -229,6 +229,7 @@ nav {
 /* Título enorme — Impeccable: max 6rem */
 .hero-title {
   font-family: 'Bebas Neue', sans-serif;
+  font-weight: 400; /* ahora es h1: sin esto el navegador sintetiza negrita falsa (Bebas solo trae 400) */
   font-size: clamp(52px, 8.5vw, 96px);        /* ≤ 6rem = 96px */
   line-height: 0.92;
   letter-spacing: -0.02em;                     /* Impeccable: ≥ -0.04em */
@@ -380,6 +381,7 @@ section { padding: var(--s9) var(--s7); }
 }
 .s-title {
   font-family: 'Bebas Neue', sans-serif;
+  font-weight: 400; /* ahora es h2: evita la negrita sintética del user-agent */
   font-size: clamp(38px, 5.5vw, 62px);
   letter-spacing: -0.01em; color: var(--ink);
   line-height: 0.95; margin-bottom: var(--s7);
@@ -2433,6 +2435,9 @@ document.addEventListener('click', function(e){
     if(closeBtn) closeBtn.focus();
   }
   function closeModal(){
+    // si hay una compra en vuelo, se cancela (evita la navegación sorpresa
+    // al checkout después de cerrar — revisión harden 2026-07-12)
+    if (window.vmCancelarCompra) window.vmCancelarCompra();
     modal.classList.remove('open');
     modal.setAttribute('aria-hidden','true');
     document.body.style.overflow = '';
@@ -2504,6 +2509,7 @@ document.addEventListener('click', function(e){
   var tallasAct = [];        // tallas (CO) del producto abierto
   var enviando = false;      // guard: una sola petición de pago a la vez
   var formAbiertoEn = 0;     // guard: ignora el doble clic al abrir el formulario
+  var abortCompra = null;    // la petición de pago en vuelo (se puede cancelar)
 
   // Equivalencias aproximadas por género (anclas del negocio):
   //  · hombre/unisex: EU = CO + 2 (US 10 = EU 43 = CO 41)

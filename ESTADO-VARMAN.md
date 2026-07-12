@@ -75,6 +75,17 @@ Brief `web/briefs/BRIEF-WEB-COMPRA-WOMPI.md`; nota `web/NOTA-WEB-COMPRA-WOMPI-20
   `WOMPI_PRV_KEY` (Secret), `FIREBASE_SA_B64` (Secret), `WOMPI_ENV=test` → **re-subir web\publicar**.
   Rollback en 1 línea: `COMPRA_WOMPI=false`.
 
+## Auditoría de seguridad + calidad — HECHA (2026-07-12), quedan 5 fixes en cola
+Auditoría completa en 5 ciclos (código de las 3 piezas, reglas de datos, VM, producción en
+vivo, CVEs) + revisión triple con verificación adversarial (12 agentes). Informe:
+`seguridad/INFORME-SEGURIDAD-2026-07-12.md`. Lo CRÍTICO ya corregido: reglas de Firestore
+endurecidas (lista de correos del equipo, antes cualquier cuenta autenticada leía pedidos),
+webhook del bot idempotente ante reintentos tardíos (batería 271/0), XSS residual, repo git
+local SIN secretos (verificado archivo por archivo). n8n 2.28.6 = parchado contra los CVEs
+2026. **Quedan 5 hallazgos confirmados** (timeout del pago, bfcache, cancelación en vuelo,
+mensajes de error, pago-sobre-cancelado del bot) EMPACADOS en
+`web/briefs/BRIEF-HARDEN-PAGO-RONDA2.md` para la próxima ronda — ninguno bloquea la venta.
+
 ## Pendientes del DUEÑO (solo Cristhian)
 1. **Catálogo web v2 + nombre de modelo (URGENTE, ver bloque arriba):** subir el archivo del
    Escritorio (`bot-varman-PARA-SUBIR-...json`), agregar `BOT_FOTO_ASESOR=on` y
@@ -85,7 +96,15 @@ Brief `web/briefs/BRIEF-WEB-COMPRA-WOMPI.md`; nota `web/NOTA-WEB-COMPRA-WOMPI-20
    registrada, sigue mostrando la Ref.
 3. **Chats reales para fluidez:** pegar 2-3 conversaciones incómodas en
    `bot_n8n/briefs/CONVERSACIONES-INCOMODAS.md` (combustible del agente de fluidez, si se retoma).
-4. **Reglas de Firestore:** pegar `app/reglas-firestore.txt` en la consola de Firebase.
+4. **Reglas de Firestore (AHORA MÁS IMPORTANTE — quedaron ENDURECIDAS 2026-07-12):** si el
+   vendedor tiene cuenta, agregar su correo en `esEquipo()` dentro de
+   `app/reglas-firestore.txt`, y pegar TODO en la consola de Firebase. Sin esto, cualquier
+   cuenta del proyecto puede leer pedidos (datos de clientes).
+4-bis. **Seguridad (10 min):** contraseña larga + 2FA en la cuenta de n8n (quien entra al
+   editor puede leer las llaves) · regla de rate-limit en Cloudflare para `/api/comprar`
+   (Security → WAF, ej. 5 req/min por IP) · corregir las llaves Wompi del `.env` LOCAL del
+   bot (prefijo pegado dos veces; los valores buenos están en `credenciales/` — chip de
+   tarea ya creado).
 5. **Re-subir la app y la web** a Cloudflare (para ver los botones nuevos + la compra web).
 6. **Compra web por Wompi:** poner las 3 variables en Cloudflare (proyecto varmancrew) y
    re-subir `web\publicar` (ver bloque "Compra web" abajo). Probar en sandbox (tarjeta 4242…).
@@ -96,6 +115,8 @@ Brief `web/briefs/BRIEF-WEB-COMPRA-WOMPI.md`; nota `web/NOTA-WEB-COMPRA-WOMPI-20
    ON el bot ya no usa el catálogo nativo aunque esté configurado — ver nota CW1).
 
 ## Pendientes del PM / agentes
+- **Ejecutar `web/briefs/BRIEF-HARDEN-PAGO-RONDA2.md`** (5 fixes de robustez del pago, con
+  líneas exactas y "hecho cuando"; 3 preparativos ya commiteados).
 - Acompañar la subida de CW2 + `BOT_FOTO_ASESOR`/`BOT_NOMBRE_MODELO` y la primera prueba en vivo.
 - Encender el resto de flags OFF de a uno, viendo conversaciones reales (empezar por los de
   menor riesgo — ver prioridad en `BITACORA-MEJORAS.md`).
@@ -122,7 +143,15 @@ Brief `web/briefs/BRIEF-WEB-COMPRA-WOMPI.md`; nota `web/NOTA-WEB-COMPRA-WOMPI-20
 - Contra entrega solo Bogotá. — 2026-07-09
 - Bot v6 en VM de Google Cloud con Docker. — 2026-07
 
+- **Repo git LOCAL iniciado en `Proyecto_zapatos`** (2026-07-12): historial de versiones al
+  fin; `.gitignore` blindado y verificado sin secretos. Los commits son la bitácora técnica.
+  Sin remoto todavía (decisión pendiente: ¿GitHub privado?).
+
 ## Bitácora de lecciones (lo nuevo arriba)
+- 2026-07-12 — **Las 3 llaves Wompi del `.env` local quedaron con el prefijo pegado DOS veces**
+  (`prv_test_prv_test_…`) → Wompi responde 401 y confunde el debugging. Fix: al pegar llaves,
+  verificar el prefijo una sola vez; los valores canónicos viven en `credenciales/`. (La VM
+  quedó bien: el webhook validó firma en la prueba E2E.)
 - 2026-07-12 — **Subir el bot a la VM por el navegador es propenso a subir un archivo VIEJO**
   (hay varios `bot-varman.json` regados con el mismo nombre; pasó 2 veces seguidas). Fix
   PERMANENTE: `workflows/build-v4-pedidos.js` ahora deja SOLO en el Escritorio un archivo con
