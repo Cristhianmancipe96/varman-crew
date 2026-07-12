@@ -2556,7 +2556,8 @@ document.addEventListener('click', function(e){
   // La llama openCard() al abrir el modal de un producto
   window.vmPrepararCompra = function(card){
     var b = card.querySelector('.js-wa');
-    refSel = (b && b.getAttribute('data-ref')) || '';
+    // solo caracteres seguros: refSel se pinta con innerHTML en total()
+    refSel = String((b && b.getAttribute('data-ref')) || '').replace(/[^\w-]/g, '');
     precioSel = parseInt(String((b && b.getAttribute('data-precio')) || '').replace(/\D/g, ''), 10) || 0;
     generoSel = String(card.getAttribute('data-genero') || '').toLowerCase();
     tallasAct = expandTallas(card.getAttribute('data-tallas'))

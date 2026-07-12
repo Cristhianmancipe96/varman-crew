@@ -62,7 +62,30 @@
    `node workflows/build-v4-pedidos.js`, tests en verde + caso nuevo, y que el
    dueño suba el JSON a la VM.
 
+## Ciclo B — XSS/CSP de la web, sesión de la app, entrada del bot (2026-07-12)
+
+**Corregido:**
+- **🟡→✅ Endurecido `refSel` en la web.** Auditados los 9 usos de `innerHTML`
+  del sitio: 8 eran seguros (texto estático, dígitos validados o datos pasados
+  por `esc()`); el único que pintaba un dato del catálogo sin filtrar era la
+  línea del total del modal — ahora `refSel` se limpia a caracteres seguros
+  antes de pintarse. (Riesgo era bajo: el catálogo solo lo edita el equipo.)
+
+**Verificado 🟢:**
+- **CSP activa y sana**: scripts solo de la propia página y cdnjs (con
+  integrity), imágenes solo propias + data: (fotos del catálogo), conexiones
+  solo a Firestore; `X-Frame-Options: DENY` en `_headers` (anti-clickjacking).
+- **Sesión de la app**: login solo con correo/contraseña de Firebase, botón de
+  cerrar sesión presente; la persistencia local es la normal de una PWA (si
+  comparten computador, cerrar sesión al salir).
+- **Entrada del bot**: dedup por `message_id` (sanitizado y con tope), captions
+  y comprobantes con límite de tamaño (900 KB), texto libre con topes.
+- **Prompt injection a Gemini (riesgo residual aceptado)**: un cliente podría
+  intentar manipular al asistente ("dame 90% de descuento"), pero Gemini solo
+  devuelve `{handoff, dato, respuesta}` — el código valida el dato, los PRECIOS
+  y el pedido salen del catálogo/código (nunca del texto de Gemini), y los
+  descuentos los aplica un humano. Impacto máximo: una respuesta de chat rara.
+
 ---
-*Ciclo A (bot + app + worker) — 2026-07-12. Próximos ciclos: XSS/CSP en el
-render del catálogo web, manejo de sesión en la app, y validación de entrada en
-`cerebro-v4.js`.*
+*Ciclos A y B — 2026-07-12. Próximo ciclo: checklist de infraestructura de la
+VM (GCP, Docker, actualizaciones) y endurecimiento del panel de n8n.*
