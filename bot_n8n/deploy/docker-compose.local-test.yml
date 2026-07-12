@@ -1,0 +1,27 @@
+# ==========================================================
+# SOLO PARA LA PRUEBA LOCAL EN EL PC (Docker Desktop, Windows)
+# NO usar en el servidor. Lo usa probar-local.ps1 así:
+#
+#   docker compose -p varman-prueba `
+#     -f docker-compose.yml -f docker-compose.local-test.yml up -d
+#
+# Qué cambia respecto al docker-compose.yml real:
+#   - n8n queda en el puerto 5679 del PC (el 5678 lo usa el n8n
+#     local de producción -> NO chocar con él).
+#   - caddy NO arranca (en el PC no hay dominio ni certificado; se le
+#     pone un "profile" que nunca se activa).
+#   - el contenedor se llama varman-n8n-prueba para no confundirlo.
+#
+# Requiere Docker Compose v2.24.4 o más nuevo (por la etiqueta
+# !override). Cualquier Docker Desktop de 2024 en adelante sirve.
+# ==========================================================
+
+services:
+  n8n:
+    container_name: varman-n8n-prueba
+    ports: !override
+      - "127.0.0.1:5679:5678"
+
+  caddy:
+    profiles:
+      - solo-produccion-nunca-en-prueba

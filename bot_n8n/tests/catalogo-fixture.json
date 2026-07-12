@@ -1,0 +1,554 @@
+{
+  "documents": [
+    {
+      "name": "projects/varman-crew/databases/(default)/documents/tiendas/varman/catalogo/01",
+      "fields": {
+        "ref": {
+          "stringValue": "01"
+        },
+        "cat": {
+          "stringValue": "deportivas"
+        },
+        "precio": {
+          "integerValue": "250000"
+        },
+        "marca": {
+          "stringValue": "adidas"
+        },
+        "fotos": {
+          "arrayValue": {
+            "values": [
+              {
+                "stringValue": "p005"
+              }
+            ]
+          }
+        },
+        "activo": {
+          "booleanValue": true
+        },
+        "orden": {
+          "integerValue": "1"
+        },
+        "tag": {
+          "stringValue": "Nuevo"
+        }
+      }
+    },
+    {
+      "name": "projects/varman-crew/databases/(default)/documents/tiendas/varman/catalogo/02",
+      "fields": {
+        "ref": {
+          "stringValue": "02"
+        },
+        "cat": {
+          "stringValue": "deportivas"
+        },
+        "precio": {
+          "integerValue": "300000"
+        },
+        "marca": {
+          "stringValue": "nike"
+        },
+        "fotos": {
+          "arrayValue": {
+            "values": [
+              {
+                "stringValue": "p006"
+              }
+            ]
+          }
+        },
+        "activo": {
+          "booleanValue": true
+        },
+        "orden": {
+          "integerValue": "2"
+        }
+      }
+    },
+    {
+      "name": "projects/varman-crew/databases/(default)/documents/tiendas/varman/catalogo/03",
+      "fields": {
+        "ref": {
+          "stringValue": "03"
+        },
+        "cat": {
+          "stringValue": "deportivas"
+        },
+        "precio": {
+          "integerValue": "235000"
+        },
+        "marca": {
+          "stringValue": "adidas"
+        },
+        "fotos": {
+          "arrayValue": {
+            "values": [
+              {
+                "stringValue": "p007"
+              }
+            ]
+          }
+        },
+        "activo": {
+          "booleanValue": true
+        },
+        "orden": {
+          "integerValue": "3"
+        }
+      }
+    },
+    {
+      "name": "projects/varman-crew/databases/(default)/documents/tiendas/varman/catalogo/04",
+      "fields": {
+        "ref": {
+          "stringValue": "04"
+        },
+        "cat": {
+          "stringValue": "deportivas"
+        },
+        "precio": {
+          "integerValue": "260000"
+        },
+        "marca": {
+          "stringValue": "puma"
+        },
+        "fotos": {
+          "arrayValue": {
+            "values": [
+              {
+                "stringValue": "fapp0000000001"
+              }
+            ]
+          }
+        },
+        "activo": {
+          "booleanValue": true
+        },
+        "orden": {
+          "integerValue": "4"
+        }
+      }
+    },
+    {
+      "name": "projects/varman-crew/databases/(default)/documents/tiendas/varman/catalogo/05",
+      "fields": {
+        "ref": {
+          "stringValue": "05"
+        },
+        "cat": {
+          "stringValue": "deportivas"
+        },
+        "precio": {
+          "integerValue": "480000"
+        },
+        "marca": {
+          "stringValue": "nike"
+        },
+        "fotos": {
+          "arrayValue": {
+            "values": [
+              {
+                "stringValue": "p016"
+              }
+            ]
+          }
+        },
+        "activo": {
+          "booleanValue": true
+        },
+        "orden": {
+          "integerValue": "5"
+        },
+        "tag": {
+          "stringValue": "Popular"
+        }
+      }
+    },
+    {
+      "name": "projects/varman-crew/databases/(default)/documents/tiendas/varman/catalogo/06",
+      "fields": {
+        "ref": {
+          "stringValue": "06"
+        },
+        "cat": {
+          "stringValue": "deportivas"
+        },
+        "precio": {
+          "integerValue": "320000"
+        },
+        "marca": {
+          "stringValue": "adidas"
+        },
+        "fotos": {
+          "arrayValue": {
+            "values": [
+              {
+                "stringValue": "p008"
+              }
+            ]
+          }
+        },
+        "activo": {
+          "booleanValue": true
+        },
+        "orden": {
+          "integerValue": "6"
+        }
+      }
+    },
+    {
+      "name": "projects/varman-crew/databases/(default)/documents/tiendas/varman/catalogo/07",
+      "fields": {
+        "ref": {
+          "stringValue": "07"
+        },
+        "cat": {
+          "stringValue": "deportivas"
+        },
+        "precio": {
+          "integerValue": "350000"
+        },
+        "marca": {
+          "stringValue": "jordan"
+        },
+        "fotos": {
+          "arrayValue": {
+            "values": [
+              {
+                "stringValue": "p009"
+              }
+            ]
+          }
+        },
+        "activo": {
+          "booleanValue": true
+        },
+        "orden": {
+          "integerValue": "7"
+        }
+      }
+    },
+    {
+      "name": "projects/varman-crew/databases/(default)/documents/tiendas/varman/catalogo/08",
+      "fields": {
+        "ref": {
+          "stringValue": "08"
+        },
+        "cat": {
+          "stringValue": "deportivas"
+        },
+        "precio": {
+          "integerValue": "280000"
+        },
+        "marca": {
+          "stringValue": "nike"
+        },
+        "fotos": {
+          "arrayValue": {
+            "values": [
+              {
+                "stringValue": "p010"
+              }
+            ]
+          }
+        },
+        "activo": {
+          "booleanValue": true
+        },
+        "orden": {
+          "integerValue": "8"
+        }
+      }
+    },
+    {
+      "name": "projects/varman-crew/databases/(default)/documents/tiendas/varman/catalogo/09",
+      "fields": {
+        "ref": {
+          "stringValue": "09"
+        },
+        "cat": {
+          "stringValue": "deportivas"
+        },
+        "precio": {
+          "integerValue": "240000"
+        },
+        "marca": {
+          "stringValue": "puma"
+        },
+        "fotos": {
+          "arrayValue": {
+            "values": [
+              {
+                "stringValue": "p013"
+              }
+            ]
+          }
+        },
+        "activo": {
+          "booleanValue": true
+        },
+        "orden": {
+          "integerValue": "9"
+        }
+      }
+    },
+    {
+      "name": "projects/varman-crew/databases/(default)/documents/tiendas/varman/catalogo/10",
+      "fields": {
+        "ref": {
+          "stringValue": "10"
+        },
+        "cat": {
+          "stringValue": "deportivas"
+        },
+        "precio": {
+          "integerValue": "265000"
+        },
+        "marca": {
+          "stringValue": "reebok"
+        },
+        "fotos": {
+          "arrayValue": {
+            "values": [
+              {
+                "stringValue": "p005"
+              }
+            ]
+          }
+        },
+        "activo": {
+          "booleanValue": true
+        },
+        "orden": {
+          "integerValue": "10"
+        }
+      }
+    },
+    {
+      "name": "projects/varman-crew/databases/(default)/documents/tiendas/varman/catalogo/11",
+      "fields": {
+        "ref": {
+          "stringValue": "11"
+        },
+        "cat": {
+          "stringValue": "deportivas"
+        },
+        "precio": {
+          "integerValue": "255000"
+        },
+        "marca": {
+          "stringValue": "vans"
+        },
+        "fotos": {
+          "arrayValue": {
+            "values": [
+              {
+                "stringValue": "p006"
+              }
+            ]
+          }
+        },
+        "activo": {
+          "booleanValue": true
+        },
+        "orden": {
+          "integerValue": "11"
+        }
+      }
+    },
+    {
+      "name": "projects/varman-crew/databases/(default)/documents/tiendas/varman/catalogo/12",
+      "fields": {
+        "ref": {
+          "stringValue": "12"
+        },
+        "cat": {
+          "stringValue": "deportivas"
+        },
+        "precio": {
+          "integerValue": "245000"
+        },
+        "marca": {
+          "stringValue": "converse"
+        },
+        "fotos": {
+          "arrayValue": {
+            "values": [
+              {
+                "stringValue": "p007"
+              }
+            ]
+          }
+        },
+        "activo": {
+          "booleanValue": true
+        },
+        "orden": {
+          "integerValue": "12"
+        }
+      }
+    },
+    {
+      "name": "projects/varman-crew/databases/(default)/documents/tiendas/varman/catalogo/20",
+      "fields": {
+        "ref": {
+          "stringValue": "20"
+        },
+        "cat": {
+          "stringValue": "casuales"
+        },
+        "precio": {
+          "integerValue": "270000"
+        },
+        "marca": {
+          "stringValue": "nike"
+        },
+        "fotos": {
+          "arrayValue": {
+            "values": [
+              {
+                "stringValue": "p008"
+              }
+            ]
+          }
+        },
+        "activo": {
+          "booleanValue": true
+        },
+        "orden": {
+          "integerValue": "13"
+        }
+      }
+    },
+    {
+      "name": "projects/varman-crew/databases/(default)/documents/tiendas/varman/catalogo/21",
+      "fields": {
+        "ref": {
+          "stringValue": "21"
+        },
+        "cat": {
+          "stringValue": "casuales"
+        },
+        "precio": {
+          "integerValue": "290000"
+        },
+        "marca": {
+          "stringValue": "adidas"
+        },
+        "fotos": {
+          "arrayValue": {
+            "values": [
+              {
+                "stringValue": "p009"
+              }
+            ]
+          }
+        },
+        "activo": {
+          "booleanValue": true
+        },
+        "orden": {
+          "integerValue": "14"
+        }
+      }
+    },
+    {
+      "name": "projects/varman-crew/databases/(default)/documents/tiendas/varman/catalogo/22",
+      "fields": {
+        "ref": {
+          "stringValue": "22"
+        },
+        "cat": {
+          "stringValue": "casuales"
+        },
+        "precio": {
+          "integerValue": "310000"
+        },
+        "marca": {
+          "stringValue": "puma"
+        },
+        "fotos": {
+          "arrayValue": {
+            "values": [
+              {
+                "stringValue": "p010"
+              }
+            ]
+          }
+        },
+        "activo": {
+          "booleanValue": true
+        },
+        "orden": {
+          "integerValue": "15"
+        }
+      }
+    },
+    {
+      "name": "projects/varman-crew/databases/(default)/documents/tiendas/varman/catalogo/30",
+      "fields": {
+        "ref": {
+          "stringValue": "30"
+        },
+        "cat": {
+          "stringValue": "urbanas"
+        },
+        "precio": {
+          "integerValue": "460000"
+        },
+        "marca": {
+          "stringValue": "jordan"
+        },
+        "fotos": {
+          "arrayValue": {
+            "values": [
+              {
+                "stringValue": "p013"
+              }
+            ]
+          }
+        },
+        "activo": {
+          "booleanValue": true
+        },
+        "orden": {
+          "integerValue": "16"
+        }
+      }
+    },
+    {
+      "name": "projects/varman-crew/databases/(default)/documents/tiendas/varman/catalogo/31",
+      "fields": {
+        "ref": {
+          "stringValue": "31"
+        },
+        "cat": {
+          "stringValue": "urbanas"
+        },
+        "precio": {
+          "integerValue": "330000"
+        },
+        "marca": {
+          "stringValue": "nike"
+        },
+        "fotos": {
+          "arrayValue": {
+            "values": [
+              {
+                "stringValue": "p016"
+              }
+            ]
+          }
+        },
+        "activo": {
+          "booleanValue": true
+        },
+        "orden": {
+          "integerValue": "17"
+        }
+      }
+    }
+  ]
+}

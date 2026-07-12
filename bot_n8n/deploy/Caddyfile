@@ -1,0 +1,16 @@
+# ==========================================================
+# VarMan Crew · Bot WhatsApp — Caddyfile
+# Caddy pide y renueva SOLO el certificado Let's Encrypt del dominio.
+# Requisito: bot.varmancrew.com → IP de la VM, en modo "DNS only"
+# (nube GRIS) en Cloudflare, y puertos 80/443 abiertos en GCP.
+# ==========================================================
+
+{
+	# Correo para avisos de Let's Encrypt (renovaciones, problemas)
+	email varmansneakersandclothes@gmail.com
+}
+
+bot.varmancrew.com {
+	# Todo lo que llegue por HTTPS pasa al n8n de la red interna de Docker
+	reverse_proxy n8n:5678
+}

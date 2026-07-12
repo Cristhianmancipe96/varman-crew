@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>VarMan Crew — Inventario</title>
+
+  <!-- App instalable (PWA) -->
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#101014" />
+  <link rel="apple-touch-icon" href="icon.png" />
+  <link rel="icon" href="icon.png" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="VarMan" />
+  <style>
+    html, body { margin: 0; padding: 0; background: #F4F4F2; }
+    /* Mensaje por si algo no carga */
+    #fallback { font-family: system-ui, sans-serif; padding: 40px; color: #3A3A3E; line-height: 1.6; }
+  </style>
+</head>
+<body>
+  <div id="root">
+    <div id="fallback">
+      Cargando VarMan… Si esto no desaparece, abre la app con el archivo
+      <b>iniciar-varman.bat</b> (no abras el index.html directamente).
+    </div>
+  </div>
+
+  <!-- Librerías locales (carpeta vendor) — no usan internet -->
+  <script src="vendor/react.development.js"></script>
+  <script src="vendor/react-dom.development.js"></script>
+  <script src="vendor/babel.min.js"></script>
+
+  <!-- Firebase (sincronización en la nube). Si no hay internet, la app
+       funciona igual en modo local y sincroniza cuando vuelva la conexión. -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
+
+  <!-- La app. Babel convierte el JSX en el navegador.
+       Se carga con ?v=<tiempo> para que SIEMPRE traiga la última versión
+       y el navegador no muestre una versión vieja en caché. -->
+  <script>
+    document.write(
+      '<script type="text/babel" data-presets="react" src="app.jsx?v=' + Date.now() + '"><\/script>'
+    );
+  </script>
+
+  <!-- Service worker: habilita instalar la app y el uso sin conexión -->
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", function () {
+        navigator.serviceWorker.register("sw.js").catch(function (e) {
+          console.warn("No se pudo registrar el service worker:", e && e.message);
+        });
+      });
+    }
+  </script>
+</body>
+</html>

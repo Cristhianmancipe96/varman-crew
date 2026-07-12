@@ -1,0 +1,16 @@
+# Secretos - NUNCA subir a git
+.env
+*.env
+credenciales/
+credenciales_bot_whatsapp_PRIVADO.txt
+varman-crew-firebase-adminsdk-*.json
+*-firebase-adminsdk-*.json
+
+# Datos y logs locales de n8n
+.n8n/
+*.log
+tunnel-url.txt
+node_modules/
+
+# Node portable local (herramienta del loop de mejoras — no versionar)
+herramientas/

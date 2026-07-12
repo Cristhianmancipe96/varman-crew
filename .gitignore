@@ -1,0 +1,27 @@
+# ── Credenciales y secretos — NUNCA subir a git ni a hosting ──
+bot_n8n/credenciales/
+**/.env
+**/.env.*
+*.env.produccion-gcp
+
+# Llaves y respaldos sensibles
+varman-crew-firebase-adminsdk-*.json
+*.tar.gz
+*.tar.gz.*
+
+# Archivos de llaves sueltos
+**/wompi.txt
+**/vm.txt
+**/*vm.txt
+**/*PRIVADO*.txt
+**/bussiness.txt
+**/*BORRAR-DESPUES*
+
+# Node portable (pesado; borrar si algún día se instala Node en el sistema)
+bot_n8n/herramientas/
+
+# Temporales / dependencias
+node_modules/
+*.log
+.DS_Store
+Thumbs.db

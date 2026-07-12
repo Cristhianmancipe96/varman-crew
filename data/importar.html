@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Importar datos · VarMan</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #0F0F13; color: #fff;
+      font-family: system-ui, sans-serif; display: flex; align-items: center; justify-content: center; }
+    .box { text-align: center; padding: 30px; max-width: 360px; }
+    h1 { font-size: 18px; margin: 0 0 10px; }
+    p { color: rgba(255,255,255,.7); line-height: 1.5; font-size: 14px; }
+    a { display: inline-block; margin-top: 16px; background: #FF5A1F; color: #fff;
+      text-decoration: none; font-weight: 700; padding: 12px 22px; border-radius: 12px; }
+    .err { color: #FF8A5C; }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <h1>VarMan · Importar inventario</h1>
+    <div id="msg"><p>Cargando datos de BASE GENERAL…</p></div>
+  </div>
+  <script>
+    fetch('datos-varman.json?_=' + Date.now())
+      .then(function (r) { if (!r.ok) throw new Error('No encontré datos-varman.json'); return r.json(); })
+      .then(function (d) {
+        localStorage.setItem('varman-tienda-v1', JSON.stringify(d));
+        document.getElementById('msg').innerHTML =
+          '<p>✓ Se cargaron <b>' + d.products.length + ' productos</b> y <b>' +
+          d.sales.length + ' ventas</b> reales.<br>Abriendo la app…</p>' +
+          '<a href="index.html">Abrir la app ahora →</a>';
+        setTimeout(function () { location.href = 'index.html'; }, 1800);
+      })
+      .catch(function (e) {
+        document.getElementById('msg').innerHTML =
+          '<p class="err">Error: ' + e.message + '</p>';
+      });
+  </script>
+</body>
+</html>

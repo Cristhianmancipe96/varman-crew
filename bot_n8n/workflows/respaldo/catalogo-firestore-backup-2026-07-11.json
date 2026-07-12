@@ -1,0 +1,2243 @@
+{
+  "documents": [
+    {
+      "name": "projects/varman-crew/databases/(default)/documents/tiendas/varman/catalogo/c01",
+      "fields": {
+        "id": {
+          "stringValue": "c01"
+        },
+        "precio": {
+          "integerValue": "249900"
+        },
+        "fotos": {
+          "arrayValue": {
+            "values": [
+              {
+                "stringValue": "p005"
+              },
+              {
+                "stringValue": "p006"
+              },
+              {
+                "stringValue": "p007"
+              }
+            ]
+          }
+        },
+        "orden": {
+          "integerValue": "1"
+        },
+        "cat": {
+          "stringValue": "deportivas"
+        },
+        "marca": {
+          "stringValue": "Adidas EQT beige"
+        },
+        "activo": {
+          "booleanValue": true
+        },
+        "ref": {
+          "stringValue": "01"
+        },
+        "refInventario": {
+          "stringValue": "VRM071"
+        },
+        "tag": {
+          "stringValue": "Nuevo"
+        }
+      },
+      "createTime": "2026-07-02T09:32:14.171052Z",
+      "updateTime": "2026-07-11T01:59:29.585561Z"
+    },
+    {
+      "name": "projects/varman-crew/databases/(default)/documents/tiendas/varman/catalogo/c02",
+      "fields": {
+        "id": {
+          "stringValue": "c02"
+        },
+        "precio": {
+          "integerValue": "224900"
+        },
+        "orden": {
+          "integerValue": "2"
+        },
+        "fotos": {
+          "arrayValue": {
+            "values": [
+              {
+                "stringValue": "p008"
+              },
+              {
+                "stringValue": "p009"
+              },
+              {
+                "stringValue": "p010"
+              }
+            ]
+          }
+        },
+        "cat": {
+          "stringValue": "deportivas"
+        },
+        "activo": {
+          "booleanValue": true
+        },
+        "marca": {
+          "stringValue": "Nike free metcon beige"
+        },
+        "ref": {
+          "stringValue": "02"
+        },
+        "refInventario": {
+          "stringValue": ""
+        },
+        "tag": {
+          "stringValue": "Nuevo"
+        }
+      },
+      "createTime": "2026-07-02T09:32:14.307566Z",
+      "updateTime": "2026-07-11T16:17:09.963010Z"
+    },
+    {
+      "name": "projects/varman-crew/databases/(default)/documents/tiendas/varman/catalogo/c03",
+      "fields": {
+        "cat": {
+          "stringValue": "urbanas"
+        },
+        "activo": {
+          "booleanValue": true
+        },
+        "marca": {
+          "stringValue": "Jordan retro 4 Thunder"
+        },
+        "precio": {
+          "integerValue": "264900"
+        },
+        "id": {
+          "stringValue": "c03"
+        },
+        "orden": {
+          "integerValue": "3"
+        },
+        "fotos": {
+          "arrayValue": {
+            "values": [
+              {
+                "stringValue": "p016"
+              },
+              {
+                "stringValue": "p013"
+              },
+              {
+                "stringValue": "p014"
+              },
+              {
+                "stringValue": "p015"
+              }
+            ]
+          }
+        },
+        "refInventario": {
+          "stringValue": ""
+        },
+        "tag": {
+          "stringValue": "Popular"
+        },
+        "ref": {
+          "stringValue": "03"
+        }
+      },
+      "createTime": "2026-07-02T09:32:14.316464Z",
+      "updateTime": "2026-07-11T16:17:16.521652Z"
+    },
+    {
+      "name": "projects/varman-crew/databases/(default)/documents/tiendas/varman/catalogo/c04",
+      "fields": {
+        "refInventario": {
+          "stringValue": ""
+        },
+        "tag": {
+          "stringValue": "Nuevo"
+        },
+        "ref": {
+          "stringValue": "04"
+        },
+        "cat": {
+          "stringValue": "deportivas"
+        },
+        "marca": {
+          "stringValue": "Asics sky elite"
+        },
+        "activo": {
+          "booleanValue": true
+        },
+        "precio": {
+          "integerValue": "299900"
+        },
+        "id": {
+          "stringValue": "c04"
+        },
+        "fotos": {
+          "arrayValue": {
+            "values": [
+              {
+                "stringValue": "p018"
+              },
+              {
+                "stringValue": "p017"
+              },
+              {
+                "stringValue": "p019"
+              }
+            ]
+          }
+        },
+        "orden": {
+          "integerValue": "4"
+        }
+      },
+      "createTime": "2026-07-02T09:32:14.325236Z",
+      "updateTime": "2026-07-08T22:00:12.352250Z"
+    },
+    {
+      "name": "projects/varman-crew/databases/(default)/documents/tiendas/varman/catalogo/c05",
+      "fields": {
+        "ref": {
+          "stringValue": "05"
+        },
+        "refInventario": {
+          "stringValue": ""
+        },
+        "tag": {
+          "stringValue": "Nuevo"
+        },
+        "precio": {
+          "integerValue": "449900"
+        },
+        "id": {
+          "stringValue": "c05"
+        },
+        "fotos": {
+          "arrayValue": {
+            "values": [
+              {
+                "stringValue": "p022"
+              },
+              {
+                "stringValue": "p020"
+              },
+              {
+                "stringValue": "p021"
+              }
+            ]
+          }
+        },
+        "orden": {
+          "integerValue": "5"
+        },
+        "cat": {
+          "stringValue": "urbanas"
+        },
+        "marca": {
+          "stringValue": "Louis Vuitton swarovsky"
+        },
+        "activo": {
+          "booleanValue": true
+        }
+      },
+      "createTime": "2026-07-02T09:32:14.334136Z",
+      "updateTime": "2026-07-11T02:12:58.198014Z"
+    },
+    {
+      "name": "projects/varman-crew/databases/(default)/documents/tiendas/varman/catalogo/c06",
+      "fields": {
+        "activo": {
+          "booleanValue": true
+        },
+        "marca": {
+          "stringValue": "Louis Vuitton swarovsky"
+        },
+        "cat": {
+          "stringValue": "urbanas"
+        },
+        "orden": {
+          "integerValue": "6"
+        },
+        "fotos": {
+          "arrayValue": {
+            "values": [
+              {
+                "stringValue": "p023"
+              },
+              {
+                "stringValue": "p024"
+              }
+            ]
+          }
+        },
+        "precio": {
+          "integerValue": "449900"
+        },
+        "id": {
+          "stringValue": "c06"
+        },
+        "tag": {
+          "stringValue": ""
+        },
+        "refInventario": {
+          "stringValue": ""
+        },
+        "ref": {
+          "stringValue": "06"
+        }
+      },
+      "createTime": "2026-07-02T09:32:14.342879Z",
+      "updateTime": "2026-07-11T02:05:02.284786Z"
+    },
+    {
+      "name": "projects/varman-crew/databases/(default)/documents/tiendas/varman/catalogo/c07",
+      "fields": {
+        "orden": {
+          "integerValue": "7"
+        },
+        "fotos": {
+          "arrayValue": {
+            "values": [
+              {
+                "stringValue": "fmrgkj5ps5mahx"
+              },
+              {
+                "stringValue": "fmrgkjcmlsluxb"
+              },
+              {
+                "stringValue": "fmrgkji1gkrcud"
+              }
+            ]
+          }
+        },
+        "id": {
+          "stringValue": "c07"
+        },
+        "precio": {
+          "integerValue": "249900"
+        },
+        "activo": {
+          "booleanValue": true
+        },
+        "marca": {
+          "stringValue": "Skechers D’lite"
+        },
+        "cat": {
+          "stringValue": "casuales"
+        },
+        "ref": {
+          "stringValue": "07"
+        },
+        "tag": {
+          "stringValue": ""
+        },
+        "refInventario": {
+          "stringValue": ""
+        }
+      },
+      "createTime": "2026-07-02T09:32:14.351411Z",
+      "updateTime": "2026-07-11T16:18:16.319081Z"
+    },
+    {
+      "name": "projects/varman-crew/databases/(default)/documents/tiendas/varman/catalogo/c08",
+      "fields": {
+        "cat": {
+          "stringValue": "deportivas"
+        },
+        "activo": {
+          "booleanValue": true
+        },
+        "marca": {
+          "stringValue": "Skechers one"
+        },
+        "precio": {
+          "integerValue": "249900"
+        },
+        "id": {
+          "stringValue": "c08"
+        },
+        "orden": {
+          "integerValue": "8"
+        },
+        "fotos": {
+          "arrayValue": {
+            "values": [
+              {
+                "stringValue": "p027"
+              }
+            ]
+          }
+        },
+        "refInventario": {
+          "stringValue": ""
+        },
+        "tag": {
+          "stringValue": ""
+        },
+        "ref": {
+          "stringValue": "08"
+        }
+      },
+      "createTime": "2026-07-02T09:32:14.360310Z",
+      "updateTime": "2026-07-11T02:06:46.630184Z"
+    },
+    {
+      "name": "projects/varman-crew/databases/(default)/documents/tiendas/varman/catalogo/c09",
+      "fields": {
+        "precio": {
+          "integerValue": "249900"
+        },
+        "id": {
+          "stringValue": "c09"
+        },
+        "orden": {
+          "integerValue": "9"
+        },
+        "fotos": {
+          "arrayValue": {
+            "values": [
+              {
+                "stringValue": "p028"
+              },
+              {
+                "stringValue": "p029"
+              }
+            ]
+          }
+        },
+        "cat": {
+          "stringValue": "deportivas"
+        },
+        "activo": {
+          "booleanValue": true
+        },
+        "marca": {
+          "stringValue": "Adidas terrex"
+        },
+        "ref": {
+          "stringValue": "09"
+        },
+        "refInventario": {
+          "stringValue": ""
+        },
+        "tag": {
+          "stringValue": ""
+        }
+      },
+      "createTime": "2026-07-02T09:32:14.368967Z",
+      "updateTime": "2026-07-11T02:07:05.485781Z"
+    },
+    {
+      "name": "projects/varman-crew/databases/(default)/documents/tiendas/varman/catalogo/c10",
+      "fields": {
+        "tag": {
+          "stringValue": ""
+        },
+        "refInventario": {
+          "stringValue": ""
+        },
+        "ref": {
+          "stringValue": "10"
+        },
+        "activo": {
+          "booleanValue": true
+        },
+        "marca": {
+          "stringValue": "Adidas terrex"
+        },
+        "cat": {
+          "stringValue": "deportivas"
+        },
+        "orden": {
+          "integerValue": "10"
+        },
+        "fotos": {
+          "arrayValue": {
+            "values": [
+              {
+                "stringValue": "p031"
+              },
+              {
+                "stringValue": "p030"
+              }
+            ]
+          }
+        },
+        "precio": {
+          "integerValue": "249900"
+        },
+        "id": {
+          "stringValue": "c10"
+        }
+      },
+      "createTime": "2026-07-02T09:32:14.377558Z",
+      "updateTime": "2026-07-11T02:07:13.703959Z"
+    },
+    {
+      "name": "projects/varman-crew/databases/(default)/documents/tiendas/varman/catalogo/c11",
+      "fields": {
+        "refInventario": {
+          "stringValue": ""
+        },
+        "tag": {
+          "stringValue": ""
+        },
+        "ref": {
+          "stringValue": "11"
+        },
+        "cat": {
+          "stringValue": "casuales"
+        },
+        "activo": {
+          "booleanValue": true
+        },
+        "marca": {
+          "stringValue": "Adidas spezial"
+        },
+        "precio": {
+          "integerValue": "249900"
+        },
+        "id": {
+          "stringValue": "c11"
+        },
+        "orden": {
+          "integerValue": "11"
+        },
+        "fotos": {
+          "arrayValue": {
+            "values": [
+              {
+                "stringValue": "p032"
+              },
+              {
+                "stringValue": "p033"
+              },
+              {
+                "stringValue": "p034"
+              }
+            ]
+          }
+        }
+      },
+      "createTime": "2026-07-02T09:32:14.674096Z",
+      "updateTime": "2026-07-08T22:01:31.444422Z"
+    },
+    {
+      "name": "projects/varman-crew/databases/(default)/documents/tiendas/varman/catalogo/c12",
+      "fields": {
+        "tag": {
+          "stringValue": ""
+        },
+        "refInventario": {
+          "stringValue": ""
+        },
+        "ref": {
+          "stringValue": "12"
+        },
+        "activo": {
+          "booleanValue": true
+        },
+        "marca": {
+          "stringValue": "Nike Sb teddy bear pink"
+        },
+        "cat": {
+          "stringValue": "urbanas"
+        },
+        "orden": {
+          "integerValue": "12"
+        },
+        "fotos": {
+          "arrayValue": {
+            "values": [
+              {
+                "stringValue": "fmrgkk58wqyrlx"
+              },
+              {
+                "stringValue": "fmrgkk5j2uzjwr"
+              },
+              {
+                "stringValue": "fmrgkk5sbrzh1f"
+              },
+              {
+                "stringValue": "fmrgkk62bbjt67"
+              },
+              {
+                "stringValue": "fmrgkk5dlvscf6"
+              },
+              {
+                "stringValue": "fmrgkk5owjbsft"
+              }
+            ]
+          }
+        },
+        "precio": {
+          "integerValue": "329900"
+        },
+        "id": {
+          "stringValue": "c12"
+        }
+      },
+      "createTime": "2026-07-02T09:32:14.853453Z",
+      "updateTime": "2026-07-11T16:18:53.292991Z"
+    },
+    {
+      "name": "projects/varman-crew/databases/(default)/documents/tiendas/varman/catalogo/c13",
+      "fields": {
+        "refInventario": {
+          "stringValue": ""
+        },
+        "tag": {
+          "stringValue": ""
+        },
+        "ref": {
+          "stringValue": "13"
+        },
+        "cat": {
+          "stringValue": "urbanas"
+        },
+        "marca": {
+          "stringValue": "Af1 stussy"
+        },
+        "activo": {
+          "booleanValue": true
+        },
+        "precio": {
+          "integerValue": "329900"
+        },
+        "id": {
+          "stringValue": "c13"
+        },
+        "fotos": {
+          "arrayValue": {
+            "values": [
+              {
+                "stringValue": "fmrgkkusojjybf"
+              },
+              {
+                "stringValue": "fmrgkkv40frc2z"
+              },
+              {
+                "stringValue": "fmrgkkvgz5upj5"
+              },
+              {
+                "stringValue": "fmrgkkvurbmffa"
+              }
+            ]
+          }
+        },
+        "orden": {
+          "integerValue": "13"
+        }
+      },
+      "createTime": "2026-07-02T09:32:14.863118Z",
+      "updateTime": "2026-07-11T16:19:56.019086Z"
+    },
+    {
+      "name": "projects/varman-crew/databases/(default)/documents/tiendas/varman/catalogo/c14",
+      "fields": {
+        "refInventario": {
+          "stringValue": ""
+        },
+        "tag": {
+          "stringValue": ""
+        },
+        "ref": {
+          "stringValue": "14"
+        },
+        "cat": {
+          "stringValue": "urbanas"
+        },
+        "marca": {
+          "stringValue": "Nike sb ivory hyper royal"
+        },
+        "activo": {
+          "booleanValue": true
+        },
+        "precio": {
+          "integerValue": "269900"
+        },
+        "id": {
+          "stringValue": "c14"
+        },
+        "fotos": {
+          "arrayValue": {
+            "values": [
+              {
+                "stringValue": "fmrgkmh4wa527p"
+              },
+              {
+                "stringValue": "fmrgkmgbs63mwh"
+              },
+              {
+                "stringValue": "fmrgkmgl4on47d"
+              },
+              {
+                "stringValue": "fmrgkmgupq54mf"
+              },
+              {
+                "stringValue": "fmrgkmhg1a0uw4"
+              }
+            ]
+          }
+        },
+        "orden": {
+          "integerValue": "14"
+        }
+      },
+      "createTime": "2026-07-02T09:32:14.872073Z",
+      "updateTime": "2026-07-11T16:20:46.267242Z"
+    },
+    {
+      "name": "projects/varman-crew/databases/(default)/documents/tiendas/varman/catalogo/c15",
+      "fields": {
+        "tag": {
+          "stringValue": "Popular"
+        },
+        "refInventario": {
+          "stringValue": ""
+        },
+        "ref": {
+          "stringValue": "15"
+        },
+        "activo": {
+          "booleanValue": true
+        },
+        "marca": {
+          "stringValue": "Jordan retro 1 craft"
+        },
+        "cat": {
+          "stringValue": "urbanas"
+        },
+        "orden": {
+          "integerValue": "15"
+        },
+        "fotos": {
+          "arrayValue": {
+            "values": [
+              {
+                "stringValue": "fmrgkn7i63k1c6"
+              },
+              {
+                "stringValue": "fmrgkn7rk8ql11"
+              },
+              {
+                "stringValue": "fmrgkn80vgbzmd"
+              },
+              {
+                "stringValue": "fmrgkn8b4aw6ka"
+              },
+              {
+                "stringValue": "fmrgkn8kgcpgi9"
+              }
+            ]
+          }
+        },
+        "precio": {
+          "integerValue": "279900"
+        },
+        "id": {
+          "stringValue": "c15"
+        }
+      },
+      "createTime": "2026-07-02T09:32:14.881611Z",
+      "updateTime": "2026-07-11T16:21:19.186454Z"
+    },
+    {
+      "name": "projects/varman-crew/databases/(default)/documents/tiendas/varman/catalogo/c16",
+      "fields": {
+        "tag": {
+          "stringValue": ""
+        },
+        "refInventario": {
+          "stringValue": ""
+        },
+        "ref": {
+          "stringValue": "16"
+        },
+        "marca": {
+          "stringValue": "Jordan retro 1 dusted clay"
+        },
+        "activo": {
+          "booleanValue": true
+        },
+        "cat": {
+          "stringValue": "urbanas"
+        },
+        "fotos": {
+          "arrayValue": {
+            "values": [
+              {
+                "stringValue": "fmrgkoveuyee44"
+              },
+              {
+                "stringValue": "fmrgkoujg6jww3"
+              },
+              {
+                "stringValue": "fmrgkouuat7eld"
+              },
+              {
+                "stringValue": "fmrgkov4acuxnh"
+              }
+            ]
+          }
+        },
+        "orden": {
+          "integerValue": "16"
+        },
+        "precio": {
+          "integerValue": "279900"
+        },
+        "id": {
+          "stringValue": "c16"
+        }
+      },
+      "createTime": "2026-07-02T09:32:14.892284Z",
+      "updateTime": "2026-07-11T16:22:33.997484Z"
+    },
+    {
+      "name": "projects/varman-crew/databases/(default)/documents/tiendas/varman/catalogo/c17",
+      "fields": {
+        "precio": {
+          "integerValue": "269900"
+        },
+        "id": {
+          "stringValue": "c17"
+        },
+        "fotos": {
+          "arrayValue": {
+            "values": [
+              {
+                "stringValue": "fmrgkpe3yw9pvl"
+              },
+              {
+                "stringValue": "fmrgkpee3olegv"
+              },
+              {
+                "stringValue": "fmrgkpeoidfzig"
+              },
+              {
+                "stringValue": "fmrgkpezswntkx"
+              }
+            ]
+          }
+        },
+        "orden": {
+          "integerValue": "17"
+        },
+        "cat": {
+          "stringValue": "casuales"
+        },
+        "marca": {
+          "stringValue": "Tiger onitsuka mexico"
+        },
+        "activo": {
+          "booleanValue": true
+        },
+        "ref": {
+          "stringValue": "17"
+        },
+        "refInventario": {
+          "stringValue": ""
+        },
+        "tag": {
+          "stringValue": ""
+        }
+      },
+      "createTime": "2026-07-02T09:32:14.902746Z",
+      "updateTime": "2026-07-11T16:22:58.958843Z"
+    },
+    {
+      "name": "projects/varman-crew/databases/(default)/documents/tiendas/varman/catalogo/c18",
+      "fields": {
+        "tag": {
+          "stringValue": ""
+        },
+        "refInventario": {
+          "stringValue": ""
+        },
+        "ref": {
+          "stringValue": "18"
+        },
+        "marca": {
+          "stringValue": "Tiger onitsuka mexico"
+        },
+        "activo": {
+          "booleanValue": true
+        },
+        "cat": {
+          "stringValue": "casuales"
+        },
+        "fotos": {
+          "arrayValue": {
+            "values": [
+              {
+                "stringValue": "fmrgkruvjkyjjd"
+              },
+              {
+                "stringValue": "fmrgkrv3yi841o"
+              },
+              {
+                "stringValue": "fmrgkrvkessljp"
+              },
+              {
+                "stringValue": "fmrgkrvu97cuw3"
+              },
+              {
+                "stringValue": "fmrgkrw5jv3nft"
+              }
+            ]
+          }
+        },
+        "orden": {
+          "integerValue": "18"
+        },
+        "precio": {
+          "integerValue": "269900"
+        },
+        "id": {
+          "stringValue": "c18"
+        }
+      },
+      "createTime": "2026-07-02T09:32:14.912461Z",
+      "updateTime": "2026-07-11T16:25:01.665971Z"
+    },
+    {
+      "name": "projects/varman-crew/databases/(default)/documents/tiendas/varman/catalogo/c19",
+      "fields": {
+        "refInventario": {
+          "stringValue": ""
+        },
+        "tag": {
+          "stringValue": ""
+        },
+        "ref": {
+          "stringValue": "19"
+        },
+        "cat": {
+          "stringValue": "urbanas"
+        },
+        "activo": {
+          "booleanValue": true
+        },
+        "marca": {
+          "stringValue": "Nike sb hayley wilson"
+        },
+        "precio": {
+          "integerValue": "279900"
+        },
+        "id": {
+          "stringValue": "c19"
+        },
+        "orden": {
+          "integerValue": "19"
+        },
+        "fotos": {
+          "arrayValue": {
+            "values": [
+              {
+                "stringValue": "fmrgksmt8c9p18"
+              },
+              {
+                "stringValue": "fmrgksm7h7uf7p"
+              },
+              {
+                "stringValue": "fmrgksmigxctfp"
+              },
+              {
+                "stringValue": "fmrgksn5k2hrgy"
+              },
+              {
+                "stringValue": "fmrgksnhjpomro"
+              },
+              {
+                "stringValue": "fmrgksnsnfwjas"
+              }
+            ]
+          }
+        }
+      },
+      "createTime": "2026-07-02T09:32:14.922924Z",
+      "updateTime": "2026-07-11T16:25:36.573289Z"
+    },
+    {
+      "name": "projects/varman-crew/databases/(default)/documents/tiendas/varman/catalogo/c21",
+      "fields": {
+        "precio": {
+          "integerValue": "269900"
+        },
+        "id": {
+          "stringValue": "c21"
+        },
+        "fotos": {
+          "arrayValue": {
+            "values": [
+              {
+                "stringValue": "fmrgkxy8fz6r1q"
+              },
+              {
+                "stringValue": "fmrgkxxlyd3twu"
+              },
+              {
+                "stringValue": "fmrgkxxvr2xoqq"
+              },
+              {
+                "stringValue": "fmrgkxyj8nvob3"
+              },
+              {
+                "stringValue": "fmrgkxytx3g6ys"
+              }
+            ]
+          }
+        },
+        "orden": {
+          "integerValue": "21"
+        },
+        "cat": {
+          "stringValue": "urbanas"
+        },
+        "marca": {
+          "stringValue": "Jordan retro 4 A Ma Maniere"
+        },
+        "activo": {
+          "booleanValue": true
+        },
+        "ref": {
+          "stringValue": "21"
+        },
+        "refInventario": {
+          "stringValue": ""
+        },
+        "tag": {
+          "stringValue": ""
+        }
+      },
+      "createTime": "2026-07-02T09:32:15.280097Z",
+      "updateTime": "2026-07-11T16:29:46.688813Z"
+    },
+    {
+      "name": "projects/varman-crew/databases/(default)/documents/tiendas/varman/catalogo/c22",
+      "fields": {
+        "ref": {
+          "stringValue": "22"
+        },
+        "tag": {
+          "stringValue": "Popular"
+        },
+        "refInventario": {
+          "stringValue": ""
+        },
+        "fotos": {
+          "arrayValue": {
+            "values": [
+              {
+                "stringValue": "fmrgkyov8771iu"
+              },
+              {
+                "stringValue": "p053"
+              },
+              {
+                "stringValue": "fmrgkyo0kh5tgz"
+              },
+              {
+                "stringValue": "fmrgkyob2s3td2"
+              },
+              {
+                "stringValue": "fmrgkyokbs84gz"
+              },
+              {
+                "stringValue": "fmrgkyp6mnr6b9"
+              }
+            ]
+          }
+        },
+        "orden": {
+          "integerValue": "22"
+        },
+        "precio": {
+          "integerValue": "279900"
+        },
+        "id": {
+          "stringValue": "c22"
+        },
+        "marca": {
+          "stringValue": "Jordan retro 1 fearles blue"
+        },
+        "activo": {
+          "booleanValue": true
+        },
+        "cat": {
+          "stringValue": "urbanas"
+        }
+      },
+      "createTime": "2026-07-02T09:32:15.419436Z",
+      "updateTime": "2026-07-11T16:32:09.521256Z"
+    },
+    {
+      "name": "projects/varman-crew/databases/(default)/documents/tiendas/varman/catalogo/c23",
+      "fields": {
+        "tag": {
+          "stringValue": ""
+        },
+        "refInventario": {
+          "stringValue": ""
+        },
+        "ref": {
+          "stringValue": "23"
+        },
+        "marca": {
+          "stringValue": "Nike sb dunk low supreme"
+        },
+        "activo": {
+          "booleanValue": true
+        },
+        "cat": {
+          "stringValue": "urbanas"
+        },
+        "fotos": {
+          "arrayValue": {
+            "values": [
+              {
+                "stringValue": "fmrgl1x78qqyok"
+              },
+              {
+                "stringValue": "fmrgl1xnf143cb"
+              },
+              {
+                "stringValue": "fmrgl1y1qixsri"
+              },
+              {
+                "stringValue": "fmrgl1ygi161ba"
+              },
+              {
+                "stringValue": "fmrgl1yrm0l052"
+              },
+              {
+                "stringValue": "fmrgl1z2lr1w56"
+              },
+              {
+                "stringValue": "fmrgl1zd6xfjrp"
+              }
+            ]
+          }
+        },
+        "orden": {
+          "integerValue": "23"
+        },
+        "precio": {
+          "integerValue": "279900"
+        },
+        "id": {
+          "stringValue": "c23"
+        }
+      },
+      "createTime": "2026-07-02T09:32:15.430019Z",
+      "updateTime": "2026-07-11T16:33:03.970040Z"
+    },
+    {
+      "name": "projects/varman-crew/databases/(default)/documents/tiendas/varman/catalogo/c24",
+      "fields": {
+        "refInventario": {
+          "stringValue": ""
+        },
+        "tag": {
+          "stringValue": ""
+        },
+        "ref": {
+          "stringValue": "24"
+        },
+        "cat": {
+          "stringValue": "urbanas"
+        },
+        "marca": {
+          "stringValue": "Jordan retro 3 rare air"
+        },
+        "activo": {
+          "booleanValue": true
+        },
+        "precio": {
+          "integerValue": "339900"
+        },
+        "id": {
+          "stringValue": "c24"
+        },
+        "fotos": {
+          "arrayValue": {
+            "values": [
+              {
+                "stringValue": "fmrgl3d7ce4vxm"
+              },
+              {
+                "stringValue": "fmrgl3cl8hnagl"
+              },
+              {
+                "stringValue": "fmrgl3cw791bo3"
+              },
+              {
+                "stringValue": "fmrgl3dgsjlt2v"
+              }
+            ]
+          }
+        },
+        "orden": {
+          "integerValue": "24"
+        }
+      },
+      "createTime": "2026-07-02T09:32:15.439886Z",
+      "updateTime": "2026-07-11T16:33:59.019038Z"
+    },
+    {
+      "name": "projects/varman-crew/databases/(default)/documents/tiendas/varman/catalogo/c25",
+      "fields": {
+        "ref": {
+          "stringValue": "25"
+        },
+        "tag": {
+          "stringValue": ""
+        },
+        "refInventario": {
+          "stringValue": ""
+        },
+        "orden": {
+          "integerValue": "25"
+        },
+        "fotos": {
+          "arrayValue": {
+            "values": [
+              {
+                "stringValue": "fmrgl42buc0lwk"
+              },
+              {
+                "stringValue": "fmrgl42n8ocb6l"
+              },
+              {
+                "stringValue": "fmrgl43039c27g"
+              },
+              {
+                "stringValue": "fmrgl43a4oimmj"
+              },
+              {
+                "stringValue": "fmrgl43ovcuiio"
+              },
+              {
+                "stringValue": "fmrgl441czgt82"
+              }
+            ]
+          }
+        },
+        "id": {
+          "stringValue": "c25"
+        },
+        "precio": {
+          "integerValue": "389900"
+        },
+        "activo": {
+          "booleanValue": true
+        },
+        "marca": {
+          "stringValue": "Jordan retro 4 undefeated"
+        },
+        "cat": {
+          "stringValue": "urbanas"
+        }
+      },
+      "createTime": "2026-07-02T09:32:15.450572Z",
+      "updateTime": "2026-07-11T16:34:35.744586Z"
+    },
+    {
+      "name": "projects/varman-crew/databases/(default)/documents/tiendas/varman/catalogo/c26",
+      "fields": {
+        "marca": {
+          "stringValue": "Adidas campus korn"
+        },
+        "activo": {
+          "booleanValue": true
+        },
+        "cat": {
+          "stringValue": "urbanas"
+        },
+        "fotos": {
+          "arrayValue": {
+            "values": [
+              {
+                "stringValue": "fmrgl5kon2ycdo"
+              },
+              {
+                "stringValue": "fmrgl5qi3vp7c9"
+              },
+              {
+                "stringValue": "fmrgl5zr6zxhs2"
+              },
+              {
+                "stringValue": "fmrgl670ui5yzk"
+              },
+              {
+                "stringValue": "fmrgl6ci6tzlqa"
+              }
+            ]
+          }
+        },
+        "orden": {
+          "integerValue": "26"
+        },
+        "id": {
+          "stringValue": "c26"
+        },
+        "precio": {
+          "integerValue": "259900"
+        },
+        "tag": {
+          "stringValue": ""
+        },
+        "refInventario": {
+          "stringValue": ""
+        },
+        "ref": {
+          "stringValue": "26"
+        }
+      },
+      "createTime": "2026-07-02T09:32:15.460811Z",
+      "updateTime": "2026-07-11T16:36:23.413650Z"
+    },
+    {
+      "name": "projects/varman-crew/databases/(default)/documents/tiendas/varman/catalogo/c27",
+      "fields": {
+        "refInventario": {
+          "stringValue": ""
+        },
+        "tag": {
+          "stringValue": ""
+        },
+        "ref": {
+          "stringValue": "27"
+        },
+        "cat": {
+          "stringValue": "urbanas"
+        },
+        "marca": {
+          "stringValue": "Jordan retro 3 A Ma Maniére"
+        },
+        "activo": {
+          "booleanValue": true
+        },
+        "id": {
+          "stringValue": "c27"
+        },
+        "precio": {
+          "integerValue": "379900"
+        },
+        "fotos": {
+          "arrayValue": {
+            "values": [
+              {
+                "stringValue": "fmrgl752d9bxrl"
+              },
+              {
+                "stringValue": "fmrgl75ak6hfd6"
+              },
+              {
+                "stringValue": "fmrgl75jbn9ljo"
+              },
+              {
+                "stringValue": "fmrgl75sob3u8k"
+              }
+            ]
+          }
+        },
+        "orden": {
+          "integerValue": "27"
+        }
+      },
+      "createTime": "2026-07-02T09:32:15.470426Z",
+      "updateTime": "2026-07-11T16:36:47.772277Z"
+    },
+    {
+      "name": "projects/varman-crew/databases/(default)/documents/tiendas/varman/catalogo/c28",
+      "fields": {
+        "ref": {
+          "stringValue": "28"
+        },
+        "tag": {
+          "stringValue": ""
+        },
+        "refInventario": {
+          "stringValue": ""
+        },
+        "orden": {
+          "integerValue": "28"
+        },
+        "fotos": {
+          "arrayValue": {
+            "values": [
+              {
+                "stringValue": "fmrgl7q4ae0vbe"
+              },
+              {
+                "stringValue": "fmrgl7qdgu7aq4"
+              },
+              {
+                "stringValue": "fmrgl7qm1lskfn"
+              },
+              {
+                "stringValue": "fmrgl7qvpsqypc"
+              },
+              {
+                "stringValue": "fmrgl7r51kh5y5"
+              },
+              {
+                "stringValue": "fmrgl7rf3boptr"
+              }
+            ]
+          }
+        },
+        "id": {
+          "stringValue": "c28"
+        },
+        "precio": {
+          "integerValue": "240000"
+        },
+        "activo": {
+          "booleanValue": true
+        },
+        "marca": {
+          "stringValue": "Adidas superstar korn"
+        },
+        "cat": {
+          "stringValue": "urbanas"
+        }
+      },
+      "createTime": "2026-07-02T09:32:15.480231Z",
+      "updateTime": "2026-07-11T16:37:25.574553Z"
+    },
+    {
+      "name": "projects/varman-crew/databases/(default)/documents/tiendas/varman/catalogo/c29",
+      "fields": {
+        "tag": {
+          "stringValue": "Popular"
+        },
+        "refInventario": {
+          "stringValue": ""
+        },
+        "ref": {
+          "stringValue": "29"
+        },
+        "activo": {
+          "booleanValue": true
+        },
+        "marca": {
+          "stringValue": "Jordan retro 1 obsidian"
+        },
+        "cat": {
+          "stringValue": "urbanas"
+        },
+        "orden": {
+          "integerValue": "29"
+        },
+        "fotos": {
+          "arrayValue": {
+            "values": [
+              {
+                "stringValue": "fmrgl8ju5knrxw"
+              },
+              {
+                "stringValue": "fmrgl8k31v42oz"
+              },
+              {
+                "stringValue": "fmrgl8kbgskjdz"
+              },
+              {
+                "stringValue": "fmrgl8kl9m57xs"
+              }
+            ]
+          }
+        },
+        "id": {
+          "stringValue": "c29"
+        },
+        "precio": {
+          "integerValue": "399900"
+        }
+      },
+      "createTime": "2026-07-02T09:32:15.489487Z",
+      "updateTime": "2026-07-11T16:37:58.260569Z"
+    },
+    {
+      "name": "projects/varman-crew/databases/(default)/documents/tiendas/varman/catalogo/c30",
+      "fields": {
+        "ref": {
+          "stringValue": "30"
+        },
+        "tag": {
+          "stringValue": ""
+        },
+        "refInventario": {
+          "stringValue": ""
+        },
+        "orden": {
+          "integerValue": "30"
+        },
+        "fotos": {
+          "arrayValue": {
+            "values": [
+              {
+                "stringValue": "fmrgl95wgh4ysa"
+              },
+              {
+                "stringValue": "fmrgl964ufz0eu"
+              },
+              {
+                "stringValue": "fmrgl96cepp8y3"
+              },
+              {
+                "stringValue": "fmrgl96m2zcukx"
+              }
+            ]
+          }
+        },
+        "id": {
+          "stringValue": "c30"
+        },
+        "precio": {
+          "integerValue": "409900"
+        },
+        "activo": {
+          "booleanValue": true
+        },
+        "marca": {
+          "stringValue": "Jordan retro 4 sb"
+        },
+        "cat": {
+          "stringValue": "urbanas"
+        }
+      },
+      "createTime": "2026-07-02T09:32:15.498177Z",
+      "updateTime": "2026-07-11T16:38:22.810083Z"
+    },
+    {
+      "name": "projects/varman-crew/databases/(default)/documents/tiendas/varman/catalogo/c31",
+      "fields": {
+        "cat": {
+          "stringValue": "urbanas"
+        },
+        "marca": {
+          "stringValue": "Jordan retro 4 SE Craft"
+        },
+        "activo": {
+          "booleanValue": true
+        },
+        "id": {
+          "stringValue": "c31"
+        },
+        "precio": {
+          "integerValue": "409900"
+        },
+        "fotos": {
+          "arrayValue": {
+            "values": [
+              {
+                "stringValue": "fmrgla0l5my2zw"
+              },
+              {
+                "stringValue": "fmrgla0aqj7m68"
+              },
+              {
+                "stringValue": "fmrgl9zkafxn0y"
+              },
+              {
+                "stringValue": "fmrgl9zsib3vyv"
+              },
+              {
+                "stringValue": "fmrgla00n5tdji"
+              }
+            ]
+          }
+        },
+        "orden": {
+          "integerValue": "31"
+        },
+        "refInventario": {
+          "stringValue": ""
+        },
+        "tag": {
+          "stringValue": ""
+        },
+        "ref": {
+          "stringValue": "31"
+        }
+      },
+      "createTime": "2026-07-02T09:32:15.838818Z",
+      "updateTime": "2026-07-11T16:39:15.345317Z"
+    },
+    {
+      "name": "projects/varman-crew/databases/(default)/documents/tiendas/varman/catalogo/c32",
+      "fields": {
+        "orden": {
+          "integerValue": "32"
+        },
+        "fotos": {
+          "arrayValue": {
+            "values": [
+              {
+                "stringValue": "fmrglat3e84zbs"
+              },
+              {
+                "stringValue": "fmrglatd7h08x6"
+              },
+              {
+                "stringValue": "fmrglatljng4pq"
+              },
+              {
+                "stringValue": "fmrglatvbfmsgs"
+              },
+              {
+                "stringValue": "fmrglau4xh21zv"
+              }
+            ]
+          }
+        },
+        "precio": {
+          "integerValue": "399900"
+        },
+        "id": {
+          "stringValue": "c32"
+        },
+        "activo": {
+          "booleanValue": true
+        },
+        "marca": {
+          "stringValue": "Jordan retro 4 orchid"
+        },
+        "cat": {
+          "stringValue": "urbanas"
+        },
+        "ref": {
+          "stringValue": "32"
+        },
+        "tag": {
+          "stringValue": ""
+        },
+        "refInventario": {
+          "stringValue": ""
+        }
+      },
+      "createTime": "2026-07-02T09:32:15.975888Z",
+      "updateTime": "2026-07-11T16:39:43.058658Z"
+    },
+    {
+      "name": "projects/varman-crew/databases/(default)/documents/tiendas/varman/catalogo/c34",
+      "fields": {
+        "tag": {
+          "stringValue": "Nuevo"
+        },
+        "refInventario": {
+          "stringValue": "VRM079"
+        },
+        "ref": {
+          "stringValue": "34"
+        },
+        "marca": {
+          "stringValue": "Jordan 3 Levi's"
+        },
+        "activo": {
+          "booleanValue": true
+        },
+        "cat": {
+          "stringValue": "urbanas"
+        },
+        "fotos": {
+          "arrayValue": {
+            "values": [
+              {
+                "stringValue": "fmrf71zkpqp7kt"
+              },
+              {
+                "stringValue": "fmrf71znvgh04m"
+              },
+              {
+                "stringValue": "fmrf71zr4qnof6"
+              }
+            ]
+          }
+        },
+        "orden": {
+          "integerValue": "0"
+        },
+        "precio": {
+          "integerValue": "264900"
+        },
+        "id": {
+          "stringValue": "c34"
+        }
+      },
+      "createTime": "2026-07-10T17:20:16.118828Z",
+      "updateTime": "2026-07-11T01:59:02.203415Z"
+    },
+    {
+      "name": "projects/varman-crew/databases/(default)/documents/tiendas/varman/catalogo/c35",
+      "fields": {
+        "ref": {
+          "stringValue": "35"
+        },
+        "tag": {
+          "stringValue": "Nuevo"
+        },
+        "refInventario": {
+          "stringValue": ""
+        },
+        "fotos": {
+          "arrayValue": {
+            "values": [
+              {
+                "stringValue": "fmrgiopzt3167u"
+              },
+              {
+                "stringValue": "fmrgioqauje5rb"
+              },
+              {
+                "stringValue": "fmrgioqmz0tpx6"
+              },
+              {
+                "stringValue": "fmrgioqxnj1dmg"
+              },
+              {
+                "stringValue": "fmrgior62qrjyw"
+              }
+            ]
+          }
+        },
+        "orden": {
+          "integerValue": "-1"
+        },
+        "precio": {
+          "integerValue": "230000"
+        },
+        "id": {
+          "stringValue": "c35"
+        },
+        "marca": {
+          "stringValue": "Superstar blessd"
+        },
+        "activo": {
+          "booleanValue": true
+        },
+        "cat": {
+          "stringValue": "urbanas"
+        }
+      },
+      "createTime": "2026-07-11T15:27:20.817468Z",
+      "updateTime": "2026-07-11T16:16:53.720640Z"
+    },
+    {
+      "name": "projects/varman-crew/databases/(default)/documents/tiendas/varman/catalogo/c36",
+      "fields": {
+        "tag": {
+          "stringValue": "Nuevo"
+        },
+        "refInventario": {
+          "stringValue": "VRM023"
+        },
+        "ref": {
+          "stringValue": "36"
+        },
+        "activo": {
+          "booleanValue": true
+        },
+        "marca": {
+          "stringValue": "Fila Ray"
+        },
+        "cat": {
+          "stringValue": "casuales"
+        },
+        "orden": {
+          "integerValue": "-2"
+        },
+        "fotos": {
+          "arrayValue": {
+            "values": [
+              {
+                "stringValue": "fmrgj4liaiy93p"
+              },
+              {
+                "stringValue": "fmrgj4buisiur1"
+              },
+              {
+                "stringValue": "fmrgj4gszl4onq"
+              }
+            ]
+          }
+        },
+        "id": {
+          "stringValue": "c36"
+        },
+        "precio": {
+          "integerValue": "249900"
+        }
+      },
+      "createTime": "2026-07-11T15:39:13.429844Z",
+      "updateTime": "2026-07-11T16:16:48.953562Z"
+    },
+    {
+      "name": "projects/varman-crew/databases/(default)/documents/tiendas/varman/catalogo/c37",
+      "fields": {
+        "precio": {
+          "integerValue": "249900"
+        },
+        "id": {
+          "stringValue": "c37"
+        },
+        "fotos": {
+          "arrayValue": {
+            "values": [
+              {
+                "stringValue": "fmrgjboik5va16"
+              },
+              {
+                "stringValue": "fmrgjbosfcrzpf"
+              },
+              {
+                "stringValue": "fmrgjbp0jf96k3"
+              },
+              {
+                "stringValue": "fmrgjbp9nu0ejk"
+              }
+            ]
+          }
+        },
+        "orden": {
+          "integerValue": "-3"
+        },
+        "cat": {
+          "stringValue": "urbanas"
+        },
+        "marca": {
+          "stringValue": "Nike SB Cafe"
+        },
+        "activo": {
+          "booleanValue": true
+        },
+        "ref": {
+          "stringValue": "37"
+        },
+        "refInventario": {
+          "stringValue": ""
+        },
+        "tag": {
+          "stringValue": "Nuevo"
+        }
+      },
+      "createTime": "2026-07-11T15:45:33.484503Z",
+      "updateTime": "2026-07-11T16:16:44.400232Z"
+    },
+    {
+      "name": "projects/varman-crew/databases/(default)/documents/tiendas/varman/catalogo/c38",
+      "fields": {
+        "fotos": {
+          "arrayValue": {
+            "values": [
+              {
+                "stringValue": "fmrgjeoki4lh9a"
+              },
+              {
+                "stringValue": "fmrgjeoua4x23u"
+              },
+              {
+                "stringValue": "fmrgjep3s7eio9"
+              }
+            ]
+          }
+        },
+        "orden": {
+          "integerValue": "-4"
+        },
+        "id": {
+          "stringValue": "c38"
+        },
+        "precio": {
+          "integerValue": "234900"
+        },
+        "marca": {
+          "stringValue": "New balance 530 azul"
+        },
+        "activo": {
+          "booleanValue": true
+        },
+        "cat": {
+          "stringValue": "deportivas"
+        },
+        "ref": {
+          "stringValue": "38"
+        },
+        "tag": {
+          "stringValue": "Nuevo"
+        },
+        "refInventario": {
+          "stringValue": "VRM037"
+        }
+      },
+      "createTime": "2026-07-11T15:58:35.289041Z",
+      "updateTime": "2026-07-11T15:58:35.289041Z"
+    },
+    {
+      "name": "projects/varman-crew/databases/(default)/documents/tiendas/varman/catalogo/c39",
+      "fields": {
+        "ref": {
+          "stringValue": "39"
+        },
+        "refInventario": {
+          "stringValue": "VRM038"
+        },
+        "tag": {
+          "stringValue": "Nuevo"
+        },
+        "id": {
+          "stringValue": "c39"
+        },
+        "precio": {
+          "integerValue": "234900"
+        },
+        "orden": {
+          "integerValue": "-5"
+        },
+        "fotos": {
+          "arrayValue": {
+            "values": [
+              {
+                "stringValue": "fmrgjv0hz49oxw"
+              },
+              {
+                "stringValue": "fmrgjvcjvidsim"
+              },
+              {
+                "stringValue": "fmrgjvh8pyd1ax"
+              }
+            ]
+          }
+        },
+        "cat": {
+          "stringValue": "deportivas"
+        },
+        "activo": {
+          "booleanValue": true
+        },
+        "marca": {
+          "stringValue": "New Balance 530 plateeada"
+        }
+      },
+      "createTime": "2026-07-11T16:00:03.373319Z",
+      "updateTime": "2026-07-11T16:00:03.373319Z"
+    },
+    {
+      "name": "projects/varman-crew/databases/(default)/documents/tiendas/varman/catalogo/c40",
+      "fields": {
+        "cat": {
+          "stringValue": "casuales"
+        },
+        "activo": {
+          "booleanValue": true
+        },
+        "marca": {
+          "stringValue": "New Balance 9060 negra blanca"
+        },
+        "precio": {
+          "integerValue": "254900"
+        },
+        "id": {
+          "stringValue": "c40"
+        },
+        "orden": {
+          "integerValue": "-6"
+        },
+        "fotos": {
+          "arrayValue": {
+            "values": [
+              {
+                "stringValue": "fmrgjxekrmjcnh"
+              },
+              {
+                "stringValue": "fmrgjxjuon5lip"
+              },
+              {
+                "stringValue": "fmrgjxui711bdu"
+              }
+            ]
+          }
+        },
+        "refInventario": {
+          "stringValue": "VRM044"
+        },
+        "tag": {
+          "stringValue": "Nuevo"
+        },
+        "ref": {
+          "stringValue": "40"
+        }
+      },
+      "createTime": "2026-07-11T16:02:29.408297Z",
+      "updateTime": "2026-07-11T16:16:31.246426Z"
+    },
+    {
+      "name": "projects/varman-crew/databases/(default)/documents/tiendas/varman/catalogo/c41",
+      "fields": {
+        "tag": {
+          "stringValue": "Nuevo"
+        },
+        "refInventario": {
+          "stringValue": ""
+        },
+        "ref": {
+          "stringValue": "41"
+        },
+        "activo": {
+          "booleanValue": true
+        },
+        "marca": {
+          "stringValue": "Jordan retro 1 poshmark"
+        },
+        "cat": {
+          "stringValue": "urbanas"
+        },
+        "orden": {
+          "integerValue": "-7"
+        },
+        "fotos": {
+          "arrayValue": {
+            "values": [
+              {
+                "stringValue": "fmrgk15i6rf1dv"
+              },
+              {
+                "stringValue": "fmrgk15sf2kimq"
+              },
+              {
+                "stringValue": "fmrgk165oqtoxt"
+              },
+              {
+                "stringValue": "fmrgk16js5xybl"
+              }
+            ]
+          }
+        },
+        "precio": {
+          "integerValue": "284900"
+        },
+        "id": {
+          "stringValue": "c41"
+        }
+      },
+      "createTime": "2026-07-11T16:05:48.186542Z",
+      "updateTime": "2026-07-11T16:16:19.003697Z"
+    },
+    {
+      "name": "projects/varman-crew/databases/(default)/documents/tiendas/varman/catalogo/c42",
+      "fields": {
+        "fotos": {
+          "arrayValue": {
+            "values": [
+              {
+                "stringValue": "fmrgk4uzeas8vw"
+              },
+              {
+                "stringValue": "fmrgk4v7bi5rgn"
+              },
+              {
+                "stringValue": "fmrgk4vesac5pu"
+              },
+              {
+                "stringValue": "fmrgk4vp03nedv"
+              }
+            ]
+          }
+        },
+        "orden": {
+          "integerValue": "-8"
+        },
+        "precio": {
+          "integerValue": "284900"
+        },
+        "id": {
+          "stringValue": "c42"
+        },
+        "marca": {
+          "stringValue": "Jordan retro 3 Sail"
+        },
+        "activo": {
+          "booleanValue": true
+        },
+        "cat": {
+          "stringValue": "urbanas"
+        },
+        "ref": {
+          "stringValue": "42"
+        },
+        "tag": {
+          "stringValue": "Nuevo"
+        },
+        "refInventario": {
+          "stringValue": ""
+        }
+      },
+      "createTime": "2026-07-11T16:09:50.384562Z",
+      "updateTime": "2026-07-11T16:16:12.356994Z"
+    },
+    {
+      "name": "projects/varman-crew/databases/(default)/documents/tiendas/varman/catalogo/c43",
+      "fields": {
+        "orden": {
+          "integerValue": "-9"
+        },
+        "fotos": {
+          "arrayValue": {
+            "values": [
+              {
+                "stringValue": "fmrgka4m58bjt5"
+              },
+              {
+                "stringValue": "fmrgka4uj3ytbh"
+              },
+              {
+                "stringValue": "fmrgka52wgck7h"
+              },
+              {
+                "stringValue": "fmrgka5c8zlyeg"
+              }
+            ]
+          }
+        },
+        "precio": {
+          "integerValue": "284900"
+        },
+        "id": {
+          "stringValue": "c43"
+        },
+        "activo": {
+          "booleanValue": true
+        },
+        "marca": {
+          "stringValue": "Jordan retro 3 Lucky Shorts"
+        },
+        "cat": {
+          "stringValue": "urbanas"
+        },
+        "ref": {
+          "stringValue": "43"
+        },
+        "tag": {
+          "stringValue": "Nuevo"
+        },
+        "refInventario": {
+          "stringValue": ""
+        }
+      },
+      "createTime": "2026-07-11T16:11:59.433308Z",
+      "updateTime": "2026-07-11T16:16:06.243607Z"
+    },
+    {
+      "name": "projects/varman-crew/databases/(default)/documents/tiendas/varman/catalogo/c44",
+      "fields": {
+        "ref": {
+          "stringValue": "44"
+        },
+        "refInventario": {
+          "stringValue": ""
+        },
+        "tag": {
+          "stringValue": "Nuevo"
+        },
+        "precio": {
+          "integerValue": "284900"
+        },
+        "id": {
+          "stringValue": "c44"
+        },
+        "orden": {
+          "integerValue": "-10"
+        },
+        "fotos": {
+          "arrayValue": {
+            "values": [
+              {
+                "stringValue": "fmrgkc8momkto6"
+              },
+              {
+                "stringValue": "fmrgkc8vmb6sax"
+              },
+              {
+                "stringValue": "fmrgkc947xctrw"
+              },
+              {
+                "stringValue": "fmrgkc9elen8ii"
+              }
+            ]
+          }
+        },
+        "cat": {
+          "stringValue": "urbanas"
+        },
+        "activo": {
+          "booleanValue": true
+        },
+        "marca": {
+          "stringValue": "Jordan retro 1 OG"
+        }
+      },
+      "createTime": "2026-07-11T16:13:57.415567Z",
+      "updateTime": "2026-07-11T16:16:01.414356Z"
+    },
+    {
+      "name": "projects/varman-crew/databases/(default)/documents/tiendas/varman/catalogo/c45",
+      "fields": {
+        "ref": {
+          "stringValue": "45"
+        },
+        "refInventario": {
+          "stringValue": ""
+        },
+        "tag": {
+          "stringValue": "Nuevo"
+        },
+        "precio": {
+          "integerValue": "284900"
+        },
+        "id": {
+          "stringValue": "c45"
+        },
+        "orden": {
+          "integerValue": "-11"
+        },
+        "fotos": {
+          "arrayValue": {
+            "values": [
+              {
+                "stringValue": "fmrgkevh4tzbb9"
+              },
+              {
+                "stringValue": "fmrgkevskpg45z"
+              },
+              {
+                "stringValue": "fmrgkew4ct63j0"
+              },
+              {
+                "stringValue": "fmrgkewfaec96s"
+              }
+            ]
+          }
+        },
+        "cat": {
+          "stringValue": "urbanas"
+        },
+        "activo": {
+          "booleanValue": true
+        },
+        "marca": {
+          "stringValue": "Jordan retro 4 Cave Stone"
+        }
+      },
+      "createTime": "2026-07-11T16:15:40.037549Z",
+      "updateTime": "2026-07-11T16:15:56.196308Z"
+    }
+  ]
+}

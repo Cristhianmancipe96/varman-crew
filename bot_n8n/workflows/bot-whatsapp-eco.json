@@ -1,0 +1,112 @@
+{
+  "id": "VarmanEcoBot0001",
+  "name": "Bot WhatsApp VarMan - webhook + eco",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "whatsapp",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "3f1c9a52-6d1e-4b7a-9c2d-8e5a1f4b6c01",
+      "name": "Webhook verificacion (GET)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "webhookId": "3f1c9a52-6d1e-4b7a-9c2d-8e5a1f4b6c01"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Meta manda GET ?hub.mode=subscribe&hub.verify_token=...&hub.challenge=...\n// Si el token coincide con nuestro secreto, hay que devolver el challenge tal cual.\nconst q = $input.first().json.query || {};\nconst ok = q['hub.mode'] === 'subscribe' && q['hub.verify_token'] === $env.WEBHOOK_VERIFY_TOKEN;\nreturn [{ json: { body: ok ? q['hub.challenge'] : 'token invalido', statusCode: ok ? 200 : 403 } }];"
+      },
+      "id": "a1b2c3d4-0001-4e5f-8a9b-c0d1e2f3a4b5",
+      "name": "Verificar token",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.body }}",
+        "options": {
+          "responseCode": "={{ $json.statusCode }}"
+        }
+      },
+      "id": "a1b2c3d4-0002-4e5f-8a9b-c0d1e2f3a4b5",
+      "name": "Responder a Meta",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "whatsapp",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "7d4e8b21-9f3a-4c6d-b5e2-1a0f9c8d7e02",
+      "name": "Webhook mensajes (POST)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 240],
+      "webhookId": "7d4e8b21-9f3a-4c6d-b5e2-1a0f9c8d7e02"
+    },
+    {
+      "parameters": {
+        "jsCode": "// El payload de Meta viene anidado: entry[].changes[].value.messages[]\n// Los avisos de estado (sent/delivered/read) NO traen messages -> no se emite nada y el flujo muere aqui.\nconst out = [];\nfor (const item of $input.all()) {\n  const body = item.json.body || item.json;\n  for (const e of (body.entry || [])) {\n    for (const ch of (e.changes || [])) {\n      const v = ch.value || {};\n      const contacto = (v.contacts && v.contacts[0]) || {};\n      for (const m of (v.messages || [])) {\n        out.push({ json: {\n          wa_id: m.from,\n          nombre: (contacto.profile && contacto.profile.name) || '',\n          tipo: m.type,\n          texto: (m.text && m.text.body) || '',\n          message_id: m.id,\n          timestamp: m.timestamp\n        }});\n      }\n    }\n  }\n}\nreturn out;"
+      },
+      "id": "b2c3d4e5-0003-4f6a-9b0c-d1e2f3a4b5c6",
+      "name": "Extraer mensajes",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 240]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v21.0/{{ $env.WHATSAPP_PHONE_NUMBER_ID }}/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.WHATSAPP_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ messaging_product: 'whatsapp', to: $json.wa_id, type: 'text', text: { body: 'Eco VarMan: ' + ($json.texto || '(' + $json.tipo + ' recibido)') } }) }}",
+        "options": {}
+      },
+      "id": "c3d4e5f6-0004-4a7b-8c9d-e0f1a2b3c4d7",
+      "name": "Enviar eco",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 240]
+    }
+  ],
+  "connections": {
+    "Webhook verificacion (GET)": {
+      "main": [[{ "node": "Verificar token", "type": "main", "index": 0 }]]
+    },
+    "Verificar token": {
+      "main": [[{ "node": "Responder a Meta", "type": "main", "index": 0 }]]
+    },
+    "Webhook mensajes (POST)": {
+      "main": [[{ "node": "Extraer mensajes", "type": "main", "index": 0 }]]
+    },
+    "Extraer mensajes": {
+      "main": [[{ "node": "Enviar eco", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Bogota"
+  },
+  "pinData": {}
+}

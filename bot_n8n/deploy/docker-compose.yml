@@ -1,0 +1,114 @@
+# ==========================================================
+# VarMan Crew · Bot WhatsApp — n8n + Caddy (HTTPS directo, SIN túnel)
+# Servidor destino: VM varman-bot en Google Cloud (e2-micro, Ubuntu 24.04)
+#
+# Arquitectura:
+#   Meta Cloud API → https://bot.varmancrew.com (Caddy, cert Let's Encrypt)
+#                        → n8n (puerto interno 5678, red de Docker)
+#
+# Uso (en la VM, dentro de ~/varman-bot):
+#   docker compose up -d
+#
+# Requiere en ESTA MISMA carpeta:
+#   - .env       (ver .env.example; el real sale de credenciales\)
+#   - Caddyfile  (dominio y reverse proxy)
+# La guía completa está en GUIA-GCP.md
+# ==========================================================
+
+services:
+
+  # ---------- n8n (el motor del bot) ----------
+  n8n:
+    # Imagen OFICIAL de n8n, versión FIJADA a 2.28.6:
+    #  - la misma que corría en el PC local, así los workflows
+    #    se importan sin sorpresas de migración.
+    # Para actualizar más adelante: cambiar el número de versión aquí y
+    #   docker compose pull && docker compose up -d
+    image: docker.n8n.io/n8nio/n8n:2.28.6
+    container_name: varman-n8n
+    restart: unless-stopped
+
+    # Carga TODAS las variables del bot desde el .env
+    # (WHATSAPP_TOKEN, GEMINI_API_KEY, WEBHOOK_VERIFY_TOKEN, etc.)
+    env_file:
+      - .env
+
+    environment:
+      # --- Estas quedan FIJAS aquí y GANAN sobre el .env ---
+
+      # Sin esto en 'false', los nodos Code no pueden leer $env
+      # (el task runner de n8n 2.x lo bloquea) y el bot no responde.
+      - N8N_BLOCK_ENV_ACCESS_IN_NODE=false
+
+      # El dominio público. TLS lo termina Caddy, por eso n8n queda
+      # en http puertas adentro pero anuncia las URLs con https.
+      - N8N_HOST=${N8N_HOST}
+      - N8N_PROTOCOL=http
+      - WEBHOOK_URL=${WEBHOOK_URL}
+      - N8N_EDITOR_BASE_URL=${WEBHOOK_URL}
+
+      # En 'false' para poder entrar al editor también por
+      # http://localhost:5678 (túnel SSH). Por el dominio ya hay HTTPS.
+      - N8N_SECURE_COOKIE=false
+
+      - N8N_PORT=5678
+      - GENERIC_TIMEZONE=America/Bogota
+      - TZ=America/Bogota
+      - N8N_DIAGNOSTICS_ENABLED=false
+      - N8N_PERSONALIZATION_ENABLED=false
+
+      # n8n está detrás de 1 proxy (caddy): así confía en la IP
+      # real del visitante que le pasa Caddy.
+      - N8N_PROXY_HOPS=1
+
+    ports:
+      # OJO: 127.0.0.1 = el puerto 5678 SOLO se ve desde la propia VM.
+      # Nadie puede entrar por http://IP-DEL-SERVIDOR:5678 desde internet
+      # (además el firewall de GCP solo abre 80/443).
+      # El ÚNICO camino público es Caddy (HTTPS).
+      - "127.0.0.1:5678:5678"
+
+    volumes:
+      # Datos persistentes de n8n: base de datos SQLite, clave de
+      # cifrado y configuración. Sobrevive a reinicios y updates.
+      - n8n_data:/home/node/.n8n
+
+      # Los workflows .json del bot, visibles dentro del contenedor
+      # para poder importarlos con la CLI (solo lectura).
+      - ./workflows:/workflows:ro
+
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:5678/healthz || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # ---------- Caddy (la puerta HTTPS hacia internet) ----------
+  caddy:
+    # Reverse proxy con HTTPS AUTOMÁTICO: pide y renueva solo el
+    # certificado de Let's Encrypt para bot.varmancrew.com.
+    # Requisito: el registro A en Cloudflare debe estar en modo
+    # "DNS only" (nube GRIS) y los puertos 80/443 abiertos en GCP.
+    image: caddy:2
+    container_name: varman-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      # La configuración (dominio → n8n) vive en ./Caddyfile
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # Certificados y estado de Caddy: persistentes para NO volver a
+      # pedir el certificado en cada reinicio (Let's Encrypt tiene límites).
+      - caddy_data:/data
+      - caddy_config:/config
+    # Caddy arranca aunque n8n aún no esté sano: así el certificado
+    # se emite de una vez; mientras n8n sube, responde 502 y ya.
+    depends_on:
+      - n8n
+
+volumes:
+  n8n_data:
+  caddy_data:
+  caddy_config:

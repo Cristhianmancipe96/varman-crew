@@ -1,0 +1,212 @@
+{
+  "id": "VarmanBotV4Ped01",
+  "name": "Bot WhatsApp VarMan - COMPLETO Fase 1 (pasos 4-8)",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "whatsapp",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "40000000-0000-4000-8000-000000000001",
+      "name": "Webhook verificacion (GET)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "40000000-0000-4000-8000-000000000001"
+    },
+    {
+      "parameters": {
+        "jsCode": "const q = $input.first().json.query || {};\nconst ok = q['hub.mode'] === 'subscribe' && q['hub.verify_token'] === $env.WEBHOOK_VERIFY_TOKEN;\nreturn [{ json: { body: ok ? q['hub.challenge'] : 'token invalido', statusCode: ok ? 200 : 403 } }];"
+      },
+      "id": "40000000-0000-4000-8000-000000000002",
+      "name": "Verificar token",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.body }}",
+        "options": {
+          "responseCode": "={{ $json.statusCode }}"
+        }
+      },
+      "id": "40000000-0000-4000-8000-000000000003",
+      "name": "Responder a Meta",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "whatsapp",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "40000000-0000-4000-8000-000000000004",
+      "name": "Webhook mensajes (POST)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        260
+      ],
+      "webhookId": "40000000-0000-4000-8000-000000000004"
+    },
+    {
+      "parameters": {
+        "jsCode": "const out = [];\nfor (const item of $input.all()) {\n  const body = item.json.body || item.json;\n  for (const e of (body.entry || [])) {\n    for (const ch of (e.changes || [])) {\n      const v = ch.value || {};\n      const contacto = (v.contacts && v.contacts[0]) || {};\n      for (const m of (v.messages || [])) {\n        let texto = '';\n        let inter_id = '';\n        let imagen_id = '';\n        if (m.type === 'text') texto = (m.text && m.text.body) || '';\n        else if (m.type === 'image') imagen_id = (m.image && m.image.id) || '';\n        else if (m.type === 'interactive') {\n          const it = m.interactive || {};\n          if (it.type === 'list_reply') inter_id = (it.list_reply && it.list_reply.id) || '';\n          else if (it.type === 'button_reply') inter_id = (it.button_reply && it.button_reply.id) || '';\n        }\n        out.push({ json: {\n          wa_id: m.from,\n          nombre: (contacto.profile && contacto.profile.name) || '',\n          tipo: m.type,\n          texto,\n          inter_id,\n          imagen_id,\n          message_id: m.id\n        }});\n      }\n    }\n  }\n}\nreturn out;"
+      },
+      "id": "40000000-0000-4000-8000-000000000005",
+      "name": "Parsear mensaje",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://firestore.googleapis.com/v1/projects/varman-crew/databases/(default)/documents/tiendas/varman/catalogo?pageSize=300",
+        "options": {}
+      },
+      "id": "40000000-0000-4000-8000-000000000006",
+      "name": "Leer catalogo (Firestore)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============ CEREBRO DEL BOT (sesiones + pedidos + Gemini) ============\nconst H = this.helpers;\nconst crypto = require('crypto');\n\nconst CAT_LABEL = { deportivas: 'Deportivas', casuales: 'Casuales', urbanas: 'Urbanas' };\nconst CAT_ORDER = ['deportivas', 'casuales', 'urbanas'];\nconst FS_BASE = 'https://firestore.googleapis.com/v1/projects/varman-crew/databases/(default)/documents';\n\n// ---------- utilidades ----------\nfunction fmtPrecio(n) {\n  return '$' + String(n).replace(/\\B(?=(\\d{3})+(?!\\d))/g, '.');\n}\nfunction unwrap(v) {\n  if (v == null) return null;\n  if ('integerValue' in v) return parseInt(v.integerValue, 10);\n  if ('doubleValue' in v) return v.doubleValue;\n  if ('booleanValue' in v) return v.booleanValue;\n  if ('stringValue' in v) return v.stringValue;\n  if ('arrayValue' in v) return (v.arrayValue.values || []).map(unwrap);\n  return null;\n}\nfunction parseCatalogo(fsJson) {\n  const docs = (fsJson.documents || []);\n  const items = docs.map((d) => {\n    const f = d.fields || {}; const o = {};\n    for (const k in f) o[k] = unwrap(f[k]);\n    return o;\n  }).filter((o) => o.activo !== false);\n  items.sort((a, b) => (a.orden || 999) - (b.orden || 999));\n  return items;\n}\nfunction toFs(obj) {\n  const fields = {};\n  for (const k in obj) {\n    const v = obj[k];\n    if (v === undefined || v === null) continue;\n    if (typeof v === 'number') fields[k] = { integerValue: String(Math.round(v)) };\n    else if (typeof v === 'boolean') fields[k] = { booleanValue: v };\n    else fields[k] = { stringValue: String(v) };\n  }\n  return fields;\n}\nfunction fromFs(doc) {\n  if (!doc || !doc.fields) return null;\n  const o = {};\n  for (const k in doc.fields) o[k] = unwrap(doc.fields[k]);\n  return o;\n}\n\n// ---------- acceso admin a Firestore (service account) ----------\nfunction b64url(buf) {\n  return Buffer.from(buf).toString('base64').replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '');\n}\nasync function tokenAdmin() {\n  const sa = JSON.parse(Buffer.from($env.FIREBASE_SA_B64, 'base64').toString('utf8'));\n  const now = Math.floor(Date.now() / 1000);\n  const header = b64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));\n  const claims = b64url(JSON.stringify({\n    iss: sa.client_email,\n    scope: 'https://www.googleapis.com/auth/datastore',\n    aud: 'https://oauth2.googleapis.com/token',\n    iat: now, exp: now + 3600\n  }));\n  const signer = crypto.createSign('RSA-SHA256');\n  signer.update(header + '.' + claims);\n  const jwt = header + '.' + claims + '.' + b64url(signer.sign(sa.private_key));\n  const r = await H.httpRequest({\n    method: 'POST', url: 'https://oauth2.googleapis.com/token',\n    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },\n    body: 'grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=' + jwt,\n    timeout: 15000, json: true\n  });\n  return r.access_token;\n}\nasync function fsGet(tok, path) {\n  try {\n    const d = await H.httpRequest({ method: 'GET', url: FS_BASE + '/' + path,\n      headers: { Authorization: 'Bearer ' + tok }, json: true, timeout: 15000 });\n    return fromFs(d);\n  } catch (e) { return null; }\n}\nasync function fsSet(tok, path, obj) {\n  await H.httpRequest({ method: 'PATCH', url: FS_BASE + '/' + path,\n    headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' },\n    body: { fields: toFs(obj) }, json: true, timeout: 15000 });\n}\nasync function fsDel(tok, path) {\n  try {\n    await H.httpRequest({ method: 'DELETE', url: FS_BASE + '/' + path,\n      headers: { Authorization: 'Bearer ' + tok }, json: true, timeout: 15000 });\n  } catch (e) {}\n}\nasync function fsAdd(tok, colPath, obj) {\n  const d = await H.httpRequest({ method: 'POST', url: FS_BASE + '/' + colPath,\n    headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' },\n    body: { fields: toFs(obj) }, json: true, timeout: 15000 });\n  return d.name.split('/documents/')[1];\n}\n\n// ---------- constructores de mensajes WhatsApp ----------\nfunction msjTexto(to, body) {\n  return { messaging_product: 'whatsapp', to, type: 'text', text: { body } };\n}\nfunction listaCategorias(to, catalogo, bodyTexto) {\n  const counts = {};\n  for (const p of catalogo) counts[p.cat] = (counts[p.cat] || 0) + 1;\n  const rows = CAT_ORDER.filter((c) => counts[c]).map((c) => ({\n    id: 'cat:' + c, title: CAT_LABEL[c], description: counts[c] + ' modelos disponibles'\n  }));\n  return { messaging_product: 'whatsapp', to, type: 'interactive', interactive: {\n    type: 'list',\n    header: { type: 'text', text: 'VarMan Crew 👟' },\n    body: { text: (bodyTexto || '¡Hola! Bienvenido a *VarMan Crew*. Estos son nuestros estilos. ¿Cuál quieres ver?').slice(0, 1024) },\n    footer: { text: 'Toca «Ver categorías»' },\n    action: { button: 'Ver categorías', sections: [{ title: 'Categorías', rows }] }\n  }};\n}\nfunction listaModelos(to, catalogo, cat) {\n  const label = CAT_LABEL[cat] || cat;\n  let modelos = catalogo.filter((p) => p.cat === cat);\n  const total = modelos.length;\n  const hayMas = total > 10;\n  modelos = modelos.slice(0, 10);\n  const rows = modelos.map((p) => {\n    const desc = fmtPrecio(p.precio) + (p.tag ? '  ·  ' + p.tag : '');\n    return { id: 'ref:' + p.ref, title: 'Referencia ' + p.ref, description: desc.slice(0, 72) };\n  });\n  const bodyTxt = hayMas\n    ? 'Estos son algunos de nuestros modelos ' + label.toLowerCase() + ' (los primeros 10 de ' + total + '). Toca el que te guste 👇'\n    : 'Nuestros modelos ' + label.toLowerCase() + '. Toca el que te guste 👇';\n  return { messaging_product: 'whatsapp', to, type: 'interactive', interactive: {\n    type: 'list',\n    header: { type: 'text', text: 'VarMan Crew · ' + label },\n    body: { text: bodyTxt },\n    footer: { text: 'Envíos a todo el país' },\n    action: { button: 'Ver modelos', sections: [{ title: label, rows }] }\n  }};\n}\nfunction botonesPago(to, total) {\n  return { messaging_product: 'whatsapp', to, type: 'interactive', interactive: {\n    type: 'button',\n    body: { text: '¡Perfecto! 📦 Tu pedido va quedando listo.\\n\\nTotal a pagar: *' + fmtPrecio(total) + '*\\n\\n¿Cómo prefieres pagar?' },\n    action: { buttons: [\n      { type: 'reply', reply: { id: 'pay:nequi', title: 'Nequi' } },\n      { type: 'reply', reply: { id: 'pay:daviplata', title: 'Daviplata' } },\n      { type: 'reply', reply: { id: 'pay:breb', title: 'Bre-B' } }\n    ]}\n  }};\n}\nconst PAGOS = {\n  nequi: { nombre: 'Nequi', dato: () => $env.PAGO_NEQUI },\n  daviplata: { nombre: 'Daviplata', dato: () => $env.PAGO_DAVIPLATA },\n  breb: { nombre: 'Bre-B', dato: () => $env.PAGO_BREB }\n};\n\n// ---------- flujo principal ----------\nconst parsed = $('Parsear mensaje').item.json;\nconst catalogo = parseCatalogo($json);\nconst to = parsed.wa_id;\nconst sel = (parsed.inter_id || '').trim();\nconst texto = (parsed.texto || '').trim();\nconst dueno = String($env.OWNER_WHATSAPP || '').replace(/\\D/g, '');\nconst mensajes = [];\n\nconst tok = await tokenAdmin();\nconst SES_PATH = 'tiendas/varman/botSesiones/' + to;\nlet ses = await fsGet(tok, SES_PATH);\n// sesion vieja (>24h) = sesion muerta\nif (ses && ses.updatedAt && (Date.now() - Date.parse(ses.updatedAt)) > 24 * 3600 * 1000) {\n  await fsDel(tok, SES_PATH);\n  ses = null;\n}\nasync function guardarSes(obj) {\n  await fsSet(tok, SES_PATH, Object.assign({}, obj, { updatedAt: new Date().toISOString() }));\n}\n\nif (/^(cancelar|cancela|cancel)$/i.test(texto) && ses) {\n  await fsDel(tok, SES_PATH);\n  mensajes.push(msjTexto(to, 'Listo, cancelé el pedido 👍. Cuando quieras retomar, escribe *hola* y te muestro el catálogo.'));\n\n} else if (sel.startsWith('cat:')) {\n  if (ses) await fsDel(tok, SES_PATH); // volvio a navegar\n  mensajes.push(listaModelos(to, catalogo, sel.slice(4)));\n\n} else if (sel.startsWith('ref:')) {\n  const ref = sel.slice(4);\n  const p = catalogo.find((x) => x.ref === ref);\n  if (p) {\n    await guardarSes({ estado: 'talla', ref, precio: p.precio, nombrePerfil: parsed.nombre || '' });\n    mensajes.push(msjTexto(to, '¡Buena elección! 🔥\\n\\nLa *Referencia ' + ref + '* cuesta *' + fmtPrecio(p.precio) + '*.\\n\\n¿Qué talla buscas? Escríbeme el número (tenemos de la 36 a la 45). Si quieres empezar de nuevo, escribe *cancelar*.'));\n  } else {\n    mensajes.push(msjTexto(to, 'No encontré esa referencia 😅. Escribe *hola* para ver el catálogo de nuevo.'));\n  }\n\n} else if (sel.startsWith('pay:') && ses && (ses.estado === 'pago' || ses.estado === 'comprobante')) {\n  const clave = sel.slice(4);\n  const met = PAGOS[clave];\n  if (met) {\n    await guardarSes(Object.assign({}, ses, { estado: 'comprobante', metodo: met.nombre }));\n    mensajes.push(msjTexto(to, 'Pagas por *' + met.nombre + '* a este número/llave:\\n\\n👉 ' + met.dato() + '\\n\\nTotal: *' + fmtPrecio(ses.precio) + '*\\n\\nCuando hagas el pago, mándame la *foto del comprobante* aquí mismo 📸 y dejamos tu pedido confirmado.'));\n  }\n\n} else if (ses && ses.estado === 'talla') {\n  const m = texto.match(/\\b(3[6-9]|4[0-5])\\b/);\n  if (m) {\n    await guardarSes(Object.assign({}, ses, { estado: 'datos', talla: m[1] }));\n    mensajes.push(msjTexto(to, '¡Talla ' + m[1] + ' anotada! ✅\\n\\nAhora regálame en un solo mensaje los datos de envío:\\n\\n*Nombre completo*\\n*Dirección*\\n*Ciudad*\\n*Teléfono de contacto*'));\n  } else {\n    mensajes.push(msjTexto(to, 'Manejamos tallas de la *36 a la 45* 👟. Escríbeme solo el número (ej: *40*), o *cancelar* para empezar de nuevo.'));\n  }\n\n} else if (ses && ses.estado === 'datos') {\n  if (texto.length >= 15) {\n    await guardarSes(Object.assign({}, ses, { estado: 'pago', datosEnvio: texto.slice(0, 500) }));\n    mensajes.push(botonesPago(to, ses.precio));\n  } else {\n    mensajes.push(msjTexto(to, 'Creo que faltan datos 🙈. Mándame en un solo mensaje: *nombre completo, dirección, ciudad y teléfono*.'));\n  }\n\n} else if (ses && ses.estado === 'pago') {\n  // escribio texto en vez de tocar el boton\n  const m = texto.match(/nequi|daviplata|bre/i);\n  if (m) {\n    const clave = m[0].toLowerCase().startsWith('bre') ? 'breb' : m[0].toLowerCase();\n    const met = PAGOS[clave];\n    await guardarSes(Object.assign({}, ses, { estado: 'comprobante', metodo: met.nombre }));\n    mensajes.push(msjTexto(to, 'Pagas por *' + met.nombre + '* a este número/llave:\\n\\n👉 ' + met.dato() + '\\n\\nTotal: *' + fmtPrecio(ses.precio) + '*\\n\\nCuando hagas el pago, mándame la *foto del comprobante* aquí mismo 📸.'));\n  } else {\n    mensajes.push(botonesPago(to, ses.precio));\n  }\n\n} else if (ses && ses.estado === 'comprobante') {\n  if (parsed.imagen_id) {\n    const pedido = {\n      cliente_nombre: ses.nombrePerfil || parsed.nombre || '',\n      cliente_wa: to,\n      datos_envio: ses.datosEnvio || '',\n      ref: ses.ref,\n      talla: ses.talla || '',\n      cantidad: 1,\n      total: ses.precio,\n      metodo_pago: ses.metodo || '',\n      comprobante_media_id: parsed.imagen_id,\n      estado: 'pagado (por verificar)',\n      canal: 'whatsapp-bot',\n      creado: new Date().toISOString()\n    };\n    const pedidoPath = await fsAdd(tok, 'tiendas/varman/pedidos', pedido);\n    await fsDel(tok, SES_PATH);\n    mensajes.push(msjTexto(to, '¡Pedido recibido! 🎉\\n\\n*Referencia ' + ses.ref + '* · Talla ' + ses.talla + ' · ' + fmtPrecio(ses.precio) + '\\n\\nVamos a verificar tu pago y te confirmamos el envío por aquí mismo. ¡Gracias por comprar en VarMan Crew! 👟'));\n    if (dueno && dueno !== to) {\n      mensajes.push(msjTexto(dueno, '🛒 *NUEVO PEDIDO (por verificar)*\\n\\nRef: ' + ses.ref + ' · Talla ' + ses.talla + '\\nTotal: ' + fmtPrecio(ses.precio) + ' por ' + (ses.metodo || '?') + '\\nCliente: ' + (ses.nombrePerfil || '(sin nombre)') + ' · +' + to + '\\nEnvío: ' + (ses.datosEnvio || '') + '\\n\\n📎 Comprobante recibido (en el chat del cliente).\\nPedido guardado: ' + pedidoPath));\n    }\n  } else {\n    mensajes.push(msjTexto(to, 'Cuando puedas, mándame la *foto del comprobante* 📸 para confirmar tu pedido. Si quieres cambiar algo, escribe *cancelar*.'));\n  }\n\n} else {\n  // ---------- sin sesion: texto libre -> Gemini ----------\n  const SISTEMA = 'Eres el clasificador de intenciones del bot de WhatsApp de VarMan Crew, una tienda colombiana de zapatos (tenis/sneakers). Analiza el mensaje del cliente y responde SOLO un JSON valido (sin markdown) con esta forma: {\"intent\":\"<una de: saludo|ver_catalogo|pregunta_precio|comprar|hablar_humano|otro>\",\"respuesta\":\"<respuesta corta y calida en español colombiano, tono vendedor amable, max 2 frases, puede usar 1 emoji>\"} Reglas: \"saludo\": saludos o inicios de conversacion, la respuesta da la bienvenida a VarMan Crew. \"ver_catalogo\": pide ver zapatos, modelos, catalogo, fotos, o pregunta por un modelo o marca. \"pregunta_precio\": pregunta precios en general o de una categoria. \"comprar\": ya quiere comprar o pedir algo concreto. \"hablar_humano\": pide hablar con una persona, asesor o el dueño. \"otro\": nada de lo anterior (quejas, envios, etc.), da una respuesta util y ofrece ver el catalogo o hablar con un asesor. Contexto: precios entre $235.000 y $480.000 COP, envios a todo Colombia, pagos por Nequi/Daviplata/Bre-B.';\n  let intent = 'saludo';\n  let respuesta = '';\n  if (texto) {\n    try {\n      const r = await H.httpRequest({\n        method: 'POST',\n        url: 'https://generativelanguage.googleapis.com/v1beta/models/' + ($env.GEMINI_MODEL || 'gemini-2.5-flash-lite') + ':generateContent',\n        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': $env.GEMINI_API_KEY },\n        body: {\n          system_instruction: { parts: [{ text: SISTEMA }] },\n          contents: [{ role: 'user', parts: [{ text: texto.slice(0, 500) }] }],\n          generationConfig: { temperature: 0.3, maxOutputTokens: 200, responseMimeType: 'application/json' }\n        },\n        json: true, timeout: 15000\n      });\n      const out = JSON.parse(r.candidates[0].content.parts[0].text);\n      if (out && out.intent) { intent = out.intent; respuesta = out.respuesta || ''; }\n    } catch (e) { intent = 'saludo'; respuesta = ''; }\n  }\n  if (intent === 'hablar_humano') {\n    mensajes.push(msjTexto(to, respuesta || '¡Claro! Ya le avisé a nuestro equipo 😊. En un momento te escriben desde el +57 320 225 0619.'));\n    if (dueno && dueno !== to) {\n      mensajes.push(msjTexto(dueno, '🔔 *Cliente pide atención humana*\\n\\nNombre: ' + (parsed.nombre || '(sin nombre)') + '\\nWhatsApp: +' + to + '\\nÚltimo mensaje: \"' + texto + '\"'));\n    }\n  } else if (intent === 'otro') {\n    mensajes.push(msjTexto(to, respuesta || 'Con gusto te ayudamos 😊. ¿Quieres ver el catálogo? Escribe *hola* o dime qué necesitas.'));\n  } else if (intent === 'comprar') {\n    if (respuesta) mensajes.push(msjTexto(to, respuesta));\n    mensajes.push(listaCategorias(to, catalogo, 'Mira nuestro catálogo y toca el modelo que buscas 👇'));\n  } else {\n    mensajes.push(listaCategorias(to, catalogo, respuesta || undefined));\n  }\n}\n\nreturn mensajes.map((m) => ({ json: m }));"
+      },
+      "id": "40000000-0000-4000-8000-000000000007",
+      "name": "Cerebro (sesion+pedido+Gemini)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v21.0/{{ $env.WHATSAPP_PHONE_NUMBER_ID }}/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.WHATSAPP_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "40000000-0000-4000-8000-000000000008",
+      "name": "Enviar a WhatsApp",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        260
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook verificacion (GET)": {
+      "main": [
+        [
+          {
+            "node": "Verificar token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verificar token": {
+      "main": [
+        [
+          {
+            "node": "Responder a Meta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook mensajes (POST)": {
+      "main": [
+        [
+          {
+            "node": "Parsear mensaje",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parsear mensaje": {
+      "main": [
+        [
+          {
+            "node": "Leer catalogo (Firestore)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leer catalogo (Firestore)": {
+      "main": [
+        [
+          {
+            "node": "Cerebro (sesion+pedido+Gemini)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cerebro (sesion+pedido+Gemini)": {
+      "main": [
+        [
+          {
+            "node": "Enviar a WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Bogota"
+  },
+  "pinData": {}
+}

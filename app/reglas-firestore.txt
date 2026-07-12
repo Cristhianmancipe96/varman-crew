@@ -1,0 +1,131 @@
+REGLAS DE FIRESTORE — VarMan Crew (actualizadas 2026-07-09: pedidosOcultos +
+2026-07-07: ANULAR VENTAS + mapaCatalogo/proveedores/listaEspera/notificacionesPendientes del v5)
+================================================================================
+
+PARA QUÉ:
+- La pestaña "Caja" (gastos + estado de cuenta) solo la pueden ver los dos
+  socios. La app la esconde para los demás, pero la protección REAL son estas
+  reglas: sin ellas, alguien con conocimientos técnicos podría leer los gastos
+  aunque no vea la pestaña.
+- La pestaña "Pedidos" (2026-07-06) muestra los pedidos que crea el bot
+  de WhatsApp. La ven socios Y vendedor (todo el equipo con login), por eso su
+  regla es distinta a la de la caja. Sin esta regla nueva, la pestaña Pedidos
+  sale vacía con un error de permisos.
+  (El bot NO necesita permiso aquí: escribe con la llave maestra de Firebase,
+  que se salta las reglas. Sus colecciones privadas —botSesiones, botErrores,
+  botRate— no se listan a propósito: lo que no aparece queda BLOQUEADO.)
+- NUEVO (2026-07-07): ANULAR VENTAS. Anular una venta (reponer stock y dejarla
+  marcada en el historial) es SOLO de socios. La regla de `sales` cambió: el
+  vendedor sigue registrando/editando/borrando ventas normales, pero cualquier
+  escritura que toque los campos `anulada*` (o borrar una venta ya anulada)
+  exige ser socio. Hay que volver a pegar TODO el bloque.
+- NUEVO (2026-07-09): OCULTAR PEDIDOS. En la pestaña Pedidos, los socios pueden
+  ocultar un pedido de prueba (no se borra, solo deja de verse en la lista; se
+  puede volver a mostrar). NO toca el documento del pedido: se guarda en una
+  colección aparte `pedidosOcultos`, solo de socios (igual que `gastos`). Hay
+  que volver a pegar TODO el bloque.
+
+CÓMO PEGARLAS (2 minutos):
+1. Entra a https://console.firebase.google.com → proyecto "varman-crew"
+2. Menú izquierdo: Firestore Database → pestaña "Reglas" (Rules)
+3. BORRA todo lo que haya y pega ESTO tal cual:
+4. Botón "Publicar" (Publish)
+
+-------------------------------------------------------------------------------
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Los dos socios: los ÚNICOS que pueden ver y tocar la caja
+    function esSocio() {
+      return request.auth != null
+        && request.auth.token.email in [
+          'c.mancipe.96@gmail.com',
+          'andresvargasm91@gmail.com'
+        ];
+    }
+
+    match /tiendas/{tienda} {
+      // Documento de la tienda (guarda el logo)
+      allow read, write: if request.auth != null;
+
+      // Catálogo público de la página web (la página lee SIN login)
+      match /catalogo/{doc} {
+        allow read: if true;
+        allow write: if request.auth != null;
+      }
+      match /catalogoFotos/{doc} {
+        allow read: if true;
+        allow write: if request.auth != null;
+      }
+
+      // CAJA DE LOS SOCIOS: solo los dos correos de arriba
+      match /gastos/{doc} {
+        allow read, write: if esSocio();
+      }
+
+      // Inventario y fotos: todo el equipo con login (incluye vendedor)
+      match /products/{doc} { allow read, write: if request.auth != null; }
+      match /fotos/{doc}    { allow read, write: if request.auth != null; }
+
+      // VENTAS: todo el equipo registra/edita/borra ventas normales, pero
+      // ANULAR (los campos anulada*) es solo de socios. Las reglas se suman
+      // con "o": basta que una permita.
+      match /sales/{doc} {
+        allow read: if request.auth != null;
+        // socios: pueden todo (incluido anular y borrar anuladas)
+        allow write: if esSocio();
+        // el resto del equipo: solo escrituras SIN campos de anulación…
+        allow create, update: if request.auth != null
+          && !request.resource.data.keys().hasAny(
+               ['anulada', 'anulada_fecha', 'anulada_por', 'anulada_motivo']);
+        // …y solo puede borrar ventas que NO estén anuladas
+        allow delete: if request.auth != null && !('anulada' in resource.data);
+      }
+
+      // PEDIDOS DEL BOT DE WHATSAPP: todo el equipo con login los ve y los
+      // gestiona (verificar pago, marcar enviado/entregado, cancelar, notas).
+      // El bot los crea por su cuenta con la llave maestra (no usa esta regla).
+      match /pedidos/{doc}  { allow read, write: if request.auth != null; }
+
+      // Fotos de los comprobantes de pago (una por pedido, en colección aparte
+      // para que la lista de pedidos no pese): el equipo solo las LEE; las
+      // escribe el bot con la llave maestra.
+      match /comprobantes/{doc} { allow read: if request.auth != null; }
+
+      // ---- NUEVAS 2026-07-07 (v5, punto 5-bis y backlog 10-13) ----
+
+      // Mapa catálogo↔inventario (PRIVADO: aquí van los códigos VRM y los
+      // proveedores externos de cada ref). Lo edita el equipo desde la
+      // pestaña Tienda; el bot lo LEE con la llave maestra.
+      match /mapaCatalogo/{doc} { allow read, write: if request.auth != null; }
+
+      // Nombres de bodegas externas reutilizables (los crea la pestaña Tienda)
+      match /proveedores/{doc}  { allow read, write: if request.auth != null; }
+
+      // Lista de espera de stock ("avísame cuando llegue la talla X"): la
+      // escribe el bot; el equipo la ve en Pedidos y marca "ya avisé".
+      match /listaEspera/{doc}  { allow read, write: if request.auth != null; }
+
+      // Avisos que la app le deja al bot (reseña post-entrega, guía de envío).
+      // La app solo CREA (y puede borrar un error); el bot los marca enviados
+      // con la llave maestra.
+      match /notificacionesPendientes/{doc} {
+        allow read, create, delete: if request.auth != null;
+      }
+
+      // ---- NUEVA 2026-07-09 ----
+
+      // Pedidos ocultados (de prueba/duplicados): solo socios los ven y los
+      // tocan. Ocultar/mostrar NO modifica el documento del pedido.
+      match /pedidosOcultos/{doc} { allow read, write: if esSocio(); }
+    }
+  }
+}
+-------------------------------------------------------------------------------
+
+IMPORTANTE:
+- Si algún día cambian de correo o entra otro socio, hay que actualizar la
+  lista en DOS lugares: estas reglas y SOCIOS_CAJA al inicio de app.jsx.
+- El vendedor sigue usando la app normal (inventario, ventas, tienda) sin
+  ningún cambio; simplemente no ve ni puede leer la pestaña Caja.

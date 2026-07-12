@@ -1,0 +1,2829 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VarMan Crew — Zapatos y sneakers en Colombia</title>
+<meta name="description" content="VarMan Crew: sneakers y zapatos con estilo. Mira el catálogo y pide directo por WhatsApp.">
+<meta property="og:title" content="VarMan Crew — Zapatos y sneakers">
+<meta property="og:description" content="Mira el catálogo y pide directo por WhatsApp.">
+<meta name="theme-color" content="#FF6B00">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.44.0/dist/tabler-icons.min.css" integrity="sha384-ccZHbezhtZWmNy0cg8odL0D/jFU5k5HIls9y78Qd6lWor7rpvFIZtK0fTFG4z456" crossorigin="anonymous" referrerpolicy="no-referrer">
+<style>
+/* ============================================================
+   VARMAN CREW — Design System v3
+   Skills: Impeccable 3.5 + UI/UX Pro Max
+   OKLCH palette · 8dp spacing · WCAG AA · 150-300ms motion
+   ============================================================ */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+
+:root {
+  /* ── Brand OKLCH (no cream, no sand — Impeccable rule) ── */
+  --brand:          oklch(0.62 0.18 40);      /* #FF6B00 naranja */
+  --brand-dim:      oklch(0.62 0.18 40 / 0.12);
+  --brand-glow:     oklch(0.62 0.18 40 / 0.28);
+  --brand-hover:    oklch(0.56 0.18 40);
+
+  /* ── Surfaces — dark, con tinte brand (no puro #000) ── */
+  --bg:             oklch(0.09 0.006 40);     /* ~#0d0b09 */
+  --surf-1:         oklch(0.12 0.007 40);     /* ~#141210 */
+  --surf-2:         oklch(0.15 0.008 40);     /* ~#1a1714 */
+  --surf-3:         oklch(0.18 0.009 40);     /* ~#201d1a */
+  --surf-4:         oklch(0.22 0.01  40);     /* ~#272320 */
+
+  /* ── Text — WCAG 4.5:1 garantizado ── */
+  --ink:            oklch(0.95 0.004 40);     /* ~#F2EDE8 — 16:1 */
+  --ink-2:          oklch(0.72 0.008 40);     /* ~#B8B0A8 — 5.8:1 */
+  --ink-3:          oklch(0.52 0.008 40);     /* ~#7A7068 — 3.2:1 solo texto grande */
+  --ink-on-brand:   oklch(0.08 0.01  40);
+
+  /* ── Borders ── */
+  --border:         oklch(1 0 0 / 0.07);
+  --border-hover:   oklch(0.62 0.18 40 / 0.45);
+  --border-focus:   oklch(0.62 0.18 40 / 0.9);
+
+  /* ── Spacing 8dp ── */
+  --s1: 4px;  --s2: 8px;   --s3: 12px;  --s4: 16px;
+  --s5: 24px; --s6: 32px;  --s7: 48px;  --s8: 64px;
+  --s9: 96px; --s10: 128px;
+
+  /* ── Radii ── */
+  --r-sm: 6px; --r-md: 10px; --r-lg: 16px; --r-xl: 24px;
+
+  /* ── Type scale ── */
+  --t-xs: 11px; --t-sm: 13px; --t-base: 15px;
+  --t-lg: 18px; --t-xl: 22px;
+
+  /* ── Motion — Impeccable: ease-out-quart, 150-300ms ── */
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --d-fast: 150ms; --d-mid: 240ms; --d-slow: 360ms;
+
+  /* ── Z-index semántico (Impeccable rule) ── */
+  --z-sticky: 100; --z-nav: 200; --z-overlay: 300;
+  --z-modal: 400;  --z-toast: 500; --z-cursor: 600;
+}
+
+/* ── Reduced motion (ambas skills) ── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'Inter', sans-serif;
+  font-size: var(--t-base);
+  line-height: 1.6;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  /* Impeccable: max 75ch body line length */
+}
+
+/* Focus rings — nunca eliminar (UI/UX Pro Max P1) */
+:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+a, button, [role="button"],
+.f-btn, .cat-card, .prod-card,
+.prod-btn, .c-link, .footer-ig { cursor: pointer; }
+
+/* Skip link — a11y */
+.skip-link {
+  position: absolute; top: -100px; left: var(--s4);
+  background: var(--brand); color: var(--ink-on-brand);
+  padding: var(--s2) var(--s4); border-radius: var(--r-sm);
+  font-size: var(--t-sm); font-weight: 600; text-decoration: none;
+  z-index: 9999; transition: top var(--d-fast);
+}
+.skip-link:focus { top: var(--s4); }
+
+/* ============================================================
+   NAVEGACIÓN
+   ============================================================ */
+nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: var(--z-nav);
+  background: oklch(0.09 0.006 40 / 0.94);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 var(--s7); height: 68px;
+  transition: background var(--d-mid) var(--ease);
+}
+.nav-logo img {
+  height: 36px; object-fit: contain;
+  filter: drop-shadow(0 0 10px var(--brand-glow));
+}
+.nav-links { display: flex; gap: var(--s6); list-style: none; }
+.nav-links a {
+  font-size: var(--t-xs); font-weight: 600; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--ink-2);
+  text-decoration: none; padding: var(--s2) 0;
+  position: relative;
+  transition: color var(--d-fast) var(--ease);
+}
+/* Underline slide — Impeccable: purposeful motion */
+.nav-links a::after {
+  content: ''; position: absolute; bottom: -1px; left: 0;
+  width: 100%; height: 2px; background: var(--brand);
+  transform: scaleX(0); transform-origin: right;
+  transition: transform var(--d-mid) var(--ease);
+}
+.nav-links a:hover { color: var(--ink); }
+.nav-links a:hover::after { transform: scaleX(1); transform-origin: left; }
+
+.nav-cta {
+  background: var(--brand); color: var(--ink-on-brand);
+  padding: 10px var(--s5); border-radius: var(--r-sm);
+  font-size: var(--t-xs); font-weight: 800; letter-spacing: 0.12em;
+  text-transform: uppercase; text-decoration: none;
+  min-height: 44px; display: inline-flex; align-items: center;
+  transition: background var(--d-fast) var(--ease),
+              transform var(--d-fast) var(--ease),
+              box-shadow var(--d-fast) var(--ease);
+}
+.nav-cta:hover {
+  background: var(--brand-hover); transform: translateY(-1px);
+  box-shadow: 0 8px 24px var(--brand-glow);
+}
+.nav-cta:active { transform: none; box-shadow: none; }
+
+/* ============================================================
+   HERO — "Drenched" color strategy (Impeccable)
+   Imagen ocupa toda la pantalla, texto sobre gradiente fuerte
+   ============================================================ */
+.hero {
+  min-height: 100svh;
+  display: flex; align-items: flex-end;        /* texto abajo como póster */
+  position: relative; overflow: hidden;
+  padding: 0 var(--s7) var(--s9);
+}
+.hero-bg { position: absolute; inset: 0; }
+.hero-bg video, .hero-bg img {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  object-fit: cover; object-position: center 50%;
+  display: block;
+}
+/* Gradiente de cine — luz desde abajo */
+.hero-bg::after {
+  content: ''; position: absolute; inset: 0; z-index: 1;
+  background:
+    linear-gradient(
+      to top,
+      oklch(0.09 0.006 40 / 0.97) 0%,
+      oklch(0.09 0.006 40 / 0.75) 35%,
+      oklch(0.09 0.006 40 / 0.30) 65%,
+      transparent 100%
+    );
+}
+/* Vignette lateral */
+.hero-bg::before {
+  content: ''; position: absolute; inset: 0; z-index: 1;
+  background:
+    linear-gradient(to right,
+      oklch(0.09 0.006 40 / 0.6) 0%,
+      transparent 50%
+    );
+}
+
+.hero-content {
+  position: relative; z-index: 2;
+  width: 100%; max-width: 700px;
+  display: flex; flex-direction: column; gap: var(--s5);
+}
+
+/* Tagline — sin eyebrow pequeño, directo al grano (Impeccable) */
+.hero-tagline {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(14px, 1.8vw, 20px);
+  letter-spacing: 0.35em; text-transform: uppercase;
+  color: var(--brand); opacity: 0;
+  display: flex; align-items: center; gap: var(--s3);
+}
+.hero-tagline::before {
+  content: ''; width: 40px; height: 2px;
+  background: var(--brand); flex-shrink: 0;
+}
+
+/* Sin eyebrow duplicado — logo como titular de marca */
+.hero-logo-big { opacity: 0; }
+.hero-logo-big img {
+  height: 90px; object-fit: contain;
+  filter: drop-shadow(0 4px 32px oklch(0.62 0.18 40 / 0.35));
+}
+
+/* Título enorme — Impeccable: max 6rem */
+.hero-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(52px, 8.5vw, 96px);        /* ≤ 6rem = 96px */
+  line-height: 0.92;
+  letter-spacing: -0.02em;                     /* Impeccable: ≥ -0.04em */
+  color: var(--ink);
+  text-wrap: balance;                           /* Impeccable rule */
+  opacity: 0;
+}
+.hero-title .accent { color: var(--brand); }
+
+.hero-desc {
+  font-size: var(--t-base); color: var(--ink-2);
+  line-height: 1.75; max-width: 480px;         /* Impeccable: 65-75ch */
+  text-wrap: pretty;                            /* reduce orfanas */
+  opacity: 0;
+}
+.hero-desc strong { color: var(--ink); font-weight: 600; }
+
+.hero-btns {
+  display: flex; gap: var(--s3); flex-wrap: wrap; opacity: 0;
+}
+.btn-p {
+  background: var(--brand); color: var(--ink-on-brand);
+  padding: 15px var(--s7); border-radius: var(--r-sm);
+  font-size: var(--t-sm); font-weight: 800; letter-spacing: 0.1em;
+  text-transform: uppercase; text-decoration: none;
+  min-height: 52px; display: inline-flex; align-items: center;
+  transition: background var(--d-fast) var(--ease),
+              transform var(--d-fast) var(--ease),
+              box-shadow var(--d-fast) var(--ease);
+}
+.btn-p:hover {
+  background: var(--brand-hover); transform: translateY(-3px);
+  box-shadow: 0 12px 32px var(--brand-glow);
+}
+.btn-p:active { transform: none; box-shadow: none; }
+
+.btn-s {
+  border: 1.5px solid oklch(1 0 0 / 0.2); color: var(--ink);
+  padding: 15px var(--s7); border-radius: var(--r-sm);
+  font-size: var(--t-sm); font-weight: 600; letter-spacing: 0.1em;
+  text-transform: uppercase; text-decoration: none; background: transparent;
+  min-height: 52px; display: inline-flex; align-items: center;
+  transition: border-color var(--d-fast) var(--ease),
+              color var(--d-fast) var(--ease),
+              background var(--d-fast) var(--ease);
+}
+.btn-s:hover {
+  border-color: var(--brand); color: var(--brand);
+  background: var(--brand-dim);
+}
+
+.hero-tags {
+  display: flex; gap: var(--s5); flex-wrap: wrap; opacity: 0;
+}
+.hero-tag {
+  font-size: var(--t-xs); color: var(--ink-3);
+  display: flex; align-items: center; gap: var(--s2);
+}
+.hero-tag::before {
+  content: ''; width: 5px; height: 5px; border-radius: 50%;
+  background: var(--brand); flex-shrink: 0;
+}
+
+/* BG word decorativo */
+.hero-bg-word {
+  position: absolute; right: -2vw; top: 50%;
+  transform: translateY(-50%);
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 28vw; color: oklch(0.62 0.18 40 / 0.04);
+  line-height: 1; user-select: none; pointer-events: none;
+  letter-spacing: -0.05em; will-change: transform; z-index: 2;
+}
+.hero-metrics {
+  position: absolute; bottom: var(--s9); right: var(--s7); z-index: 2;
+  display: flex; align-items: center; gap: var(--s5); opacity: 0;
+}
+.hero-metric { text-align: center; }
+.hm-n {
+  font-family: 'Bebas Neue', sans-serif; font-size: 32px;
+  color: var(--ink); line-height: 1; display: block;
+  letter-spacing: 0.02em;
+}
+.hm-l {
+  font-size: 10px; color: var(--ink-3); letter-spacing: 0.18em;
+  text-transform: uppercase; margin-top: 3px; display: block;
+}
+.hero-metric-div {
+  width: 1px; height: 36px;
+  background: oklch(1 0 0 / 0.12);
+}
+@media (max-width: 768px) {
+  .hero-metrics { display: none; }
+}
+.hero-stripe {
+  position: absolute; left: 0; bottom: 0; right: 0;
+  height: 3px; background: var(--brand); z-index: 3;
+}
+
+/* ============================================================
+   TICKER
+   ============================================================ */
+/* Restyle 2026-07-11: de franja naranja sólida a marquesina street —
+   tipografía Bebas grande DELINEADA (hueca) sobre el fondo oscuro, con
+   puntos naranjas. Menos gritona, más crew. */
+.ticker-wrap {
+  overflow: hidden; background: var(--surf-1); padding: 12px 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+.ticker-track { display: flex; white-space: nowrap; will-change: transform; }
+.ticker-item {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 26px; letter-spacing: 0.2em; line-height: 1;
+  color: transparent;
+  -webkit-text-stroke: 1.1px oklch(0.72 0.14 40 / 0.9);
+  paint-order: stroke fill;
+  padding: 0 var(--s6); flex-shrink: 0;
+  display: flex; align-items: center; gap: var(--s4);
+}
+/* uno de cada tres lleva relleno naranja: ritmo, no muro de color */
+.ticker-item:nth-child(3n) {
+  color: var(--brand);
+  -webkit-text-stroke: 0;
+}
+.ticker-dot {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: var(--brand);
+  -webkit-text-stroke: 0;
+}
+@supports not (-webkit-text-stroke: 1px black) {
+  .ticker-item { color: var(--ink-2); } /* respaldo sin stroke */
+}
+
+/* ============================================================
+   SECCIONES — jerarquía visual sin eyebrow en cada una
+   ============================================================ */
+section { padding: var(--s9) var(--s7); }
+
+/* Solo algunas secciones tienen label — no todas (Impeccable ban) */
+.s-label {
+  font-size: var(--t-xs); font-weight: 700; letter-spacing: 0.3em;
+  text-transform: uppercase; color: var(--brand);
+  margin-bottom: var(--s3);
+  display: flex; align-items: center; gap: var(--s2);
+}
+.s-label::before {
+  content: ''; width: 18px; height: 2px;
+  background: var(--brand); flex-shrink: 0;
+}
+.s-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(38px, 5.5vw, 62px);
+  letter-spacing: -0.01em; color: var(--ink);
+  line-height: 0.95; margin-bottom: var(--s7);
+  text-wrap: balance;
+}
+
+/* ============================================================
+   PARALLAX SECTIONS
+   ============================================================ */
+.parallax-section {
+  position: relative; overflow: hidden;
+  height: 60vh; min-height: 320px;
+}
+.parallax-img {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  will-change: transform;
+}
+.parallax-img-inner {
+  width: 100%; height: 100%;
+  background: var(--surf-2);
+}
+.parallax-img-inner.img1,
+.parallax-img-inner.img2 {
+  background: none; position: relative; overflow: hidden;
+}
+.parallax-img-inner.img1 img,
+.parallax-img-inner.img2 img {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  object-fit: cover; object-position: center; display: block;
+}
+.parallax-overlay {
+  position: absolute; inset: 0;
+  background: oklch(0 0 0 / 0.5);
+  display: flex; align-items: center; justify-content: center;
+  flex-direction: column; gap: var(--s3);
+}
+.parallax-overlay-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(36px, 5.5vw, 72px);
+  letter-spacing: 0.08em; color: var(--ink);
+}
+.parallax-overlay-sub {
+  font-size: var(--t-sm); color: oklch(1 0 0 / 0.5);
+  letter-spacing: 0.3em; text-transform: uppercase;
+}
+.parallax-orange-line {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  height: 3px; background: var(--brand);
+}
+
+/* ============================================================
+   CATEGORÍAS — sin border-left (Impeccable ban)
+   Diseño basado en fondo + escala
+   ============================================================ */
+.categories {
+  background: var(--surf-1); padding: var(--s9) var(--s7);
+}
+/* Grid asimétrico — Impeccable: vary spacing for rhythm */
+.cat-grid {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr 0.9fr;
+  gap: 1px;
+}
+.cat-card {
+  background: var(--surf-2);
+  padding: var(--s8) var(--s6);
+  position: relative; overflow: hidden;
+  transition: background var(--d-mid) var(--ease);
+}
+/* Hover: background completo, no border lateral (Impeccable ban) */
+.cat-card::after {
+  content: ''; position: absolute; inset: 0;
+  background: var(--brand-dim);
+  opacity: 0;
+  transition: opacity var(--d-mid) var(--ease);
+}
+.cat-card:hover { background: var(--surf-3); }
+.cat-card:hover::after { opacity: 1; }
+.cat-card:hover .cat-arrow { color: var(--brand); transform: translateX(8px); }
+.cat-card:hover .cat-icon { background: oklch(0.62 0.18 40 / 0.2); }
+
+.cat-num {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 72px; color: oklch(1 0 0 / 0.025);
+  position: absolute; bottom: var(--s3); right: var(--s4);
+  line-height: 1; user-select: none; pointer-events: none;
+}
+.cat-icon {
+  width: 54px; height: 54px; border-radius: var(--r-md);
+  background: var(--brand-dim);
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: var(--s5); position: relative; z-index: 1;
+  transition: background var(--d-mid) var(--ease);
+}
+.cat-icon i { font-size: 22px; color: var(--brand); }
+.cat-name {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 30px; letter-spacing: 0.05em;
+  color: var(--ink); margin-bottom: var(--s2);
+  position: relative; z-index: 1;
+}
+.cat-desc {
+  font-size: var(--t-sm); color: var(--ink-2);
+  line-height: 1.65; position: relative; z-index: 1;
+}
+.cat-arrow {
+  font-size: 20px; color: var(--surf-4); margin-top: var(--s5);
+  display: block; position: relative; z-index: 1;
+  transition: color var(--d-fast) var(--ease),
+              transform var(--d-fast) var(--ease);
+}
+
+/* ============================================================
+   CATÁLOGO
+   ============================================================ */
+.catalog { background: var(--bg); }
+.catalog-top {
+  display: flex; justify-content: space-between; align-items: flex-end;
+  margin-bottom: var(--s6); flex-wrap: wrap; gap: var(--s5);
+}
+.filters { display: flex; gap: var(--s2); flex-wrap: wrap; }
+.f-btn {
+  font-size: var(--t-xs); font-weight: 700;
+  padding: 9px var(--s5); min-height: 40px;
+  border-radius: 20px;
+  border: 1.5px solid oklch(1 0 0 / 0.1);
+  color: var(--ink-2); background: transparent;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  transition: all var(--d-fast) var(--ease);
+}
+.f-btn.active, .f-btn:hover {
+  border-color: var(--brand); color: var(--brand);
+  background: var(--brand-dim);
+}
+/* Grid Impeccable: auto-fit para responsive sin breakpoints */
+.prod-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--s4);
+}
+/* Impeccable: cards solo cuando son la mejor affordance */
+.prod-card {
+  background: var(--surf-1);
+  border-radius: var(--r-lg); overflow: hidden;
+  border: 1px solid var(--border);
+  transition: transform var(--d-mid) var(--ease),
+              border-color var(--d-mid) var(--ease),
+              box-shadow var(--d-mid) var(--ease);
+}
+.prod-card:hover {
+  transform: translateY(-8px);
+  border-color: oklch(0.62 0.18 40 / 0.4);
+  box-shadow:
+    0 20px 60px oklch(0 0 0 / 0.5),
+    0 0 0 1px oklch(0.62 0.18 40 / 0.12);
+}
+.prod-img {
+  aspect-ratio: 1/1; background: var(--surf-2);
+  display: flex; align-items: center; justify-content: center;
+  position: relative; overflow: hidden;
+}
+.prod-img-ph {
+  display: flex; flex-direction: column; align-items: center; gap: var(--s2);
+}
+.prod-img-ph i { font-size: 40px; color: oklch(1 0 0 / 0.06); }
+.prod-img-ph span {
+  font-size: 10px; color: oklch(1 0 0 / 0.1);
+  letter-spacing: 0.2em; text-transform: uppercase;
+}
+.prod-tag {
+  position: absolute; top: var(--s3); left: var(--s3);
+  background: var(--brand); color: var(--ink-on-brand);
+  font-size: 9px; font-weight: 800; padding: 4px 10px;
+  border-radius: 4px; letter-spacing: 0.1em; text-transform: uppercase;
+}
+.prod-info { padding: var(--s5); }
+.prod-cat {
+  font-size: 10px; color: var(--brand);
+  letter-spacing: 0.2em; text-transform: uppercase; margin-bottom: var(--s1);
+}
+.prod-name {
+  font-size: var(--t-base); font-weight: 600;
+  color: var(--ink); margin-bottom: var(--s4); line-height: 1.35;
+}
+.prod-foot { display: flex; justify-content: space-between; align-items: center; }
+.prod-price {
+  font-family: 'Bebas Neue', sans-serif; font-size: 28px;
+  letter-spacing: 0.02em; color: var(--ink);
+}
+.prod-price small {
+  font-size: var(--t-sm); color: var(--ink-2);
+  font-family: 'Inter', sans-serif;
+}
+/* Touch target 44×44 */
+.prod-btn {
+  width: 44px; height: 44px; border-radius: var(--r-sm);
+  background: var(--brand); flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  border: none;
+  transition: background var(--d-fast) var(--ease),
+              transform var(--d-fast) var(--ease);
+}
+.prod-btn:hover { background: var(--brand-hover); transform: scale(1.08); }
+.prod-btn:active { transform: scale(0.95); }
+.prod-btn i { font-size: 16px; color: var(--ink-on-brand); }
+
+.coming-banner {
+  border: 1px dashed oklch(0.62 0.18 40 / 0.3);
+  border-radius: var(--r-lg); padding: var(--s7); text-align: center;
+  margin-bottom: var(--s5); background: oklch(0.62 0.18 40 / 0.03);
+}
+.coming-banner i { font-size: 28px; color: var(--brand); }
+.coming-banner p {
+  font-size: var(--t-sm); color: var(--ink-2);
+  margin-top: var(--s2); line-height: 1.65;
+}
+.coming-banner strong { color: var(--ink); }
+
+/* ============================================================
+   ABOUT — layout 60/40 asimétrico
+   ============================================================ */
+.about { background: var(--surf-1); }
+.about-inner {
+  display: grid; grid-template-columns: 1.15fr 1fr;
+  gap: var(--s9); align-items: center;
+}
+.about-visual {
+  position: relative; border-radius: var(--r-xl); overflow: hidden;
+  aspect-ratio: 3/4;                         /* más alto — más dramático */
+  background: var(--surf-2);
+  border: 1px solid oklch(0.62 0.18 40 / 0.2);
+  box-shadow: 0 0 60px oklch(0.62 0.18 40 / 0.08), 0 20px 60px oklch(0 0 0 / 0.4);
+}
+.about-visual-photo { position: absolute; inset: 0; overflow: hidden; }
+.about-visual-photo img {
+  width: 100%; height: 100%;
+  object-fit: cover; object-position: center;
+  opacity: 0.42; display: block;
+}
+.about-visual-overlay {
+  position: absolute; inset: 0;
+  background: linear-gradient(180deg,
+    transparent 40%,
+    oklch(0.09 0.006 40 / 0.8) 100%
+  );
+}
+.about-logo-wrap {
+  position: absolute; bottom: var(--s7); left: 0; right: 0;
+  z-index: 2;
+  display: flex; flex-direction: column; align-items: center; gap: var(--s3);
+}
+.about-logo-wrap img {
+  width: 200px; object-fit: contain;
+  filter: drop-shadow(0 4px 24px oklch(1 0 0 / 0.15));
+}
+.about-logo-label {
+  font-size: var(--t-xs); color: oklch(1 0 0 / 0.25);
+  letter-spacing: 0.25em; text-transform: uppercase;
+}
+.about-text .s-title { margin-bottom: var(--s4); }
+.about-desc {
+  font-size: var(--t-base); color: var(--ink-2);
+  line-height: 1.85; margin-bottom: var(--s6);
+  max-width: 55ch; text-wrap: pretty;
+}
+.about-desc strong { color: var(--ink); }
+
+.stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s3); }
+.stat {
+  background: var(--surf-2); border-radius: var(--r-md); padding: var(--s5);
+  border: 1px solid var(--border);
+  transition: border-color var(--d-mid) var(--ease),
+              transform var(--d-mid) var(--ease);
+}
+.stat:hover {
+  border-color: oklch(0.62 0.18 40 / 0.3);
+  transform: translateY(-2px);
+}
+.stat-n {
+  font-family: 'Bebas Neue', sans-serif; font-size: 44px;
+  color: var(--brand); line-height: 1;
+}
+.stat-l {
+  font-size: var(--t-xs); color: var(--ink-2);
+  margin-top: var(--s1); text-transform: uppercase; letter-spacing: 0.1em;
+}
+
+/* ============================================================
+   CONTACTO
+   ============================================================ */
+.contact { background: var(--bg); }
+.contact-inner { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s9); }
+.contact-desc {
+  font-size: var(--t-base); color: var(--ink-2);
+  line-height: 1.8; margin-bottom: var(--s6); max-width: 60ch;
+}
+.c-links { display: flex; flex-direction: column; gap: var(--s3); }
+.c-link {
+  display: flex; align-items: center; gap: var(--s4);
+  padding: var(--s4) var(--s5); border-radius: var(--r-md);
+  border: 1px solid var(--border); background: var(--surf-1);
+  text-decoration: none; min-height: 68px;
+  transition: border-color var(--d-fast) var(--ease),
+              background var(--d-fast) var(--ease),
+              transform var(--d-fast) var(--ease);
+}
+.c-link:hover {
+  border-color: var(--brand);
+  background: var(--brand-dim);
+  transform: translateX(6px);
+}
+.c-icon {
+  width: 46px; height: 46px; border-radius: var(--r-sm);
+  background: var(--brand-dim); flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  transition: background var(--d-fast) var(--ease);
+}
+.c-link:hover .c-icon { background: oklch(0.62 0.18 40 / 0.22); }
+.c-icon i { font-size: 18px; color: var(--brand); }
+.c-lbl { font-size: 10px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.15em; }
+.c-val { font-size: var(--t-sm); font-weight: 600; color: var(--ink); margin-top: 2px; }
+
+/* Form con labels visibles (UI/UX Pro Max P8) */
+.c-form { display: flex; flex-direction: column; gap: var(--s4); }
+.f-group { display: flex; flex-direction: column; gap: var(--s2); }
+.f-label {
+  font-size: var(--t-xs); color: var(--ink-2);
+  text-transform: uppercase; letter-spacing: 0.15em; font-weight: 600;
+}
+.f-input, .f-textarea {
+  background: var(--surf-1); border: 1.5px solid oklch(1 0 0 / 0.1);
+  border-radius: var(--r-sm); padding: 14px var(--s4);
+  font-family: 'Inter', sans-serif; font-size: var(--t-base);
+  color: var(--ink); outline: none; min-height: 50px;
+  transition: border-color var(--d-fast) var(--ease),
+              background var(--d-fast) var(--ease);
+}
+.f-input:focus, .f-textarea:focus {
+  border-color: var(--brand);
+  background: oklch(0.62 0.18 40 / 0.04);
+}
+.f-input::placeholder, .f-textarea::placeholder { color: var(--ink-3); }
+.f-textarea { min-height: 120px; resize: vertical; }
+.f-submit {
+  background: var(--brand); color: var(--ink-on-brand);
+  padding: 17px var(--s5); border-radius: var(--r-sm);
+  font-family: 'Inter', sans-serif; font-weight: 800;
+  font-size: var(--t-sm); text-transform: uppercase; letter-spacing: 0.1em;
+  border: none; width: 100%; min-height: 54px;
+  transition: background var(--d-fast) var(--ease),
+              transform var(--d-fast) var(--ease),
+              box-shadow var(--d-fast) var(--ease);
+}
+.f-submit:hover {
+  background: var(--brand-hover); transform: translateY(-2px);
+  box-shadow: 0 12px 32px var(--brand-glow);
+}
+.f-submit:active { transform: none; box-shadow: none; }
+.f-submit:disabled { opacity: 0.6; transform: none; cursor: not-allowed; }
+
+/* ============================================================
+   CÓMO COMPRAR — 4 pasos
+   ============================================================ */
+.howbuy { background: var(--surf-1); }
+.hb-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--s3); }
+.hb-step {
+  position: relative; display: block;
+  background: var(--surf-2); border: 1px solid var(--border);
+  border-radius: var(--r-md); padding: var(--s5);
+  color: inherit; text-decoration: none;
+}
+a.hb-step {
+  transition: border-color var(--d-mid) var(--ease),
+              transform var(--d-mid) var(--ease);
+}
+a.hb-step:hover {
+  border-color: oklch(0.62 0.18 40 / 0.3);
+  transform: translateY(-2px);
+}
+.hb-num {
+  position: absolute; top: var(--s4); right: var(--s4);
+  font-family: 'Bebas Neue', sans-serif; font-size: 34px;
+  color: var(--ink-3); line-height: 1;
+}
+.hb-icon {
+  width: 44px; height: 44px; border-radius: var(--r-sm);
+  background: var(--brand-dim); color: var(--brand);
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: var(--s4);
+}
+.hb-icon i { font-size: 22px; }
+.hb-name { font-weight: 700; font-size: var(--t-base); color: var(--ink); margin-bottom: var(--s2); }
+.hb-desc { font-size: var(--t-sm); color: var(--ink-2); line-height: 1.6; text-wrap: pretty; }
+@media (max-width: 1024px) { .hb-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 560px)  { .hb-grid { grid-template-columns: 1fr; } }
+
+/* ============================================================
+   FOOTER
+   ============================================================ */
+footer {
+  background: oklch(0.07 0.005 40);
+  border-top: 1px solid var(--border);
+  padding: var(--s7); display: flex;
+  justify-content: space-between; align-items: center;
+  flex-wrap: wrap; gap: var(--s5);
+}
+.footer-logo img {
+  height: 48px; object-fit: contain;
+  filter: drop-shadow(0 0 16px var(--brand-glow));
+}
+.footer-tag { font-size: var(--t-xs); color: oklch(0.35 0.005 40); margin-top: var(--s1); letter-spacing: 0.2em; text-transform: uppercase; }
+.footer-copy { font-size: 12px; color: oklch(0.3 0.005 40); }
+.footer-socials { display: flex; align-items: center; gap: var(--s2); }
+.footer-ig {
+  display: flex; align-items: center; justify-content: center;
+  width: 44px; height: 44px; border-radius: var(--r-sm);
+  border: 1px solid var(--border); color: var(--ink-3);
+  text-decoration: none;
+  transition: color var(--d-fast) var(--ease),
+              border-color var(--d-fast) var(--ease),
+              background var(--d-fast) var(--ease),
+              transform var(--d-fast) var(--ease);
+}
+.footer-ig:hover {
+  color: var(--brand); border-color: var(--brand);
+  background: var(--brand-dim); transform: translateY(-3px);
+}
+.footer-ig i { font-size: 20px; }
+
+/* ============================================================
+   HAMBURGER & MOBILE MENU
+   ============================================================ */
+.nav-hamburger {
+  display: none; flex-direction: column; justify-content: center;
+  gap: 5px; width: 44px; height: 44px; cursor: pointer;
+  background: transparent; border: none; padding: var(--s1);
+}
+.nav-hamburger span {
+  display: block; height: 2px; background: var(--ink);
+  border-radius: 2px;
+  transition: all var(--d-mid) var(--ease); transform-origin: center;
+}
+.nav-hamburger.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+.nav-hamburger.open span:nth-child(2) { opacity: 0; transform: scaleX(0); }
+.nav-hamburger.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
+.mobile-menu {
+  display: none; position: fixed; top: 68px; left: 0; right: 0;
+  z-index: calc(var(--z-nav) - 1);
+  background: oklch(0.09 0.006 40 / 0.98);
+  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid oklch(0.62 0.18 40 / 0.2);
+  flex-direction: column;
+  transform: translateY(-8px); opacity: 0;
+  transition: opacity var(--d-mid) var(--ease),
+              transform var(--d-mid) var(--ease);
+  pointer-events: none;
+}
+.mobile-menu.open { display: flex; opacity: 1; transform: translateY(0); pointer-events: all; }
+.mobile-menu a {
+  padding: var(--s5);
+  font-size: var(--t-sm); font-weight: 600; letter-spacing: 0.15em;
+  text-transform: uppercase; color: var(--ink-2);
+  text-decoration: none; border-bottom: 1px solid var(--border);
+  min-height: 58px; display: flex; align-items: center;
+  transition: color var(--d-fast), background var(--d-fast);
+}
+.mobile-menu a:hover { color: var(--brand); background: var(--brand-dim); }
+.mobile-menu .mob-cta {
+  margin: var(--s4) var(--s5) var(--s5);
+  background: var(--brand); color: var(--ink-on-brand);
+  text-align: center; border-radius: var(--r-sm);
+  font-weight: 800; border-bottom: none; justify-content: center;
+  padding: 15px var(--s5); min-height: 52px;
+}
+.mobile-menu .mob-cta:hover { background: var(--brand-hover); color: var(--ink-on-brand); }
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+@media (max-width: 768px) {
+  nav { padding: 0 var(--s5); height: 60px; }
+  .nav-links, .nav-cta { display: none !important; }
+  .nav-hamburger { display: flex; }
+  .nav-logo img { height: 28px; }
+
+  .hero {
+    padding: 80px var(--s5) var(--s8);
+    align-items: flex-end; min-height: 100svh;
+  }
+  .hero-content {
+    width: 100%;
+    max-width: 100%;
+    gap: var(--s4);
+  }
+  .hero-bg::before { display: none; }
+  .hero-bg::after {
+    background: linear-gradient(
+      to top,
+      oklch(0.09 0.006 40 / 0.97) 0%,
+      oklch(0.09 0.006 40 / 0.8) 40%,
+      oklch(0.09 0.006 40 / 0.4) 70%,
+      transparent 100%
+    ) !important;
+  }
+  .hero-bg-word { font-size: 55vw; right: -3vw; }
+  .hero-logo-big img { height: 60px; }
+  .hero-title { font-size: clamp(46px, 13vw, 72px); }
+  .hero-tagline { font-size: clamp(12px, 3.5vw, 16px); }
+  .hero-desc { font-size: var(--t-sm); }
+  .hero-btns { flex-direction: column; gap: var(--s2); }
+  .btn-p, .btn-s { justify-content: center; padding: 15px var(--s5); }
+  .hero-tags { gap: var(--s4); }
+  .hero-tagline::before,
+  .hero-tagline::after { display: none; }
+
+  section { padding: var(--s8) var(--s5); }
+  .s-title { font-size: clamp(32px, 9vw, 48px); margin-bottom: var(--s6); }
+
+  .parallax-section { height: 56vw; min-height: 220px; max-height: 380px; }
+  .parallax-overlay-title { font-size: clamp(26px, 8vw, 44px); }
+
+  .categories { padding: var(--s8) var(--s5); }
+  .cat-grid { grid-template-columns: 1fr; gap: 1px; }
+  .cat-card { padding: var(--s6) var(--s5); }
+
+  .catalog-top { flex-direction: column; align-items: flex-start; gap: var(--s4); }
+  .prod-grid { grid-template-columns: repeat(2, 1fr); gap: var(--s3); }
+  .prod-info { padding: var(--s3); }
+  .prod-name { font-size: var(--t-sm); }
+  .prod-price { font-size: 22px; }
+
+  .about-inner { grid-template-columns: 1fr; gap: var(--s7); }
+  .about-visual { aspect-ratio: 4/3; }
+  .about-logo-wrap img { width: 140px; }
+  .about-desc { font-size: var(--t-sm); }
+  .stats-grid { gap: var(--s2); }
+  .stat-n { font-size: 36px; }
+
+  .contact-inner { grid-template-columns: 1fr; gap: var(--s7); }
+
+  footer { padding: var(--s6) var(--s5); flex-direction: column; align-items: flex-start; }
+}
+@media (max-width: 380px) {
+  .prod-grid { grid-template-columns: 1fr; }
+  .hero-title { font-size: 40px; }
+}
+
+/* ============================================================
+   ANIMATION CLASSES — Impeccable: reveal debe tener default visible
+   ============================================================ */
+.text-reveal-wrap { overflow: hidden; display: block; }
+.text-reveal-inner { display: block; transform: translateY(110%); }
+/* Fallback: si GSAP no carga, el contenido es visible */
+.no-gsap .text-reveal-inner { transform: translateY(0) !important; }
+.no-gsap #anim-eyebrow,
+.no-gsap #anim-logo,
+.no-gsap #anim-desc,
+.no-gsap #anim-btns,
+.no-gsap #anim-tags,
+.no-gsap .hero-tagline,
+.no-gsap .hero-logo-big,
+.no-gsap .hero-desc,
+.no-gsap .hero-btns,
+.no-gsap .hero-tags,
+.no-gsap .hero-metrics,
+.no-gsap .section-fade,
+.no-gsap .slide-left,
+.no-gsap .slide-right,
+.no-gsap .scale-in { opacity: 1 !important; transform: none !important; }
+
+.orange-bar { display: block; height: 3px; background: var(--brand); width: 0; margin-bottom: var(--s3); }
+.section-fade { opacity: 0; transform: translateY(40px); }
+.slide-left { opacity: 0; transform: translateX(-50px); }
+.slide-right { opacity: 0; transform: translateX(50px); }
+.scale-in { opacity: 0; transform: scale(0.92); }
+.reveal-clip { clip-path: inset(100% 0 0 0); }
+.word-split, .char-wrap, .line-wrap { overflow: hidden; display: inline-block; }
+.count-up { display: inline-block; }
+
+/* Cursor follower */
+.cursor-dot {
+  position: fixed; width: 8px; height: 8px; border-radius: 50%;
+  background: var(--brand); pointer-events: none; z-index: var(--z-cursor);
+  transform: translate(-50%, -50%); will-change: left, top;
+}
+.cursor-ring {
+  position: fixed; width: 36px; height: 36px; border-radius: 50%;
+  border: 1.5px solid oklch(0.62 0.18 40 / 0.5); pointer-events: none;
+  z-index: calc(var(--z-cursor) - 1);
+  transform: translate(-50%, -50%); will-change: left, top;
+  transition: width var(--d-slow), height var(--d-slow), border-color var(--d-slow);
+}
+@media (max-width: 768px) {
+  .cursor-dot, .cursor-ring { display: none; }
+  .ticker-item { font-size: 21px; padding: 0 var(--s5); }
+}
+</style>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src https://fonts.gstatic.com https://cdn.jsdelivr.net; img-src 'self' data:; connect-src 'self' https://firestore.googleapis.com; object-src 'none'; base-uri 'self'; form-action 'self'">
+<link rel="icon" type="image/png" href="/favicon.png">
+<link rel="apple-touch-icon" href="/favicon.png">
+<meta property="og:image" content="https://varmancrew.com/og-image.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:url" content="https://varmancrew.com/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="VarMan Crew">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="VarMan Crew — Zapatos y sneakers">
+<meta name="twitter:description" content="Mira el catálogo y pide directo por WhatsApp.">
+<meta name="twitter:image" content="https://varmancrew.com/og-image.jpg">
+<style>
+.prod-carousel .cv{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .9s ease, transform .6s cubic-bezier(0.22,1,0.36,1);}
+.prod-carousel .cv.active{opacity:1;}
+.prod-card:hover .cv.active{transform:scale(1.05);}
+.prod-info .prod-cat{margin-bottom:var(--s4);font-weight:700;}
+.prod-card{cursor:pointer;opacity:1;}
+.prod-card:focus-visible{outline:2px solid var(--brand,#ff6b00);outline-offset:3px;}
+@keyframes vmCardIn{from{transform:translateY(10px)}to{transform:none}}
+.prod-card.vm-in{animation:vmCardIn .28s cubic-bezier(0.16,1,0.3,1);}
+@media (prefers-reduced-motion: reduce){.prod-card.vm-in{animation:none;}}
+.prod-btn i{font-size:18px;}
+/* Indicador de "ver detalle" sobre la foto */
+.prod-zoom{position:absolute;top:var(--s3,12px);right:var(--s3,12px);width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.45);backdrop-filter:blur(4px);color:#fff;opacity:0;transform:scale(.85);transition:opacity .25s ease, transform .25s ease;pointer-events:none;z-index:2;}
+.prod-zoom i{font-size:16px;}
+.prod-card:hover .prod-zoom,.prod-card:focus-visible .prod-zoom{opacity:1;transform:scale(1);}
+/* Modal de detalle */
+.vm-modal{position:fixed;inset:0;z-index:1000;display:none;align-items:center;justify-content:center;padding:16px;}
+.vm-modal.open{display:flex;}
+.vm-modal-overlay{position:absolute;inset:0;background:rgba(0,0,0,.74);backdrop-filter:blur(4px);}
+.vm-modal-box{position:relative;z-index:1;background:var(--surf-1,#15151a);border:1px solid var(--border,rgba(255,255,255,.1));border-radius:var(--r-lg,18px);max-width:440px;width:100%;max-height:94vh;overflow:auto;box-shadow:0 30px 80px rgba(0,0,0,.6);animation:vmPop .28s cubic-bezier(0.22,1,0.36,1);}
+@keyframes vmPop{from{opacity:0;transform:translateY(12px) scale(.97)}to{opacity:1;transform:none}}
+.vm-modal-close{position:absolute;top:10px;right:10px;z-index:3;width:38px;height:38px;border-radius:50%;border:none;background:rgba(0,0,0,.55);color:#fff;font-size:22px;line-height:1;cursor:pointer;transition:background .2s ease;}
+.vm-modal-close:hover{background:var(--brand,#ff6b00);}
+.vm-gallery{position:relative;aspect-ratio:1/1;background:var(--surf-2,#0e0e12);}
+.vm-gallery-img{width:100%;height:100%;object-fit:cover;display:block;}
+.vm-counter{position:absolute;top:12px;left:12px;background:rgba(0,0,0,.55);backdrop-filter:blur(4px);color:#fff;font-size:11px;font-weight:700;letter-spacing:.05em;padding:4px 9px;border-radius:99px;}
+.vm-nav{position:absolute;top:50%;transform:translateY(-50%);width:42px;height:42px;border-radius:50%;border:none;background:rgba(0,0,0,.45);color:#fff;font-size:24px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .2s ease;}
+.vm-nav:hover{background:var(--brand,#ff6b00);}
+.vm-prev{left:10px;}
+.vm-next{right:10px;}
+.vm-dots{position:absolute;bottom:10px;left:0;right:0;display:flex;gap:6px;justify-content:center;}
+.vm-dot{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.45);transition:background .2s ease;}
+.vm-dot.on{background:var(--brand,#ff6b00);}
+.vm-modal-info{padding:20px 22px 24px;}
+.vm-modal-cat{font-size:11px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:var(--brand,#ff6b00);margin-bottom:6px;}
+.vm-modal-price{font-family:'Bebas Neue',sans-serif;font-size:32px;color:var(--ink,#fff);margin-bottom:12px;}
+.vm-modal-desc{font-size:14px;line-height:1.6;color:var(--ink-2,#b8b8c0);margin-bottom:18px;max-width:60ch;}
+.vm-modal-wa{width:100%;padding:15px;border:none;border-radius:12px;background:var(--brand,#ff6b00);color:#fff;font-weight:800;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:background .2s ease, transform .1s ease;}
+.vm-modal-wa:hover{background:var(--brand-hover,#e85d00);}
+.vm-modal-wa:active{transform:scale(.98);}
+.vm-modal-wa i{font-size:19px;}
+.vm-fab{position:fixed;right:18px;bottom:18px;z-index:900;width:58px;height:58px;border-radius:50%;background:#25D366;color:#fff;display:flex;align-items:center;justify-content:center;text-decoration:none;box-shadow:0 8px 24px rgba(0,0,0,.35);transition:transform .2s ease, box-shadow .2s ease;animation:vmFabPulse 2.6s ease-out infinite;}
+.vm-fab i{font-size:32px;}
+.vm-fab:hover{transform:scale(1.08);box-shadow:0 12px 30px rgba(37,211,102,.55);}
+.vm-fab:active{transform:scale(.96);}
+@keyframes vmFabPulse{0%{box-shadow:0 8px 24px rgba(0,0,0,.35), 0 0 0 0 rgba(37,211,102,.5)}70%{box-shadow:0 8px 24px rgba(0,0,0,.35), 0 0 0 16px rgba(37,211,102,0)}100%{box-shadow:0 8px 24px rgba(0,0,0,.35), 0 0 0 0 rgba(37,211,102,0)}}
+@media (prefers-reduced-motion: reduce){
+  .prod-carousel .cv{transition:opacity .2s linear;}
+  .prod-card:hover .cv.active{transform:none;}
+  .prod-card:hover{transform:none;}
+  .vm-modal-box{animation:none;}
+  .vm-fab{animation:none;}
+}
+/* ── Acento por GÉNERO en la tarjeta (no en toda la página) ──────────────
+   Cada referencia lleva su color: Dama rosa vivo, Caballero azul eléctrico,
+   Unisex (o sin marcar) verde menta. El acento vive en la etiqueta sobre la
+   foto, la categoría y el halo del hover — con profundidad, nada plano. */
+.prod-card{ --gacc: oklch(0.75 0.14 160); --gacc-deep: oklch(0.52 0.12 160); } /* unisex */
+.prod-card[data-genero="dama"]{ --gacc: oklch(0.70 0.17 356); --gacc-deep: oklch(0.48 0.16 356); }
+.prod-card[data-genero="caballero"]{ --gacc: oklch(0.66 0.14 240); --gacc-deep: oklch(0.45 0.13 240); }
+.prod-gen{
+  position:absolute; left:var(--s3,12px); bottom:var(--s3,12px); z-index:2;
+  font-family:'Bebas Neue',sans-serif; font-size:12px; letter-spacing:.16em;
+  padding:4px 12px 3px; border-radius:99px; color:oklch(0.15 0.01 0);
+  /* degradado claro→acento con texto oscuro: contraste ≥4.5:1 en todo el chip */
+  background:linear-gradient(135deg, color-mix(in oklab, var(--gacc), white 12%), var(--gacc));
+  box-shadow:0 4px 16px color-mix(in oklab, var(--gacc), transparent 55%),
+             inset 0 1px 0 oklch(1 0 0 / .35);
+}
+.prod-card .prod-cat{ color:var(--gacc); }
+.prod-card:hover{
+  border-color: color-mix(in oklab, var(--gacc), transparent 55%);
+  box-shadow: 0 20px 60px oklch(0 0 0 / 0.5),
+              0 8px 40px color-mix(in oklab, var(--gacc), transparent 78%),
+              0 0 0 1px color-mix(in oklab, var(--gacc), transparent 86%);
+}
+/* ── Selector de sección DAMA / CABALLERO (encima del catálogo) ──────────
+   Dos placas grandes tipo póster: al pasar se lava con su color, al elegirla
+   se llena con el degradado y filtra el catálogo. Tocarla de nuevo la apaga. */
+.gen-picker{ display:grid; grid-template-columns:1fr 1fr; gap:var(--s3,12px); margin:0 0 var(--s6,32px); }
+.gen-opt{
+  --ga: var(--brand); --ga-deep: var(--brand-hover);
+  position:relative; overflow:hidden; cursor:pointer;
+  display:flex; flex-direction:column; align-items:flex-start; gap:2px;
+  padding:18px 22px 14px; min-height:76px;
+  background:var(--surf-1); border:1.5px solid var(--border); border-radius:var(--r-lg,16px);
+  color:var(--ink); text-align:left;
+  transition:border-color var(--d-mid) var(--ease), box-shadow var(--d-mid) var(--ease),
+             transform var(--d-mid) var(--ease);
+}
+.gen-opt[data-gfilter="dama"]{ --ga: oklch(0.70 0.17 356); --ga-deep: oklch(0.48 0.16 356); }
+.gen-opt[data-gfilter="caballero"]{ --ga: oklch(0.66 0.14 240); --ga-deep: oklch(0.45 0.13 240); }
+.gen-opt::before{ /* lavado de color diagonal, aparece al pasar/activar */
+  content:''; position:absolute; inset:0; z-index:0; opacity:0;
+  background:linear-gradient(120deg, var(--ga-deep), var(--ga) 90%);
+  transition:opacity var(--d-mid) var(--ease);
+}
+.gen-opt > *{ position:relative; z-index:1; }
+.gen-word{ font-family:'Bebas Neue',sans-serif; font-size:clamp(26px,4.2vw,34px); line-height:.95; letter-spacing:.06em; }
+.gen-sub{ font-size:var(--t-xs,11px); color:var(--ink-2); letter-spacing:.14em; text-transform:uppercase; transition:color var(--d-mid) var(--ease); }
+.gen-opt:hover{ border-color:color-mix(in oklab, var(--ga), transparent 40%); transform:translateY(-2px);
+  box-shadow:0 10px 34px color-mix(in oklab, var(--ga), transparent 78%); }
+.gen-opt:hover::before{ opacity:.14; }
+.gen-opt.active{ border-color:transparent; color:oklch(0.98 0 0);
+  box-shadow:0 14px 44px color-mix(in oklab, var(--ga), transparent 60%); }
+.gen-opt.active::before{ opacity:1;
+  /* versión activa: extremo claro atenuado para que el texto blanco contraste */
+  background:linear-gradient(120deg, var(--ga-deep), color-mix(in oklab, var(--ga), black 20%) 90%); }
+.gen-opt.active .gen-sub{ color:oklch(1 0 0 / .8); }
+.gen-opt .gen-x{ position:absolute; top:10px; right:14px; font-size:14px; opacity:0; transition:opacity var(--d-mid) var(--ease); }
+.gen-opt.active .gen-x{ opacity:.85; }
+@media (max-width:560px){ .gen-opt{ padding:14px 16px 11px; min-height:64px; } }
+/* sub-enlaces Dama/Caballero del menú móvil */
+.mobile-menu a.mob-sub { font-size: 15px; padding-left: 44px; color: var(--ink-2); }
+/* ── Compra web (Wompi): talla, cantidad y datos de envío en el modal ── */
+.f-sep{width:1px;height:22px;background:var(--border,rgba(255,255,255,.12));margin:0 4px;align-self:center;}
+.vm-compra{margin-bottom:16px;}
+.vm-compra-lbl{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-2,#b8b8c0);margin-bottom:8px;}
+.vm-tallas{display:flex;flex-wrap:wrap;gap:8px;}
+.vm-talla{min-width:44px;height:40px;padding:0 10px;border-radius:10px;border:1.5px solid var(--border,rgba(255,255,255,.12));background:transparent;color:var(--ink,#fff);font-weight:700;font-size:14px;cursor:pointer;transition:border-color .15s ease, background .15s ease;}
+.vm-talla:hover{border-color:var(--brand,#ff6b00);}
+.vm-talla.on{background:var(--gacc,var(--brand,#ff6b00));border-color:var(--gacc,var(--brand,#ff6b00));color:oklch(0.13 0.01 0);font-weight:800;}
+/* el modal hereda el acento del género del producto (lo pone vmPrepararCompra) */
+.vm-modal-box .vm-modal-cat{color:var(--gacc,var(--brand,#ff6b00));}
+/* selector de sistema de tallas (CO / EU / US) + línea de equivalencia */
+.vm-compra-lbl{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+.vm-sys{display:inline-flex;gap:0;border:1.5px solid var(--border,rgba(255,255,255,.12));border-radius:9px;overflow:hidden;}
+.vm-sys-b{min-width:38px;height:26px;padding:0 8px;border:none;background:transparent;color:var(--ink-2,#b8b8c0);font-weight:800;font-size:11px;letter-spacing:.06em;cursor:pointer;transition:background .15s ease,color .15s ease;}
+.vm-sys-b.on{background:var(--brand,#ff6b00);color:var(--ink-on-brand,#111);}
+.vm-talla-eq{font-size:12px;color:var(--ink-2,#b8b8c0);margin-top:8px;min-height:16px;}
+.vm-talla-eq b{color:var(--ink,#fff);}
+/* fila del teléfono: prefijo del país + número */
+.vm-tel-row{display:flex;gap:8px;}
+.vm-tel-row select{flex:0 0 108px;background:var(--surf-2,#0e0e12);border:1.5px solid var(--border,rgba(255,255,255,.12));border-radius:10px;color:var(--ink,#fff);padding:11px 8px;font-size:14px;font-family:inherit;}
+.vm-tel-row select:focus{border-color:var(--brand,#ff6b00);outline:none;}
+.vm-tel-row input{flex:1;min-width:0;}
+.vm-cant{display:flex;align-items:center;gap:10px;}
+.vm-cant button{width:40px;height:40px;border-radius:10px;border:1.5px solid var(--border,rgba(255,255,255,.12));background:transparent;color:var(--ink,#fff);font-size:20px;line-height:1;cursor:pointer;transition:border-color .15s ease;}
+.vm-cant button:hover{border-color:var(--brand,#ff6b00);}
+.vm-cant-n{min-width:28px;text-align:center;font-weight:800;font-size:16px;}
+.vm-compra-err{display:none;color:#ff8a8a;font-size:12.5px;font-weight:600;margin:10px 0 0;}
+.vm-compra-err.on{display:block;}
+.vm-compra-form{display:none;margin-top:14px;border-top:1px solid var(--border,rgba(255,255,255,.1));padding-top:4px;}
+.vm-compra-form.abierto{display:block;}
+.vm-compra-form label{display:block;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-2,#b8b8c0);margin:10px 0 5px;}
+.vm-compra-form input,.vm-compra-form textarea{width:100%;background:var(--surf-2,#0e0e12);border:1.5px solid var(--border,rgba(255,255,255,.12));border-radius:10px;color:var(--ink,#fff);padding:11px 12px;font-size:15px;font-family:inherit;resize:vertical;}
+.vm-compra-form input:focus,.vm-compra-form textarea:focus{border-color:var(--brand,#ff6b00);outline:none;}
+.vm-compra-total{font-size:14px;color:var(--ink-2,#b8b8c0);margin-top:12px;}
+.vm-compra-total b{color:var(--ink,#fff);}
+.vm-compra-seguro{font-size:11.5px;color:var(--ink-3,#8a8a92);margin-top:10px;line-height:1.5;}
+.vm-banner-gracias{position:fixed;left:50%;transform:translateX(-50%);bottom:24px;z-index:1100;background:var(--surf-3,#1c1c22);border:1px solid var(--brand,#ff6b00);color:var(--ink,#fff);padding:14px 18px;border-radius:14px;font-size:14px;max-width:92vw;box-shadow:0 16px 48px rgba(0,0,0,.5);}
+</style>
+</head>
+<body>
+<script>
+// Fallback inmediato — marca no-gsap hasta que GSAP cargue
+document.documentElement.classList.add('no-gsap');
+</script>
+<div class="cursor-dot" id="cursorDot"></div>
+<div class="cursor-ring" id="cursorRing"></div>
+
+<!-- NAVBAR -->
+<nav>
+  <div class="nav-logo">
+    <img src="img/p001.png" alt="VarMan Crew">
+  </div>
+  <ul class="nav-links" role="list">
+    <li><a href="#inicio">Inicio</a></li>
+    <li><a href="#catalogo">Catálogo</a></li>
+    <li><a href="#nosotros">Nosotros</a></li>
+    <li><a href="#contacto">Contacto</a></li>
+  </ul>
+  <a href="#contacto" class="nav-cta">Contáctanos</a>
+  <button class="nav-hamburger" aria-label="Abrir menú" aria-expanded="false" id="hamburger">
+    <span></span><span></span><span></span>
+  </button>
+</nav>
+<div class="mobile-menu" id="mobile-menu">
+  <a href="#inicio" onclick="closeMobileMenu()">Inicio</a>
+  <a href="#catalogo" onclick="closeMobileMenu()">Catálogo</a>
+  <!-- atajos por género: fijan el filtro Dama/Caballero y tiñen la página -->
+  <a href="#catalogo" class="mob-sub" data-genero-link="dama" onclick="closeMobileMenu()">→ Dama</a>
+  <a href="#catalogo" class="mob-sub" data-genero-link="caballero" onclick="closeMobileMenu()">→ Caballero</a>
+  <a href="#nosotros" onclick="closeMobileMenu()">Nosotros</a>
+  <a href="#contacto" onclick="closeMobileMenu()">Contacto</a>
+  <a href="#contacto" class="mob-cta" onclick="closeMobileMenu()">Contáctanos</a>
+  <div style="display:flex;gap:12px;padding:0 24px 24px;margin-top:-8px;">
+    <a href="https://www.instagram.com/varmansnk/" target="_blank" rel="noopener noreferrer" style="display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);color:#777;text-decoration:none;font-size:20px;">
+      <i class="ti ti-brand-instagram"></i></a>
+    <a href="https://www.facebook.com/people/VarMan-Sneakers-and-Clothes/100095220926692/" target="_blank" rel="noopener noreferrer" style="display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);color:#777;text-decoration:none;font-size:20px;">
+      <i class="ti ti-brand-facebook"></i></a>
+    <a href="https://www.tiktok.com/@varmansnk" target="_blank" rel="noopener noreferrer" style="display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);color:#777;text-decoration:none;font-size:20px;">
+      <i class="ti ti-brand-tiktok"></i></a>
+  </div>
+</div>
+
+<!-- HERO -->
+<section class="hero" id="inicio" aria-label="Sección principal">
+  <div class="hero-bg">
+    <video autoplay muted loop playsinline id="hero-video"
+      style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center;">
+      <source src="img/p002.mp4" type="video/mp4">
+    </video>
+    <img src="img/p003.jpg" alt="" 
+      style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 50%;"
+      id="hero-fallback">
+  </div>
+  <div class="hero-bg-word" id="hero-bg-word">CREW</div>
+  <div class="hero-stripe"></div>
+  <div class="hero-content">
+    <div class="hero-tagline" id="anim-eyebrow">Lleva contigo la frescura Crew</div>
+    <div class="hero-logo-big" id="anim-logo">
+      <img src="img/p001.png" alt="VarMan Crew logo">
+    </div>
+    <div class="hero-title" id="anim-title">
+      <span class="text-reveal-wrap"><span class="text-reveal-inner">LLEVA</span></span><br>
+      <span class="text-reveal-wrap"><span class="text-reveal-inner">CONTIGO</span></span><br>
+      <span class="text-reveal-wrap"><span class="text-reveal-inner">LA <span class="accent">FRESCURA</span></span></span>
+    </div>
+    <div class="hero-tagline" id="anim-tagline">— Lleva contigo la frescura Crew —</div>
+    <p class="hero-desc" id="anim-desc">
+      <strong>VarMan Crew</strong> — moda urbana, deportiva y casual.<br>
+      Estilo auténtico que habla por ti.
+    </p>
+    <div class="hero-btns" id="anim-btns">
+      <a href="#catalogo" class="btn-p">Ver catálogo</a>
+      <a href="#nosotros" class="btn-s">Sobre nosotros</a>
+    </div>
+    <div class="hero-tags" id="anim-tags">
+      <div class="hero-tag">Deportivas</div>
+      <div class="hero-tag">Casuales</div>
+      <div class="hero-tag">Urbanas</div>
+    </div>
+  </div>
+</section>
+
+<!-- TICKER -->
+<div class="ticker-wrap" id="ticker">
+  <div class="ticker-track" id="ticker-track">
+    <div class="ticker-item">SNEAKERS <span class="ticker-dot"></span></div>
+    <div class="ticker-item">VARMAN CREW <span class="ticker-dot"></span></div>
+    <div class="ticker-item">DEPORTIVAS <span class="ticker-dot"></span></div>
+    <div class="ticker-item">CASUALES <span class="ticker-dot"></span></div>
+    <div class="ticker-item">URBANAS <span class="ticker-dot"></span></div>
+    <div class="ticker-item">FRESCURA <span class="ticker-dot"></span></div>
+    <div class="ticker-item">CREW STYLE <span class="ticker-dot"></span></div>
+    <div class="ticker-item">SNEAKERS <span class="ticker-dot"></span></div>
+    <div class="ticker-item">VARMAN CREW <span class="ticker-dot"></span></div>
+    <div class="ticker-item">DEPORTIVAS <span class="ticker-dot"></span></div>
+    <div class="ticker-item">CASUALES <span class="ticker-dot"></span></div>
+    <div class="ticker-item">URBANAS <span class="ticker-dot"></span></div>
+    <div class="ticker-item">FRESCURA <span class="ticker-dot"></span></div>
+    <div class="ticker-item">CREW STYLE <span class="ticker-dot"></span></div>
+  </div>
+</div>
+
+<!-- PARALLAX BAND 1 -->
+<div class="parallax-section" id="par1">
+  <div class="parallax-img" id="par1-img">
+    <div class="parallax-img-inner img1">
+      <img src="img/p004.jpg" alt="Sneakers deportivas" loading="lazy">
+    </div>
+  </div>
+  <div class="parallax-overlay">
+    <div class="parallax-overlay-title">SNEAKERS</div>
+    <div class="parallax-overlay-sub">Frescura en cada paso</div>
+  </div>
+  <div class="parallax-orange-line"></div>
+</div>
+
+<!-- CATEGORIES -->
+<section class="categories" id="catalogo-section">
+  <div class="s-label">Explorar por estilo</div>
+  <div class="s-title">LO QUE<br><span style="color:var(--brand)">BUSCAS</span></div>
+  <div class="cat-grid">
+    <div class="cat-card">
+      <div class="cat-num">01</div>
+      <div class="cat-icon"><i class="ti ti-run"></i></div>
+      <div class="cat-name">Deportivas</div>
+      <div class="cat-desc">Para moverse sin límites, con comodidad y estilo en cada paso.</div>
+      <span class="cat-arrow">→</span>
+    </div>
+    <div class="cat-card">
+      <div class="cat-num">02</div>
+      <div class="cat-icon"><i class="ti ti-hanger"></i></div>
+      <div class="cat-name">Casuales</div>
+      <div class="cat-desc">Piezas versátiles para el día a día que nunca pasan de moda.</div>
+      <span class="cat-arrow">→</span>
+    </div>
+    <div class="cat-card">
+      <div class="cat-num">03</div>
+      <div class="cat-icon"><i class="ti ti-building-community"></i></div>
+      <div class="cat-name">Urbanas</div>
+      <div class="cat-desc">La calle como pasarela — prendas que marcan actitud y presencia.</div>
+      <span class="cat-arrow">→</span>
+    </div>
+  </div>
+</section>
+
+<!-- CATALOG -->
+<section class="catalog" id="catalogo">
+  <div class="catalog-top">
+    <div>
+      <div class="s-label">Lo que tenemos</div>
+      <div class="s-title" style="margin-bottom:0">SNEAKERS</div>
+    </div>
+    <div class="filters" role="group" aria-label="Filtrar catálogo">
+      <button class="f-btn active" data-filter="todos" aria-pressed="true">Todos</button>
+      <button class="f-btn" data-filter="deportivas" aria-pressed="false">Deportivas</button>
+      <button class="f-btn" data-filter="casuales" aria-pressed="false">Casuales</button>
+      <button class="f-btn" data-filter="urbanas" aria-pressed="false">Urbanas</button>
+    </div>
+  </div>
+  <!-- Selector de sección por género: filtra el catálogo y cada tarjeta lleva
+       su acento de color (dama rosa / caballero azul / unisex menta). Tocarla
+       de nuevo la apaga. El género se marca en la app (pestaña Tienda). -->
+  <div class="gen-picker" role="group" aria-label="Elegir sección Dama o Caballero">
+    <button class="gen-opt g-btn" data-gfilter="dama" aria-pressed="false">
+      <span class="gen-word">DAMA</span>
+      <span class="gen-sub">Para ella</span>
+      <span class="gen-x" aria-hidden="true">✕</span>
+    </button>
+    <button class="gen-opt g-btn" data-gfilter="caballero" aria-pressed="false">
+      <span class="gen-word">CABALLERO</span>
+      <span class="gen-sub">Para él</span>
+      <span class="gen-x" aria-hidden="true">✕</span>
+    </button>
+  </div>
+  <div class="prod-grid">
+    <div class="prod-card" data-cat="deportivas" role="button" tabindex="0" aria-label="Ver Deportivas, $259.900 COP">
+      <div class="prod-img prod-carousel">
+        <img class="cv active" src="img/p005.jpg" loading="lazy" alt=""><img class="cv" src="img/p006.jpg" loading="lazy" alt=""><img class="cv" src="img/p007.jpg" loading="lazy" alt="">
+        <div class="prod-tag">Nuevo</div>
+        <span class="prod-zoom" aria-hidden="true"><i class="ti ti-arrows-maximize"></i></span>
+      </div>
+      <div class="prod-info">
+        <div class="prod-cat">Deportivas</div>
+        <div class="prod-foot">
+          <div class="prod-price">$ 259.900 <small>COP</small></div>
+          <button class="prod-btn js-wa" data-ref="01" data-precio="259.900" aria-label="Pedir por WhatsApp"><i class="ti ti-brand-whatsapp"></i></button>
+        </div>
+      </div>
+    </div>    <div class="prod-card" data-cat="casuales" role="button" tabindex="0" aria-label="Ver Casuales, $259.900 COP">
+      <div class="prod-img prod-carousel">
+        <img class="cv active" src="img/p008.jpg" loading="lazy" alt=""><img class="cv" src="img/p009.jpg" loading="lazy" alt=""><img class="cv" src="img/p010.jpg" loading="lazy" alt=""><img class="cv" src="img/p011.jpg" loading="lazy" alt=""><img class="cv" src="img/p012.jpg" loading="lazy" alt="">
+        <div class="prod-tag">Nuevo</div>
+        <span class="prod-zoom" aria-hidden="true"><i class="ti ti-arrows-maximize"></i></span>
+      </div>
+      <div class="prod-info">
+        <div class="prod-cat">Casuales</div>
+        <div class="prod-foot">
+          <div class="prod-price">$ 259.900 <small>COP</small></div>
+          <button class="prod-btn js-wa" data-ref="02" data-precio="259.900" aria-label="Pedir por WhatsApp"><i class="ti ti-brand-whatsapp"></i></button>
+        </div>
+      </div>
+    </div>    <div class="prod-card" data-cat="deportivas" role="button" tabindex="0" aria-label="Ver Deportivas, $389.900 COP">
+      <div class="prod-img prod-carousel">
+        <img class="cv active" src="img/p013.jpg" loading="lazy" alt=""><img class="cv" src="img/p014.jpg" loading="lazy" alt=""><img class="cv" src="img/p015.jpg" loading="lazy" alt=""><img class="cv" src="img/p016.jpg" loading="lazy" alt="">
+        <div class="prod-tag">Popular</div>
+        <span class="prod-zoom" aria-hidden="true"><i class="ti ti-arrows-maximize"></i></span>
+      </div>
+      <div class="prod-info">
+        <div class="prod-cat">Deportivas</div>
+        <div class="prod-foot">
+          <div class="prod-price">$ 389.900 <small>COP</small></div>
+          <button class="prod-btn js-wa" data-ref="03" data-precio="389.900" aria-label="Pedir por WhatsApp"><i class="ti ti-brand-whatsapp"></i></button>
+        </div>
+      </div>
+    </div>    <div class="prod-card" data-cat="deportivas" role="button" tabindex="0" aria-label="Ver Deportivas, $299.900 COP">
+      <div class="prod-img prod-carousel">
+        <img class="cv active" src="img/p017.jpg" loading="lazy" alt=""><img class="cv" src="img/p018.jpg" loading="lazy" alt=""><img class="cv" src="img/p019.jpg" loading="lazy" alt="">
+        <div class="prod-tag">Nuevo</div>
+        <span class="prod-zoom" aria-hidden="true"><i class="ti ti-arrows-maximize"></i></span>
+      </div>
+      <div class="prod-info">
+        <div class="prod-cat">Deportivas</div>
+        <div class="prod-foot">
+          <div class="prod-price">$ 299.900 <small>COP</small></div>
+          <button class="prod-btn js-wa" data-ref="04" data-precio="299.900" aria-label="Pedir por WhatsApp"><i class="ti ti-brand-whatsapp"></i></button>
+        </div>
+      </div>
+    </div>    <div class="prod-card" data-cat="urbanas" role="button" tabindex="0" aria-label="Ver Urbanas, $480.000 COP">
+      <div class="prod-img prod-carousel">
+        <img class="cv active" src="img/p020.jpg" loading="lazy" alt=""><img class="cv" src="img/p021.jpg" loading="lazy" alt=""><img class="cv" src="img/p022.jpg" loading="lazy" alt="">
+        
+        <span class="prod-zoom" aria-hidden="true"><i class="ti ti-arrows-maximize"></i></span>
+      </div>
+      <div class="prod-info">
+        <div class="prod-cat">Urbanas</div>
+        <div class="prod-foot">
+          <div class="prod-price">$ 480.000 <small>COP</small></div>
+          <button class="prod-btn js-wa" data-ref="05" data-precio="480.000" aria-label="Pedir por WhatsApp"><i class="ti ti-brand-whatsapp"></i></button>
+        </div>
+      </div>
+    </div>    <div class="prod-card" data-cat="urbanas" role="button" tabindex="0" aria-label="Ver Urbanas, $480.000 COP">
+      <div class="prod-img prod-carousel">
+        <img class="cv active" src="img/p023.jpg" loading="lazy" alt=""><img class="cv" src="img/p024.jpg" loading="lazy" alt="">
+        
+        <span class="prod-zoom" aria-hidden="true"><i class="ti ti-arrows-maximize"></i></span>
+      </div>
+      <div class="prod-info">
+        <div class="prod-cat">Urbanas</div>
+        <div class="prod-foot">
+          <div class="prod-price">$ 480.000 <small>COP</small></div>
+          <button class="prod-btn js-wa" data-ref="06" data-precio="480.000" aria-label="Pedir por WhatsApp"><i class="ti ti-brand-whatsapp"></i></button>
+        </div>
+      </div>
+    </div>    <div class="prod-card" data-cat="deportivas" role="button" tabindex="0" aria-label="Ver Deportivas, $269.900 COP">
+      <div class="prod-img prod-carousel">
+        <img class="cv active" src="img/p025.jpg" loading="lazy" alt=""><img class="cv" src="img/p026.jpg" loading="lazy" alt="">
+        
+        <span class="prod-zoom" aria-hidden="true"><i class="ti ti-arrows-maximize"></i></span>
+      </div>
+      <div class="prod-info">
+        <div class="prod-cat">Deportivas</div>
+        <div class="prod-foot">
+          <div class="prod-price">$ 269.900 <small>COP</small></div>
+          <button class="prod-btn js-wa" data-ref="07" data-precio="269.900" aria-label="Pedir por WhatsApp"><i class="ti ti-brand-whatsapp"></i></button>
+        </div>
+      </div>
+    </div>    <div class="prod-card" data-cat="deportivas" role="button" tabindex="0" aria-label="Ver Deportivas, $259.900 COP">
+      <div class="prod-img prod-carousel">
+        <img class="cv active" src="img/p027.jpg" loading="lazy" alt="">
+        
+        <span class="prod-zoom" aria-hidden="true"><i class="ti ti-arrows-maximize"></i></span>
+      </div>
+      <div class="prod-info">
+        <div class="prod-cat">Deportivas</div>
+        <div class="prod-foot">
+          <div class="prod-price">$ 259.900 <small>COP</small></div>
+          <button class="prod-btn js-wa" data-ref="08" data-precio="259.900" aria-label="Pedir por WhatsApp"><i class="ti ti-brand-whatsapp"></i></button>
+        </div>
+      </div>
+    </div>    <div class="prod-card" data-cat="deportivas" role="button" tabindex="0" aria-label="Ver Deportivas, $289.900 COP">
+      <div class="prod-img prod-carousel">
+        <img class="cv active" src="img/p028.jpg" loading="lazy" alt=""><img class="cv" src="img/p029.jpg" loading="lazy" alt="">
+        
+        <span class="prod-zoom" aria-hidden="true"><i class="ti ti-arrows-maximize"></i></span>
+      </div>
+      <div class="prod-info">
+        <div class="prod-cat">Deportivas</div>
+        <div class="prod-foot">
+          <div class="prod-price">$ 289.900 <small>COP</small></div>
+          <button class="prod-btn js-wa" data-ref="09" data-precio="289.900" aria-label="Pedir por WhatsApp"><i class="ti ti-brand-whatsapp"></i></button>
+        </div>
+      </div>
+    </div>    <div class="prod-card" data-cat="deportivas" role="button" tabindex="0" aria-label="Ver Deportivas, $299.900 COP">
+      <div class="prod-img prod-carousel">
+        <img class="cv active" src="img/p030.jpg" loading="lazy" alt=""><img class="cv" src="img/p031.jpg" loading="lazy" alt="">
+        
+        <span class="prod-zoom" aria-hidden="true"><i class="ti ti-arrows-maximize"></i></span>
+      </div>
+      <div class="prod-info">
+        <div class="prod-cat">Deportivas</div>
+        <div class="prod-foot">
+          <div class="prod-price">$ 299.900 <small>COP</small></div>
+          <button class="prod-btn js-wa" data-ref="10" data-precio="299.900" aria-label="Pedir por WhatsApp"><i class="ti ti-brand-whatsapp"></i></button>
+        </div>
+      </div>
+    </div>    <div class="prod-card" data-cat="casuales" role="button" tabindex="0" aria-label="Ver Casuales, $249.900 COP">
+      <div class="prod-img prod-carousel">
+        <img class="cv active" src="img/p032.jpg" loading="lazy" alt=""><img class="cv" src="img/p032.jpg" loading="lazy" alt=""><img class="cv" src="img/p033.jpg" loading="lazy" alt=""><img class="cv" src="img/p034.jpg" loading="lazy" alt="">
+        
+        <span class="prod-zoom" aria-hidden="true"><i class="ti ti-arrows-maximize"></i></span>
+      </div>
+      <div class="prod-info">
+        <div class="prod-cat">Casuales</div>
+        <div class="prod-foot">
+          <div class="prod-price">$ 249.900 <small>COP</small></div>
+          <button class="prod-btn js-wa" data-ref="11" data-precio="249.900" aria-label="Pedir por WhatsApp"><i class="ti ti-brand-whatsapp"></i></button>
+        </div>
+      </div>
+    </div>    <div class="prod-card" data-cat="casuales" role="button" tabindex="0" aria-label="Ver Casuales, $329.900 COP">
+      <div class="prod-img prod-carousel">
+        <img class="cv active" src="img/p035.jpg" loading="lazy" alt=""><img class="cv" src="img/p036.jpg" loading="lazy" alt="">
+        
+        <span class="prod-zoom" aria-hidden="true"><i class="ti ti-arrows-maximize"></i></span>
+      </div>
+      <div class="prod-info">
+        <div class="prod-cat">Casuales</div>
+        <div class="prod-foot">
+          <div class="prod-price">$ 329.900 <small>COP</small></div>
+          <button class="prod-btn js-wa" data-ref="12" data-precio="329.900" aria-label="Pedir por WhatsApp"><i class="ti ti-brand-whatsapp"></i></button>
+        </div>
+      </div>
+    </div>    <div class="prod-card" data-cat="casuales" role="button" tabindex="0" aria-label="Ver Casuales, $329.900 COP">
+      <div class="prod-img prod-carousel">
+        <img class="cv active" src="img/p037.jpg" loading="lazy" alt=""><img class="cv" src="img/p037.jpg" loading="lazy" alt="">
+        
+        <span class="prod-zoom" aria-hidden="true"><i class="ti ti-arrows-maximize"></i></span>
+      </div>
+      <div class="prod-info">
+        <div class="prod-cat">Casuales</div>
+        <div class="prod-foot">
+          <div class="prod-price">$ 329.900 <small>COP</small></div>
+          <button class="prod-btn js-wa" data-ref="13" data-precio="329.900" aria-label="Pedir por WhatsApp"><i class="ti ti-brand-whatsapp"></i></button>
+        </div>
+      </div>
+    </div>    <div class="prod-card" data-cat="casuales" role="button" tabindex="0" aria-label="Ver Casuales, $289.900 COP">
+      <div class="prod-img prod-carousel">
+        <img class="cv active" src="img/p038.jpg" loading="lazy" alt=""><img class="cv" src="img/p039.jpg" loading="lazy" alt="">
+        
+        <span class="prod-zoom" aria-hidden="true"><i class="ti ti-arrows-maximize"></i></span>
+      </div>
+      <div class="prod-info">
+        <div class="prod-cat">Casuales</div>
+        <div class="prod-foot">
+          <div class="prod-price">$ 289.900 <small>COP</small></div>
+          <button class="prod-btn js-wa" data-ref="14" data-precio="289.900" aria-label="Pedir por WhatsApp"><i class="ti ti-brand-whatsapp"></i></button>
+        </div>
+      </div>
+    </div>    <div class="prod-card" data-cat="urbanas" role="button" tabindex="0" aria-label="Ver Urbanas, $369.900 COP">
+      <div class="prod-img prod-carousel">
+        <img class="cv active" src="img/p040.jpg" loading="lazy" alt=""><img class="cv" src="img/p041.jpg" loading="lazy" alt=""><img class="cv" src="img/p042.jpg" loading="lazy" alt=""><img class="cv" src="img/p043.jpg" loading="lazy" alt="">
+        <div class="prod-tag">Popular</div>
+        <span class="prod-zoom" aria-hidden="true"><i class="ti ti-arrows-maximize"></i></span>
+      </div>
+      <div class="prod-info">
+        <div class="prod-cat">Urbanas</div>
+        <div class="prod-foot">
+          <div class="prod-price">$ 369.900 <small>COP</small></div>
+          <button class="prod-btn js-wa" data-ref="15" data-precio="369.900" aria-label="Pedir por WhatsApp"><i class="ti ti-brand-whatsapp"></i></button>
+        </div>
+      </div>
+    </div>    <div class="prod-card" data-cat="urbanas" role="button" tabindex="0" aria-label="Ver Urbanas, $359.900 COP">
+      <div class="prod-img prod-carousel">
+        <img class="cv active" src="img/p044.jpg" loading="lazy" alt=""><img class="cv" src="img/p045.jpg" loading="lazy" alt="">
+        
+        <span class="prod-zoom" aria-hidden="true"><i class="ti ti-arrows-maximize"></i></span>
+      </div>
+      <div class="prod-info">
+        <div class="prod-cat">Urbanas</div>
+        <div class="prod-foot">
+          <div class="prod-price">$ 359.900 <small>COP</small></div>
+          <button class="prod-btn js-wa" data-ref="16" data-precio="359.900" aria-label="Pedir por WhatsApp"><i class="ti ti-brand-whatsapp"></i></button>
+        </div>
+      </div>
+    </div>    <div class="prod-card" data-cat="casuales" role="button" tabindex="0" aria-label="Ver Casuales, $249.900 COP">
+      <div class="prod-img prod-carousel">
+        <img class="cv active" src="img/p046.jpg" loading="lazy" alt=""><img class="cv" src="img/p047.jpg" loading="lazy" alt="">
+        
+        <span class="prod-zoom" aria-hidden="true"><i class="ti ti-arrows-maximize"></i></span>
+      </div>
+      <div class="prod-info">
+        <div class="prod-cat">Casuales</div>
+        <div class="prod-foot">
+          <div class="prod-price">$ 249.900 <small>COP</small></div>
+          <button class="prod-btn js-wa" data-ref="17" data-precio="249.900" aria-label="Pedir por WhatsApp"><i class="ti ti-brand-whatsapp"></i></button>
+        </div>
+      </div>
+    </div>    <div class="prod-card" data-cat="deportivas" role="button" tabindex="0" aria-label="Ver Deportivas, $269.900 COP">
+      <div class="prod-img prod-carousel">
+        <img class="cv active" src="img/p048.jpg" loading="lazy" alt="">
+        
+        <span class="prod-zoom" aria-hidden="true"><i class="ti ti-arrows-maximize"></i></span>
+      </div>
+      <div class="prod-info">
+        <div class="prod-cat">Deportivas</div>
+        <div class="prod-foot">
+          <div class="prod-price">$ 269.900 <small>COP</small></div>
+          <button class="prod-btn js-wa" data-ref="18" data-precio="269.900" aria-label="Pedir por WhatsApp"><i class="ti ti-brand-whatsapp"></i></button>
+        </div>
+      </div>
+    </div>    <div class="prod-card" data-cat="urbanas" role="button" tabindex="0" aria-label="Ver Urbanas, $359.900 COP">
+      <div class="prod-img prod-carousel">
+        <img class="cv active" src="img/p049.jpg" loading="lazy" alt="">
+        
+        <span class="prod-zoom" aria-hidden="true"><i class="ti ti-arrows-maximize"></i></span>
+      </div>
+      <div class="prod-info">
+        <div class="prod-cat">Urbanas</div>
+        <div class="prod-foot">
+          <div class="prod-price">$ 359.900 <small>COP</small></div>
+          <button class="prod-btn js-wa" data-ref="19" data-precio="359.900" aria-label="Pedir por WhatsApp"><i class="ti ti-brand-whatsapp"></i></button>
+        </div>
+      </div>
+    </div>    <div class="prod-card" data-cat="urbanas" role="button" tabindex="0" aria-label="Ver Urbanas, $359.900 COP">
+      <div class="prod-img prod-carousel">
+        <img class="cv active" src="img/p050.jpg" loading="lazy" alt="">
+        
+        <span class="prod-zoom" aria-hidden="true"><i class="ti ti-arrows-maximize"></i></span>
+      </div>
+      <div class="prod-info">
+        <div class="prod-cat">Urbanas</div>
+        <div class="prod-foot">
+          <div class="prod-price">$ 359.900 <small>COP</small></div>
+          <button class="prod-btn js-wa" data-ref="20" data-precio="359.900" aria-label="Pedir por WhatsApp"><i class="ti ti-brand-whatsapp"></i></button>
+        </div>
+      </div>
+    </div>    <div class="prod-card" data-cat="urbanas" role="button" tabindex="0" aria-label="Ver Urbanas, $349.900 COP">
+      <div class="prod-img prod-carousel">
+        <img class="cv active" src="img/p051.jpg" loading="lazy" alt=""><img class="cv" src="img/p052.jpg" loading="lazy" alt="">
+        
+        <span class="prod-zoom" aria-hidden="true"><i class="ti ti-arrows-maximize"></i></span>
+      </div>
+      <div class="prod-info">
+        <div class="prod-cat">Urbanas</div>
+        <div class="prod-foot">
+          <div class="prod-price">$ 349.900 <small>COP</small></div>
+          <button class="prod-btn js-wa" data-ref="21" data-precio="349.900" aria-label="Pedir por WhatsApp"><i class="ti ti-brand-whatsapp"></i></button>
+        </div>
+      </div>
+    </div>    <div class="prod-card" data-cat="urbanas" role="button" tabindex="0" aria-label="Ver Urbanas, $399.900 COP">
+      <div class="prod-img prod-carousel">
+        <img class="cv active" src="img/p053.jpg" loading="lazy" alt="">
+        <div class="prod-tag">Popular</div>
+        <span class="prod-zoom" aria-hidden="true"><i class="ti ti-arrows-maximize"></i></span>
+      </div>
+      <div class="prod-info">
+        <div class="prod-cat">Urbanas</div>
+        <div class="prod-foot">
+          <div class="prod-price">$ 399.900 <small>COP</small></div>
+          <button class="prod-btn js-wa" data-ref="22" data-precio="399.900" aria-label="Pedir por WhatsApp"><i class="ti ti-brand-whatsapp"></i></button>
+        </div>
+      </div>
+    </div>    <div class="prod-card" data-cat="urbanas" role="button" tabindex="0" aria-label="Ver Urbanas, $369.900 COP">
+      <div class="prod-img prod-carousel">
+        <img class="cv active" src="img/p054.jpg" loading="lazy" alt=""><img class="cv" src="img/p055.jpg" loading="lazy" alt=""><img class="cv" src="img/p056.jpg" loading="lazy" alt="">
+        
+        <span class="prod-zoom" aria-hidden="true"><i class="ti ti-arrows-maximize"></i></span>
+      </div>
+      <div class="prod-info">
+        <div class="prod-cat">Urbanas</div>
+        <div class="prod-foot">
+          <div class="prod-price">$ 369.900 <small>COP</small></div>
+          <button class="prod-btn js-wa" data-ref="23" data-precio="369.900" aria-label="Pedir por WhatsApp"><i class="ti ti-brand-whatsapp"></i></button>
+        </div>
+      </div>
+    </div>    <div class="prod-card" data-cat="casuales" role="button" tabindex="0" aria-label="Ver Casuales, $339.900 COP">
+      <div class="prod-img prod-carousel">
+        <img class="cv active" src="img/p057.jpg" loading="lazy" alt="">
+        
+        <span class="prod-zoom" aria-hidden="true"><i class="ti ti-arrows-maximize"></i></span>
+      </div>
+      <div class="prod-info">
+        <div class="prod-cat">Casuales</div>
+        <div class="prod-foot">
+          <div class="prod-price">$ 339.900 <small>COP</small></div>
+          <button class="prod-btn js-wa" data-ref="24" data-precio="339.900" aria-label="Pedir por WhatsApp"><i class="ti ti-brand-whatsapp"></i></button>
+        </div>
+      </div>
+    </div>    <div class="prod-card" data-cat="urbanas" role="button" tabindex="0" aria-label="Ver Urbanas, $389.900 COP">
+      <div class="prod-img prod-carousel">
+        <img class="cv active" src="img/p058.jpg" loading="lazy" alt="">
+        
+        <span class="prod-zoom" aria-hidden="true"><i class="ti ti-arrows-maximize"></i></span>
+      </div>
+      <div class="prod-info">
+        <div class="prod-cat">Urbanas</div>
+        <div class="prod-foot">
+          <div class="prod-price">$ 389.900 <small>COP</small></div>
+          <button class="prod-btn js-wa" data-ref="25" data-precio="389.900" aria-label="Pedir por WhatsApp"><i class="ti ti-brand-whatsapp"></i></button>
+        </div>
+      </div>
+    </div>    <div class="prod-card" data-cat="casuales" role="button" tabindex="0" aria-label="Ver Casuales, $259.900 COP">
+      <div class="prod-img prod-carousel">
+        <img class="cv active" src="img/p059.jpg" loading="lazy" alt=""><img class="cv" src="img/p060.jpg" loading="lazy" alt="">
+        
+        <span class="prod-zoom" aria-hidden="true"><i class="ti ti-arrows-maximize"></i></span>
+      </div>
+      <div class="prod-info">
+        <div class="prod-cat">Casuales</div>
+        <div class="prod-foot">
+          <div class="prod-price">$ 259.900 <small>COP</small></div>
+          <button class="prod-btn js-wa" data-ref="26" data-precio="259.900" aria-label="Pedir por WhatsApp"><i class="ti ti-brand-whatsapp"></i></button>
+        </div>
+      </div>
+    </div>    <div class="prod-card" data-cat="urbanas" role="button" tabindex="0" aria-label="Ver Urbanas, $379.900 COP">
+      <div class="prod-img prod-carousel">
+        <img class="cv active" src="img/p061.jpg" loading="lazy" alt="">
+        
+        <span class="prod-zoom" aria-hidden="true"><i class="ti ti-arrows-maximize"></i></span>
+      </div>
+      <div class="prod-info">
+        <div class="prod-cat">Urbanas</div>
+        <div class="prod-foot">
+          <div class="prod-price">$ 379.900 <small>COP</small></div>
+          <button class="prod-btn js-wa" data-ref="27" data-precio="379.900" aria-label="Pedir por WhatsApp"><i class="ti ti-brand-whatsapp"></i></button>
+        </div>
+      </div>
+    </div>    <div class="prod-card" data-cat="deportivas" role="button" tabindex="0" aria-label="Ver Deportivas, $399.900 COP">
+      <div class="prod-img prod-carousel">
+        <img class="cv active" src="img/p062.jpg" loading="lazy" alt=""><img class="cv" src="img/p063.jpg" loading="lazy" alt="">
+        
+        <span class="prod-zoom" aria-hidden="true"><i class="ti ti-arrows-maximize"></i></span>
+      </div>
+      <div class="prod-info">
+        <div class="prod-cat">Deportivas</div>
+        <div class="prod-foot">
+          <div class="prod-price">$ 399.900 <small>COP</small></div>
+          <button class="prod-btn js-wa" data-ref="28" data-precio="399.900" aria-label="Pedir por WhatsApp"><i class="ti ti-brand-whatsapp"></i></button>
+        </div>
+      </div>
+    </div>    <div class="prod-card" data-cat="urbanas" role="button" tabindex="0" aria-label="Ver Urbanas, $399.900 COP">
+      <div class="prod-img prod-carousel">
+        <img class="cv active" src="img/p064.jpg" loading="lazy" alt=""><img class="cv" src="img/p065.jpg" loading="lazy" alt="">
+        <div class="prod-tag">Popular</div>
+        <span class="prod-zoom" aria-hidden="true"><i class="ti ti-arrows-maximize"></i></span>
+      </div>
+      <div class="prod-info">
+        <div class="prod-cat">Urbanas</div>
+        <div class="prod-foot">
+          <div class="prod-price">$ 399.900 <small>COP</small></div>
+          <button class="prod-btn js-wa" data-ref="29" data-precio="399.900" aria-label="Pedir por WhatsApp"><i class="ti ti-brand-whatsapp"></i></button>
+        </div>
+      </div>
+    </div>    <div class="prod-card" data-cat="deportivas" role="button" tabindex="0" aria-label="Ver Deportivas, $409.900 COP">
+      <div class="prod-img prod-carousel">
+        <img class="cv active" src="img/p066.jpg" loading="lazy" alt="">
+        
+        <span class="prod-zoom" aria-hidden="true"><i class="ti ti-arrows-maximize"></i></span>
+      </div>
+      <div class="prod-info">
+        <div class="prod-cat">Deportivas</div>
+        <div class="prod-foot">
+          <div class="prod-price">$ 409.900 <small>COP</small></div>
+          <button class="prod-btn js-wa" data-ref="30" data-precio="409.900" aria-label="Pedir por WhatsApp"><i class="ti ti-brand-whatsapp"></i></button>
+        </div>
+      </div>
+    </div>    <div class="prod-card" data-cat="deportivas" role="button" tabindex="0" aria-label="Ver Deportivas, $409.900 COP">
+      <div class="prod-img prod-carousel">
+        <img class="cv active" src="img/p067.jpg" loading="lazy" alt="">
+        
+        <span class="prod-zoom" aria-hidden="true"><i class="ti ti-arrows-maximize"></i></span>
+      </div>
+      <div class="prod-info">
+        <div class="prod-cat">Deportivas</div>
+        <div class="prod-foot">
+          <div class="prod-price">$ 409.900 <small>COP</small></div>
+          <button class="prod-btn js-wa" data-ref="31" data-precio="409.900" aria-label="Pedir por WhatsApp"><i class="ti ti-brand-whatsapp"></i></button>
+        </div>
+      </div>
+    </div>    <div class="prod-card" data-cat="deportivas" role="button" tabindex="0" aria-label="Ver Deportivas, $399.900 COP">
+      <div class="prod-img prod-carousel">
+        <img class="cv active" src="img/p068.jpg" loading="lazy" alt=""><img class="cv" src="img/p069.jpg" loading="lazy" alt="">
+        
+        <span class="prod-zoom" aria-hidden="true"><i class="ti ti-arrows-maximize"></i></span>
+      </div>
+      <div class="prod-info">
+        <div class="prod-cat">Deportivas</div>
+        <div class="prod-foot">
+          <div class="prod-price">$ 399.900 <small>COP</small></div>
+          <button class="prod-btn js-wa" data-ref="32" data-precio="399.900" aria-label="Pedir por WhatsApp"><i class="ti ti-brand-whatsapp"></i></button>
+        </div>
+      </div>
+    </div>    <div class="prod-card" data-cat="urbanas" role="button" tabindex="0" aria-label="Ver Urbanas, $369.900 COP">
+      <div class="prod-img prod-carousel">
+        <img class="cv active" src="img/p070.jpg" loading="lazy" alt="">
+        
+        <span class="prod-zoom" aria-hidden="true"><i class="ti ti-arrows-maximize"></i></span>
+      </div>
+      <div class="prod-info">
+        <div class="prod-cat">Urbanas</div>
+        <div class="prod-foot">
+          <div class="prod-price">$ 369.900 <small>COP</small></div>
+          <button class="prod-btn js-wa" data-ref="33" data-precio="369.900" aria-label="Pedir por WhatsApp"><i class="ti ti-brand-whatsapp"></i></button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PARALLAX BAND 2 -->
+<div class="parallax-section" id="par2">
+  <div class="parallax-img" id="par2-img">
+    <div class="parallax-img-inner img2">
+      <img src="img/p071.jpg" alt="Sneakers colección" loading="lazy">
+    </div>
+  </div>
+  <div class="parallax-overlay">
+    <div class="parallax-overlay-title">CREW STYLE</div>
+    <div class="parallax-overlay-sub">Lleva contigo la frescura</div>
+  </div>
+  <div class="parallax-orange-line"></div>
+</div>
+
+<!-- ABOUT -->
+<section class="about" id="nosotros">
+  <div class="about-inner">
+    <div class="about-visual">
+      <div class="about-visual-photo">
+      <img src="img/p072.jpg" alt="Sneakers background" loading="lazy">
+    </div>
+      <div class="about-visual-overlay"></div>
+      <div class="about-vis-bg"></div>
+      <div class="about-logo-wrap">
+        <img src="img/p073.png" alt="VarMan Crew" loading="lazy">
+      </div>
+    </div>
+    <div class="about-text">
+      <div class="s-label">Nuestra historia</div>
+      <div class="s-title">SOMOS<br><span style="color:var(--brand)">VARMAN CREW</span></div>
+      <p class="about-desc">
+        Nacimos para llevar la <strong>frescura del crew</strong> a cada rincón. Somos más que ropa — somos una actitud, una comunidad, un estilo de vida urbano que no pide permiso.<br><br>
+        Cada prenda está pensada para quienes se mueven con confianza y expresan quiénes son sin filtros.
+      </p>
+      <div class="stats-grid">
+        <div class="stat"><div class="stat-n">3</div><div class="stat-l">Categorías de estilo</div></div>
+        <div class="stat"><div class="stat-n">100%</div><div class="stat-l">Estilo propio</div></div>
+        <div class="stat"><div class="stat-n">1</div><div class="stat-l">Comunidad Crew</div></div>
+        <div class="stat"><div class="stat-n">∞</div><div class="stat-l">Frescura garantizada</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CONTACT -->
+<section class="contact" id="contacto">
+  <div class="s-label">Habla con nosotros</div>
+  <div class="s-title">CONTACTO</div>
+  <div class="contact-inner">
+    <div>
+      <p class="contact-desc">
+        ¿Preguntas sobre un producto, tallas o disponibilidad? Escríbenos por Instagram o deja tu mensaje aquí. Somos el Crew — respondemos rápido.
+      </p>
+      <div class="c-links">
+        <a href="https://www.instagram.com/varmansnk/" class="c-link" target="_blank" rel="noopener noreferrer">
+          <div class="c-icon"><i class="ti ti-brand-instagram"></i></div>
+          <div><div class="c-lbl">Instagram</div><div class="c-val">@varmansnk</div></div>
+        </a>
+        <a href="https://www.facebook.com/people/VarMan-Sneakers-and-Clothes/100095220926692/" class="c-link" target="_blank" rel="noopener noreferrer">
+          <div class="c-icon"><i class="ti ti-brand-facebook"></i></div>
+          <div><div class="c-lbl">Facebook</div><div class="c-val">VarMan Sneakers and Clothes</div></div>
+        </a>
+        <a href="https://www.tiktok.com/@varmansnk" class="c-link" target="_blank" rel="noopener noreferrer">
+          <div class="c-icon"><i class="ti ti-brand-tiktok"></i></div>
+          <div><div class="c-lbl">TikTok</div><div class="c-val">@varmansnk</div></div>
+        </a>
+        <div class="c-link" style="cursor:default">
+          <div class="c-icon"><i class="ti ti-map-pin"></i></div>
+          <div><div class="c-lbl">Ubicación</div><div class="c-val">Colombia 🇨🇴</div></div>
+        </div>
+      </div>
+    </div>
+    <form class="c-form" id="contact-form" novalidate>
+      <div class="f-group">
+        <label class="f-label" for="cf-nombre">Nombre</label>
+        <input type="text" class="f-input" id="cf-nombre" name="nombre" placeholder="Tu nombre" required autocomplete="name">
+      </div>
+      <div class="f-group">
+        <label class="f-label" for="cf-contacto">WhatsApp / Instagram</label>
+        <input type="text" class="f-input" id="cf-contacto" name="contacto" placeholder="@usuario o número" autocomplete="tel">
+      </div>
+      <div class="f-group">
+        <label class="f-label" for="cf-mensaje">Mensaje</label>
+        <textarea class="f-textarea" id="cf-mensaje" name="mensaje" placeholder="¿Qué producto te interesa?" required></textarea>
+      </div>
+      <button type="submit" class="f-submit" id="f-submit-btn">Enviar por WhatsApp</button>
+      <p id="cf-error" role="alert" style="display:none;color:#ff8a5c;font-size:var(--t-sm);margin-top:var(--s3);">Escribe tu nombre y el mensaje antes de enviar.</p>
+    </form>
+  </div>
+</section>
+
+<!-- CÓMO COMPRAR (el enlace de WhatsApp del paso 2 se arma con var WHATSAPP_NUMERO en el script del final — aquí no hay nada que cambiar en EL CORTE) -->
+<section class="howbuy" id="como-comprar" aria-label="Cómo comprar">
+  <div class="s-label">Así de fácil</div>
+  <div class="s-title">¿CÓMO<br><span style="color:var(--brand)">COMPRAR?</span></div>
+  <div class="hb-grid">
+    <a class="hb-step" href="#catalogo">
+      <div class="hb-num" aria-hidden="true">1</div>
+      <div class="hb-icon" aria-hidden="true"><i class="ti ti-shoe"></i></div>
+      <div class="hb-name">Elige en el catálogo</div>
+      <p class="hb-desc">Mira las referencias y toca la que te guste para ver fotos y precio.</p>
+    </a>
+    <!-- El href real (wa.me) lo pone el script del final usando WHATSAPP_NUMERO; #contacto es solo el fallback sin JS -->
+    <a class="hb-step" id="hb-wa" href="#contacto" target="_blank" rel="noopener noreferrer">
+      <div class="hb-num" aria-hidden="true">2</div>
+      <div class="hb-icon" aria-hidden="true"><i class="ti ti-brand-whatsapp"></i></div>
+      <div class="hb-name">Pide por WhatsApp</div>
+      <p class="hb-desc">Toca «Pedir» o escríbenos directo. Te confirmamos tallas y disponibilidad al momento.</p>
+    </a>
+    <div class="hb-step">
+      <div class="hb-num" aria-hidden="true">3</div>
+      <div class="hb-icon" aria-hidden="true"><i class="ti ti-wallet"></i></div>
+      <div class="hb-name">Paga a tu manera</div>
+      <p class="hb-desc">Nequi, Daviplata o Bre-B. Nos mandas el comprobante por el mismo chat.</p>
+    </div>
+    <div class="hb-step">
+      <div class="hb-num" aria-hidden="true">4</div>
+      <div class="hb-icon" aria-hidden="true"><i class="ti ti-truck-delivery"></i></div>
+      <div class="hb-name">Te llega donde estés</div>
+      <p class="hb-desc">Envíos a toda Colombia. Te avisamos apenas salga tu pedido.</p>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div>
+    <div class="footer-logo">
+      <img src="img/p001.png" alt="VarMan Crew" loading="lazy">
+    </div>
+    <div class="footer-tag">Lleva contigo la frescura Crew</div>
+  </div>
+  <div class="footer-copy">© 2025 VarMan Crew. Todos los derechos reservados.</div>
+  <div class="footer-socials">
+    <a href="https://www.instagram.com/varmansnk/" class="footer-ig" target="_blank" rel="noopener noreferrer" aria-label="Instagram">
+      <i class="ti ti-brand-instagram"></i>
+    </a>
+    <a href="https://www.facebook.com/people/VarMan-Sneakers-and-Clothes/100095220926692/" class="footer-ig" target="_blank" rel="noopener noreferrer" aria-label="Facebook">
+      <i class="ti ti-brand-facebook"></i>
+    </a>
+    <a href="https://www.tiktok.com/@varmansnk" class="footer-ig" target="_blank" rel="noopener noreferrer" aria-label="TikTok">
+      <i class="ti ti-brand-tiktok"></i>
+    </a>
+  </div>
+</footer>
+
+<!-- GSAP + ScrollTrigger + SplitText -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js" integrity="sha512-7eHRwcbYkK4d9g/6tD/mhkf++eoTHwpNM9woBxtPUBWm67zeAfFC+HrdoE2GanKeocly/VxeLvIqwvCdk7qScg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js" integrity="sha512-onMTRKJBKz8M1TnqqDuGBlowlH0ohFzMXYRNebz+yOcc5TQr/zAKsthzhuv0hiyUKEiQEQXEynnXCvNTOk50dg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script>
+gsap.registerPlugin(ScrollTrigger);
+document.documentElement.classList.remove('no-gsap');
+
+/* ─── CURSOR ─── */
+const dot = document.getElementById('cursorDot');
+const ring = document.getElementById('cursorRing');
+let mx = 0, my = 0, rx = 0, ry = 0;
+window.addEventListener('mousemove', e => { mx = e.clientX; my = e.clientY; });
+(function loop() {
+  rx += (mx - rx) * 0.12; ry += (my - ry) * 0.12;
+  if (dot) { dot.style.left = mx+'px'; dot.style.top = my+'px'; }
+  if (ring) { ring.style.left = rx+'px'; ring.style.top = ry+'px'; }
+  requestAnimationFrame(loop);
+})();
+document.querySelectorAll('a,button,.cat-card,.prod-card').forEach(el => {
+  el.addEventListener('mouseenter', () => { if(ring){ring.style.width='60px';ring.style.height='60px';ring.style.borderColor='rgba(255,107,0,0.8)';} });
+  el.addEventListener('mouseleave', () => { if(ring){ring.style.width='36px';ring.style.height='36px';ring.style.borderColor='rgba(255,107,0,0.5)';} });
+});
+
+/* ─── NAV SCROLL EFFECT ─── */
+const nav = document.querySelector('nav');
+ScrollTrigger.create({
+  start: 'top -60',
+  onUpdate: self => { nav.style.background = self.progress > 0 ? 'rgba(10,10,10,0.98)' : 'rgba(10,10,10,0.92)'; }
+});
+
+/* ─── TICKER ─── */
+const track = document.getElementById('ticker-track');
+if (track) {
+  let x = 0;
+  const speed = 0.6;
+  const clone = track.cloneNode(true);
+  track.parentNode.appendChild(clone);
+  function animTicker() {
+    x -= speed;
+    const w = track.scrollWidth;
+    if (Math.abs(x) >= w) x = 0;
+    track.style.transform = `translateX(${x}px)`;
+    clone.style.transform = `translateX(${x + w}px)`;
+    requestAnimationFrame(animTicker);
+  }
+  animTicker();
+}
+
+/* ─── HERO TEXT REVEAL ─── */
+gsap.set('.text-reveal-inner', { y: '110%' });
+// Animaciones hero — solo setear los que existen
+const heroTargets = ['#anim-eyebrow','#anim-logo','#anim-tagline','.hero-tagline','#anim-desc','#anim-btns','#anim-tags'];
+heroTargets.forEach(sel => { const el = document.querySelector(sel); if(el) gsap.set(el, { opacity: 0, y: 40 }); });
+const metricsEl = document.querySelector('.hero-metrics');
+if (metricsEl) gsap.set(metricsEl, { opacity: 0, y: 40 });
+
+const heroTl = gsap.timeline({ delay: 0.2 });
+heroTl
+  .to('#anim-eyebrow', { opacity: 1, y: 0, duration: 0.7, ease: 'power3.out' })
+  .to('#anim-logo', { opacity: 1, y: 0, duration: 0.8, ease: 'power3.out' }, '-=0.4')
+  .to('.text-reveal-inner', {
+    y: '0%', duration: 0.9, stagger: 0.12,
+    ease: 'power4.out'
+  }, '-=0.5')
+  .to('#anim-desc', { opacity: 1, y: 0, duration: 0.7, ease: 'power3.out' }, '-=0.4')
+  .to('#anim-btns', { opacity: 1, y: 0, duration: 0.6, ease: 'power3.out' }, '-=0.4')
+  .to('#anim-tags', { opacity: 1, y: 0, duration: 0.6, ease: 'power3.out' }, '-=0.3')
+  // hero-metrics animado después del timeline
+
+// hero-metrics animado independiente
+if (metricsEl) gsap.to(metricsEl, { opacity: 1, y: 0, duration: 0.8, ease: 'power2.out', delay: 1.4 });
+// animar tagline si existe
+const taglineEl = document.querySelector('.hero-tagline');
+if (taglineEl) gsap.to(taglineEl, { opacity: 1, y: 0, duration: 0.7, ease: 'power3.out', delay: 0.1 });
+
+/* ─── HERO BG WORD PARALLAX ─── */
+const bgWord = document.getElementById('hero-bg-word'); if(bgWord) gsap.to(bgWord, {
+  y: -200, ease: 'none',
+  scrollTrigger: { trigger: '.hero', start: 'top top', end: 'bottom top', scrub: 2 }
+});
+
+/* ─── PARALLAX BANDS ─── */
+const isDesktop = window.innerWidth > 768;
+['#par1', '#par2'].forEach((id, i) => { if (!document.querySelector(id)) return;
+  const img = document.querySelector(id + '-img');
+  if (!img) return;
+  if (isDesktop) {
+    const innerImg = img.querySelector('img');
+    if (innerImg) {
+      gsap.fromTo(innerImg,
+        { yPercent: -12 },
+        { yPercent: 12, ease: 'none',
+          scrollTrigger: { trigger: id, start: 'top bottom', end: 'bottom top', scrub: 1.5 }
+        }
+      );
+    }
+  }
+  // Title dramatic reveal
+  const title = document.querySelector(id === '#par1' ? '.parallax-overlay-title' : '.parallax-overlay:last-of-type .parallax-overlay-title');
+  gsap.fromTo(id + ' .parallax-overlay-title',
+    { opacity: 0, letterSpacing: '20px', y: 30 },
+    { opacity: 1, letterSpacing: '4px', y: 0, duration: 1, ease: 'power3.out',
+      scrollTrigger: { trigger: id, start: 'top 70%', toggleActions: 'play none none reverse' }
+    }
+  );
+  gsap.fromTo(id + ' .parallax-overlay-sub',
+    { opacity: 0, y: 20 },
+    { opacity: 1, y: 0, duration: 0.8, delay: 0.3, ease: 'power2.out',
+      scrollTrigger: { trigger: id, start: 'top 70%', toggleActions: 'play none none reverse' }
+    }
+  );
+});
+
+/* ─── SECTION LABELS + TITLES ─── */
+document.querySelectorAll('.s-label').forEach(el => {
+  gsap.fromTo(el,
+    { opacity: 0, x: -30 },
+    { opacity: 1, x: 0, duration: 0.6, ease: 'power2.out',
+      scrollTrigger: { trigger: el, start: 'top 88%', toggleActions: 'play none none none' }
+    }
+  );
+});
+
+document.querySelectorAll('.s-title').forEach(el => {
+  // orange bar before each title
+  const bar = document.createElement('span');
+  bar.className = 'orange-bar';
+  el.parentNode.insertBefore(bar, el);
+  gsap.to(bar, {
+    width: '48px', duration: 0.5, ease: 'power2.out',
+    scrollTrigger: { trigger: el, start: 'top 88%', toggleActions: 'play none none none' }
+  });
+  gsap.fromTo(el,
+    { opacity: 0, y: 50, skewY: 2 },
+    { opacity: 1, y: 0, skewY: 0, duration: 0.9, ease: 'power4.out',
+      scrollTrigger: { trigger: el, start: 'top 88%', toggleActions: 'play none none none' }
+    }
+  );
+});
+
+/* ─── CATEGORY CARDS — stagger + clip ─── */
+gsap.fromTo('.cat-card',
+  { opacity: 0, y: 70, clipPath: 'inset(0 0 100% 0)' },
+  { opacity: 1, y: 0, clipPath: 'inset(0 0 0% 0)',
+    duration: 0.8, stagger: { amount: 0.5, ease: 'power2.out' },
+    ease: 'power3.out',
+    scrollTrigger: { trigger: '.cat-grid', start: 'top 80%', toggleActions: 'play none none none' }
+  }
+);
+
+/* ─── PRODUCT CARDS — 3D flip in ─── */
+/* reveal de tarjetas desactivado: visibles por defecto para que nunca falten al filtrar */
+
+/* ─── ABOUT ─── */
+gsap.fromTo('.about-visual',
+  { opacity: 0, x: -80, clipPath: 'inset(0 100% 0 0)' },
+  { opacity: 1, x: 0, clipPath: 'inset(0 0% 0 0)',
+    duration: 1.1, ease: 'power4.out',
+    scrollTrigger: { trigger: '.about-inner', start: 'top 75%', toggleActions: 'play none none none' }
+  }
+);
+gsap.fromTo('.about-text',
+  { opacity: 0, x: 60 },
+  { opacity: 1, x: 0, duration: 1, ease: 'power3.out',
+    scrollTrigger: { trigger: '.about-inner', start: 'top 75%', toggleActions: 'play none none none' }
+  }
+);
+
+/* ─── STATS COUNT UP ─── */
+document.querySelectorAll('.stat').forEach((el, i) => {
+  gsap.fromTo(el,
+    { opacity: 0, scale: 0.7, y: 30 },
+    { opacity: 1, scale: 1, y: 0,
+      duration: 0.6, delay: i * 0.1, ease: 'back.out(2)',
+      scrollTrigger: { trigger: '.stats-grid', start: 'top 85%', toggleActions: 'play none none none' }
+    }
+  );
+});
+
+/* ─── CÓMO COMPRAR — pasos ─── */
+document.querySelectorAll('.hb-step').forEach((el, i) => {
+  gsap.fromTo(el,
+    { opacity: 0, y: 30 },
+    { opacity: 1, y: 0,
+      duration: 0.55, delay: i * 0.1, ease: 'power2.out',
+      scrollTrigger: { trigger: '.hb-grid', start: 'top 85%', toggleActions: 'play none none none' }
+    }
+  );
+});
+
+/* ─── CONTACT LINKS ─── */
+gsap.fromTo('.c-link',
+  { opacity: 0, x: -50, skewX: -4 },
+  { opacity: 1, x: 0, skewX: 0,
+    duration: 0.7, stagger: 0.15, ease: 'power3.out',
+    scrollTrigger: { trigger: '.c-links', start: 'top 85%', toggleActions: 'play none none none' }
+  }
+);
+gsap.fromTo('.c-form .f-group, .c-form .f-submit',
+  { opacity: 0, y: 30 },
+  { opacity: 1, y: 0,
+    duration: 0.55, stagger: 0.1, ease: 'power2.out',
+    scrollTrigger: { trigger: '.c-form', start: 'top 85%', toggleActions: 'play none none none' }
+  }
+);
+
+/* ─── FOOTER LOGO ENTRANCE ─── */
+gsap.fromTo('footer .footer-logo',
+  { opacity: 0, scale: 0.7 },
+  { opacity: 1, scale: 1, duration: 1, ease: 'elastic.out(1, 0.6)',
+    scrollTrigger: { trigger: 'footer', start: 'top 90%', toggleActions: 'play none none none' }
+  }
+);
+
+/* ─── FILTER BUTTONS — filtrado real del catálogo ─── */
+// Género (Dama/Caballero): segundo eje de filtro. Una tarjeta sin data-genero
+// (o marcada unisex en la app) se muestra en ambos géneros.
+let vmGenero = 'todos';
+function pasaGenero(card) {
+  if (vmGenero === 'todos') return true;
+  const g = (card.dataset.genero || '').toLowerCase();
+  return !g || g === 'unisex' || g === vmGenero;
+}
+function applyFilter(cat) {
+  document.querySelectorAll('.f-btn:not(.g-btn)').forEach(b => {
+    const active = b.dataset.filter === cat;
+    b.classList.toggle('active', active);
+    b.setAttribute('aria-pressed', active);
+  });
+  let visibles = 0;
+  document.querySelectorAll('.prod-card').forEach(card => {
+    const show = (cat === 'todos' || card.dataset.cat === cat) && pasaGenero(card);
+    card.style.display = show ? '' : 'none';
+    if (show) {
+      visibles++;
+      card.style.opacity = '1';
+      card.classList.remove('vm-in'); void card.offsetWidth; card.classList.add('vm-in');
+    }
+  });
+  let empty = document.getElementById('filter-empty');
+  if (!empty) {
+    empty = document.createElement('p');
+    empty.id = 'filter-empty';
+    empty.setAttribute('role', 'status');
+    empty.style.cssText = 'color:var(--ink-2);padding:32px 4px;font-size:var(--t-base);display:none;';
+    empty.textContent = 'No hay productos en esta categoría todavía — muy pronto llegan.';
+    document.querySelector('.prod-grid').after(empty);
+  }
+  empty.style.display = visibles === 0 ? 'block' : 'none';
+}
+function catActiva() {
+  const act = document.querySelector('.f-btn.active:not(.g-btn)');
+  return (act && act.dataset.filter) || 'todos';
+}
+document.querySelectorAll('.f-btn:not(.g-btn)').forEach(btn => {
+  btn.addEventListener('click', () => applyFilter(btn.dataset.filter));
+});
+// Dama/Caballero: fija el filtro Y tiñe la página (html[data-genero] cambia
+// el tono de la marca vía CSS). 'todos' = tema naranja de siempre.
+function setGenero(g) {
+  vmGenero = g === 'dama' || g === 'caballero' ? g : 'todos';
+  if (vmGenero === 'todos') document.documentElement.removeAttribute('data-genero');
+  else document.documentElement.setAttribute('data-genero', vmGenero);
+  document.querySelectorAll('.g-btn').forEach(b => {
+    const on = b.dataset.gfilter === vmGenero;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-pressed', on);
+  });
+  applyFilter(catActiva());
+}
+window.vmSetGenero = setGenero;
+// botones del catálogo: se prende y se apaga (apagados ambos = mostrar todo)
+document.querySelectorAll('.g-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    setGenero(vmGenero === btn.dataset.gfilter ? 'todos' : btn.dataset.gfilter);
+  });
+});
+// atajos del menú hamburguesa (→ Dama / → Caballero)
+document.querySelectorAll('[data-genero-link]').forEach(a => {
+  a.addEventListener('click', () => setGenero(a.dataset.generoLink));
+});
+
+/* ─── CATEGORY CARDS → filtran el catálogo ─── */
+const catMap = ['deportivas', 'casuales', 'urbanas'];
+document.querySelectorAll('.cat-card').forEach((card, i) => {
+  card.setAttribute('role', 'button');
+  card.setAttribute('tabindex', '0');
+  const go = () => {
+    applyFilter(catMap[i] || 'todos');
+    document.getElementById('catalogo').scrollIntoView({ behavior: 'smooth' });
+  };
+  card.addEventListener('click', go);
+  card.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
+});
+
+/* ─── HAMBURGER MENU ─── */
+const hamburger = document.getElementById('hamburger');
+const mobileMenu = document.getElementById('mobile-menu');
+hamburger.addEventListener('click', () => {
+  hamburger.classList.toggle('open');
+  mobileMenu.classList.toggle('open');
+  document.body.style.overflow = mobileMenu.classList.contains('open') ? 'hidden' : '';
+});
+function closeMobileMenu() {
+  hamburger.classList.remove('open');
+  mobileMenu.classList.remove('open');
+  document.body.style.overflow = '';
+}
+document.addEventListener('click', (e) => {
+  if (!nav.contains(e.target) && !mobileMenu.contains(e.target)) closeMobileMenu();
+});
+</script>
+
+<!-- EL CORTE: cambiar aquí — el número de WhatsApp vive SOLO en var WHATSAPP_NUMERO (más abajo en este bloque); el FAB y los botones "Pedir" lo toman de esa variable -->
+<script>
+// Fallback: mostrar hero si GSAP no cargó después de 3s
+setTimeout(function() {
+  if (typeof gsap !== 'undefined') return;
+  document.documentElement.classList.add('no-gsap');
+  var els = document.querySelectorAll('[id^="anim-"],.hero-tagline,.hero-logo-big,.text-reveal-inner,.hero-desc,.hero-btns,.hero-tags,.section-fade,.slide-left,.slide-right,.scale-in');
+  els.forEach(function(el) { el.style.opacity = '1'; el.style.transform = 'none'; });
+}, 3000);
+
+// Formulario de contacto → WhatsApp del negocio
+// EL CORTE: número apuntado al BOT +57 304 291 6972 (cambiado 8 jul 2026). Único lugar del sitio donde vive.
+// ⚠ NO publicar este cambio a producción hasta que Meta apruebe la verificación y la app esté en vivo:
+//   hasta entonces el 304 no recibe mensajes de público (modo desarrollo) y se perderían pedidos.
+var WHATSAPP_NUMERO = '573042916972';
+// ── COMPRA WEB con Wompi (2026-07-11) ──────────────────────────────────────
+// true  = el botón de cada producto abre "elegir talla → Comprar" y paga en
+//         línea con Wompi (el pedido lo crea /api/comprar de _worker.js).
+// false = ROLLBACK EN 1 LÍNEA: todo vuelve al botón de WhatsApp de siempre.
+var COMPRA_WOMPI = true;
+window.COMPRA_WOMPI = COMPRA_WOMPI;
+var contactForm = document.getElementById('contact-form');
+var submitBtn = document.getElementById('f-submit-btn');
+if (contactForm && submitBtn) {
+  contactForm.addEventListener('submit', function(e) {
+    e.preventDefault();
+    var nombre = document.getElementById('cf-nombre').value.trim();
+    var contacto = document.getElementById('cf-contacto').value.trim();
+    var mensaje = document.getElementById('cf-mensaje').value.trim();
+    var errEl = document.getElementById('cf-error');
+    if (!nombre || !mensaje) {
+      errEl.style.display = 'block';
+      return;
+    }
+    errEl.style.display = 'none';
+    var texto = 'Hola VarMan Crew 👟\n\n' +
+      'Soy ' + nombre + (contacto ? ' (' + contacto + ')' : '') + '.\n\n' + mensaje;
+    submitBtn.textContent = 'Abriendo WhatsApp…';
+    submitBtn.disabled = true;
+    window.open('https://wa.me/' + WHATSAPP_NUMERO + '?text=' + encodeURIComponent(texto), '_blank', 'noopener');
+    setTimeout(function() {
+      submitBtn.textContent = '¡Listo! ✓';
+      submitBtn.style.background = '#1a7a1a';
+      setTimeout(function() {
+        submitBtn.textContent = 'Enviar por WhatsApp';
+        submitBtn.disabled = false;
+        submitBtn.style.background = '';
+        contactForm.reset();
+      }, 3000);
+    }, 800);
+  });
+}
+// Hamburger aria-expanded (usa variable del script principal)
+(function() {
+  var hb = document.querySelector('.nav-hamburger');
+  if (hb) {
+    var obs = new MutationObserver(function() {
+      hb.setAttribute('aria-expanded', hb.classList.contains('open'));
+    });
+    obs.observe(hb, { attributes: true, attributeFilter: ['class'] });
+  }
+})();
+</script>
+<!-- El href real (wa.me) lo pone el script de abajo usando WHATSAPP_NUMERO; #contacto es solo el fallback sin JS -->
+<a class="vm-fab" href="#contacto" target="_blank" rel="noopener noreferrer" aria-label="Escríbenos por WhatsApp" title="Escríbenos por WhatsApp"><i class="ti ti-brand-whatsapp"></i></a>
+<div id="vm-modal" class="vm-modal" aria-hidden="true">
+  <div class="vm-modal-overlay" data-close></div>
+  <div class="vm-modal-box" role="dialog" aria-modal="true">
+    <button class="vm-modal-close" data-close aria-label="Cerrar">&times;</button>
+    <div class="vm-gallery">
+      <img class="vm-gallery-img" src="" alt="Foto del modelo">
+      <div class="vm-counter"></div>
+      <button class="vm-nav vm-prev" aria-label="Foto anterior">&#8249;</button>
+      <button class="vm-nav vm-next" aria-label="Foto siguiente">&#8250;</button>
+      <div class="vm-dots"></div>
+    </div>
+    <div class="vm-modal-info">
+      <div class="vm-modal-cat"></div>
+      <div class="vm-modal-price"></div>
+      <p class="vm-modal-desc"></p>
+      <!-- Compra web (Wompi): visible solo con COMPRA_WOMPI = true -->
+      <div class="vm-compra" id="vm-compra" hidden>
+        <div class="vm-compra-lbl">
+          <span>Talla</span>
+          <span class="vm-sys" role="group" aria-label="Sistema de tallas">
+            <button type="button" class="vm-sys-b on" data-sys="co" aria-pressed="true">CO</button>
+            <button type="button" class="vm-sys-b" data-sys="eu" aria-pressed="false">EU</button>
+            <button type="button" class="vm-sys-b" data-sys="us" aria-pressed="false">US</button>
+          </span>
+        </div>
+        <div class="vm-tallas" id="vm-tallas" role="group" aria-label="Elige tu talla"></div>
+        <div class="vm-talla-eq" id="vm-talla-eq" aria-live="polite"></div>
+        <div class="vm-compra-lbl" style="margin-top:14px;">Cantidad</div>
+        <div class="vm-cant">
+          <button type="button" id="vm-cant-menos" aria-label="Una menos">&minus;</button>
+          <span class="vm-cant-n" id="vm-cant-n">1</span>
+          <button type="button" id="vm-cant-mas" aria-label="Una más">+</button>
+        </div>
+        <div class="vm-compra-err" id="vm-compra-err" role="alert"></div>
+        <form class="vm-compra-form" id="vm-compra-form" novalidate>
+          <label for="vc-nombre">Tu nombre</label>
+          <input id="vc-nombre" name="nombre" autocomplete="name" maxlength="80">
+          <label for="vc-celular">WhatsApp (para coordinar el envío)</label>
+          <div class="vm-tel-row">
+            <select id="vc-prefijo" aria-label="Código de país">
+              <option value="57" selected>🇨🇴 +57</option>
+              <option value="1">🇺🇸 +1</option>
+              <option value="34">🇪🇸 +34</option>
+              <option value="52">🇲🇽 +52</option>
+              <option value="58">🇻🇪 +58</option>
+              <option value="593">🇪🇨 +593</option>
+              <option value="51">🇵🇪 +51</option>
+              <option value="507">🇵🇦 +507</option>
+              <option value="56">🇨🇱 +56</option>
+              <option value="54">🇦🇷 +54</option>
+              <option value="55">🇧🇷 +55</option>
+            </select>
+            <input id="vc-celular" name="celular" type="tel" inputmode="numeric" autocomplete="tel" placeholder="3XX XXX XXXX" maxlength="17">
+          </div>
+          <label for="vc-direccion">Dirección de envío (ciudad y barrio)</label>
+          <textarea id="vc-direccion" name="direccion" rows="2" maxlength="400"></textarea>
+          <div class="vm-compra-total" id="vm-compra-total"></div>
+          <div class="vm-compra-seguro">🔒 Pago seguro con <b>Wompi</b> (Bancolombia): tarjeta, PSE o Nequi. No guardamos datos de tu tarjeta.</div>
+        </form>
+      </div>
+      <button class="vm-modal-wa js-wa" data-ref="" data-precio=""><i class="ti ti-brand-whatsapp"></i> Pedir por WhatsApp</button>
+    </div>
+  </div>
+</div>
+<script>
+// --- Pedido por WhatsApp (tarjetas y modal) ---
+// El número sale de WHATSAPP_NUMERO (definida arriba): un solo punto de cambio para EL CORTE.
+// El texto "Quiero la Ref NN" lo reconoce el bot (intent ref directa) y arranca
+// el pedido YA en esa referencia — cambiarlo aquí implica cambiar el bot.
+document.addEventListener('click', function(e){
+  if (window.COMPRA_WOMPI) return; // compra web activa: el botón abre el modal de compra (script más abajo)
+  var b = e.target.closest('.js-wa'); if(!b) return;
+  e.stopPropagation();
+  var r = b.getAttribute('data-ref')||'', p = b.getAttribute('data-precio')||'';
+  var t = 'Hola! Quiero la Ref '+r+(p?' (\$'+p+' COP)':'')+' \u{1F45F}';
+  window.open('https://wa.me/'+WHATSAPP_NUMERO+'?text='+encodeURIComponent(t),'_blank','noopener');
+});
+// --- FAB de WhatsApp y paso 2 de "¿Cómo comprar?": arman su enlace con WHATSAPP_NUMERO ---
+(function(){
+  function wa(texto){ return 'https://wa.me/' + WHATSAPP_NUMERO + '?text=' + encodeURIComponent(texto); }
+  var fab = document.querySelector('.vm-fab');
+  if (fab) fab.href = wa('Hola VarMan Crew \u{1F45F}, quiero información sobre los zapatos');
+  var hb = document.getElementById('hb-wa');
+  if (hb) hb.href = wa('Hola VarMan Crew \u{1F45F}, quiero hacer un pedido');
+})();
+// --- Carrusel automatico en las tarjetas ---
+(function(){
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if(reduce) return; // respeta la preferencia de menos movimiento
+  document.querySelectorAll('.prod-carousel').forEach(function(c){
+    var imgs = c.querySelectorAll('.cv');
+    if(imgs.length < 2) return;
+    var i = 0, timer = null;
+    function step(){ imgs[i].classList.remove('active'); i=(i+1)%imgs.length; imgs[i].classList.add('active'); }
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(en){
+        if(en.isIntersecting){ if(!timer){ timer = setInterval(step, 2600 + Math.floor(Math.random()*1400)); } }
+        else if(timer){ clearInterval(timer); timer = null; }
+      });
+    }, {threshold:0.25});
+    io.observe(c);
+  });
+})();
+// --- Vista detallada (modal con galeria) ---
+(function(){
+  var modal = document.getElementById('vm-modal');
+  var gImg = modal.querySelector('.vm-gallery-img');
+  var gDots = modal.querySelector('.vm-dots');
+  var mCat = modal.querySelector('.vm-modal-cat');
+  var mPrice = modal.querySelector('.vm-modal-price');
+  var mDesc = modal.querySelector('.vm-modal-desc');
+  var mWa = modal.querySelector('.vm-modal-wa');
+  var prevBtn = modal.querySelector('.vm-prev');
+  var nextBtn = modal.querySelector('.vm-next');
+  var closeBtn = modal.querySelector('.vm-modal-close');
+  var counter = modal.querySelector('.vm-counter');
+  var imgs = [], idx = 0, lastFocus = null;
+  var DESCR = {
+    deportivas: 'Silueta deportiva, liviana y cómoda para el día a día o para entrenar. Calidad garantizada y disponible en varias tallas.',
+    casuales: 'Estilo casual y versátil que combina con todo. Cómodos para uso diario. Disponibles en varias tallas.',
+    urbanas: 'Edición urbana de alto impacto, perfecta para destacar tu estilo en la calle. Disponible en varias tallas.'
+  };
+  var CATLBL = { deportivas:'Deportivas', casuales:'Casuales', urbanas:'Urbanas' };
+  function render(){
+    gImg.src = imgs[idx];
+    var single = imgs.length < 2;
+    prevBtn.style.display = single ? 'none' : '';
+    nextBtn.style.display = single ? 'none' : '';
+    counter.style.display = single ? 'none' : '';
+    counter.textContent = (idx+1) + ' / ' + imgs.length;
+    var dots = '';
+    for(var k=0;k<imgs.length;k++){ dots += '<span class="vm-dot'+(k===idx?' on':'')+'"></span>'; }
+    gDots.innerHTML = single ? '' : dots;
+  }
+  function go(d){ idx = (idx + d + imgs.length) % imgs.length; render(); }
+  function openCard(card){
+    imgs = [].map.call(card.querySelectorAll('.cv'), function(im){ return im.getAttribute('src'); });
+    idx = 0;
+    var cat = card.getAttribute('data-cat');
+    mCat.textContent = CATLBL[cat] || '';
+    mPrice.innerHTML = card.querySelector('.prod-price').innerHTML;
+    mDesc.textContent = DESCR[cat] || '';
+    var btn = card.querySelector('.js-wa');
+    mWa.setAttribute('data-ref', btn.getAttribute('data-ref'));
+    mWa.setAttribute('data-precio', btn.getAttribute('data-precio'));
+    // compra web (Wompi): arma las tallas y reinicia el paso de compra
+    if (window.vmPrepararCompra) window.vmPrepararCompra(card);
+    render();
+    lastFocus = document.activeElement;
+    modal.classList.add('open');
+    modal.setAttribute('aria-hidden','false');
+    document.body.style.overflow = 'hidden';
+    if(closeBtn) closeBtn.focus();
+  }
+  function closeModal(){
+    modal.classList.remove('open');
+    modal.setAttribute('aria-hidden','true');
+    document.body.style.overflow = '';
+    if(lastFocus && lastFocus.focus){ lastFocus.focus(); }
+  }
+  document.addEventListener('click', function(e){
+    // Con la compra web activa, el botón de la tarjeta también abre el modal
+    // (ahí se elige la talla); en modo WhatsApp se respeta el enlace directo.
+    if(!window.COMPRA_WOMPI && e.target.closest('.js-wa')) return;
+    if(e.target.closest('.vm-modal-wa')) return; // el CTA del modal lo maneja el script de compra
+    if(e.target.closest('[data-close]')){ closeModal(); return; }
+    if(e.target.closest('.vm-prev')){ go(-1); return; }
+    if(e.target.closest('.vm-next')){ go(1); return; }
+    var card = e.target.closest('.prod-card');
+    if(card){ openCard(card); }
+  });
+  document.addEventListener('keydown', function(e){
+    if(modal.classList.contains('open')){
+      // escribiendo en el formulario de compra: las flechas mueven el cursor,
+      // no la galería (fix revisión 2026-07-11)
+      var enCampo = /^(INPUT|TEXTAREA|SELECT)$/.test((e.target && e.target.tagName) || '');
+      if(e.key === 'Escape') closeModal();
+      else if(!enCampo && e.key === 'ArrowLeft') go(-1);
+      else if(!enCampo && e.key === 'ArrowRight') go(1);
+      return;
+    }
+    if((e.key === 'Enter' || e.key === ' ')){
+      var card = e.target.closest && e.target.closest('.prod-card');
+      if(card){ e.preventDefault(); openCard(card); }
+    }
+  });
+  var sx = 0;
+  modal.addEventListener('touchstart', function(e){ sx = e.touches[0].clientX; }, {passive:true});
+  modal.addEventListener('touchend', function(e){ var dx = e.changedTouches[0].clientX - sx; if(Math.abs(dx) > 40){ go(dx < 0 ? 1 : -1); } });
+})();
+// --- Recalcular posiciones de las animaciones (evita secciones en blanco tras filtrar) ---
+(function(){
+  function refreshST(){ if(window.ScrollTrigger){ try { ScrollTrigger.refresh(); } catch(e){} } }
+  document.addEventListener('click', function(e){ if(e.target.closest('.f-btn')){ setTimeout(refreshST, 80); } });
+  window.addEventListener('load', refreshST);
+})();
+</script>
+<script>
+/* ─── COMPRA WEB con Wompi (bandera COMPRA_WOMPI, definida junto a WHATSAPP_NUMERO) ───
+   ON : el cliente elige talla y cantidad en el modal, deja nombre/WhatsApp/dirección,
+        y /api/comprar (función _worker.js, misma página) crea el pedido en Firestore
+        (estado pago_pendiente) + el link de pago de Wompi y lo manda al checkout.
+        La confirmación REAL la hace el webhook del bot (server-side, firma verificada):
+        esta página NUNCA marca nada como pagado. Ver web/NOTA-WEB-COMPRA-WOMPI-2026-07-11.md.
+   OFF: este bloque queda inerte y los botones vuelven a WhatsApp (rollback total). */
+(function(){
+  var TALLAS_DEF = '35-45';      // por defecto hombre/unisex (colombiano)
+  var TALLAS_DEF_DAMA = '34-41'; // por defecto dama (CO; EU 35-42)
+  var $ = function(id){ return document.getElementById(id); };
+  var box = $('vm-compra'), chips = $('vm-tallas'), err = $('vm-compra-err');
+  var form = $('vm-compra-form'), totalEl = $('vm-compra-total'), cantEl = $('vm-cant-n');
+  var eqEl = $('vm-talla-eq');
+  var btnModal = document.querySelector('.vm-modal-wa');
+  if (!window.COMPRA_WOMPI || !box || !chips || !form || !btnModal) return;
+
+  // Con la compra en línea activa, la sección "¿Cómo comprar?" (flujo viejo por
+  // WhatsApp) sobra: se oculta. Con COMPRA_WOMPI=false vuelve a verse (rollback).
+  var comoComprar = $('como-comprar');
+  if (comoComprar) comoComprar.style.display = 'none';
+
+  var selTalla = '', cant = 1, refSel = '', precioSel = 0;
+  var generoSel = '';        // genero del producto abierto: cambia la conversión
+  var sistema = 'co';        // CO (nacional) / EU / US — solo cambia la ETIQUETA
+  var tallasAct = [];        // tallas (CO) del producto abierto
+  var enviando = false;      // guard: una sola petición de pago a la vez
+  var formAbiertoEn = 0;     // guard: ignora el doble clic al abrir el formulario
+
+  // Equivalencias aproximadas por género (anclas del negocio):
+  //  · hombre/unisex: EU = CO + 2 (US 10 = EU 43 = CO 41)
+  //  · dama:          EU = CO + 1 (EU 35 = CO 34), tabla US de mujer
+  var EQ_US_H = { 35:'5', 36:'6', 37:'6.5', 38:'7.5', 39:'8', 40:'9', 41:'10', 42:'10.5', 43:'11', 44:'12', 45:'13', 46:'13.5' };
+  var EQ_US_D = { 34:'5', 35:'6', 36:'6.5', 37:'7.5', 38:'8.5', 39:'9', 40:'10', 41:'10.5', 42:'11' };
+  function esDama(){ return generoSel === 'dama'; }
+  function tallaEU(n){ return n + (esDama() ? 1 : 2); }
+  function tallaUS(n){ return (esDama() ? EQ_US_D : EQ_US_H)[n] || '—'; }
+  function etiquetaTalla(t){
+    var n = parseInt(t, 10);
+    if (!n) return t;
+    if (sistema === 'eu') return String(tallaEU(n));
+    if (sistema === 'us') return tallaUS(n);
+    return String(n);
+  }
+  function equivalencia(t){
+    var n = parseInt(t, 10);
+    if (!n) return '';
+    return 'CO <b>' + n + '</b> · EU <b>' + tallaEU(n) + '</b> · US <b>' + tallaUS(n) + '</b> <span style="opacity:.7">(aprox.' + (esDama() ? ' dama' : '') + ')</span>';
+  }
+  function pintarChips(){
+    var html = '';
+    tallasAct.forEach(function(t){
+      html += '<button type="button" class="vm-talla' + (t === selTalla ? ' on' : '') + '" data-talla="' + t
+        + '" aria-pressed="' + (t === selTalla) + '" aria-label="Talla ' + t + ' colombiana">' + etiquetaTalla(t) + '</button>';
+    });
+    chips.innerHTML = html;
+    if (eqEl) eqEl.innerHTML = selTalla ? equivalencia(selTalla) : 'Elige tu talla — el número cambia según CO / EU / US';
+  }
+
+  function fmtCOP(n){ try { return '$ ' + Number(n).toLocaleString('es-CO') + ' COP'; } catch(e){ return '$ ' + n; } }
+  function setBtn(html, disabled){ btnModal.innerHTML = html; btnModal.disabled = !!disabled; }
+  function mostrarErr(msj){ err.textContent = msj; err.classList.add('on'); }
+  function limpiarErr(){ err.textContent = ''; err.classList.remove('on'); }
+  function total(){ totalEl.innerHTML = selTalla ? 'Total: <b>' + fmtCOP(precioSel * cant) + '</b> · Ref ' + refSel + ' · Talla ' + selTalla + (cant > 1 ? ' · ' + cant + ' pares' : '') : ''; }
+
+  // "36-45" o "38,39,40" (o mezcla "36-38,40") → lista de tallas
+  function expandTallas(txt){
+    var out = [];
+    String(txt || '').split(',').forEach(function(p){
+      p = p.trim(); if (!p) return;
+      var m = p.match(/^(\d{2})\s*[-–]\s*(\d{2})$/);
+      if (m){ for (var i = +m[1]; i <= +m[2] && out.length < 30; i++) out.push(String(i)); }
+      else if (/^\d{2}$/.test(p)) out.push(p);
+    });
+    return out.length ? out : null;
+  }
+
+  // La llama openCard() al abrir el modal de un producto
+  window.vmPrepararCompra = function(card){
+    var b = card.querySelector('.js-wa');
+    refSel = (b && b.getAttribute('data-ref')) || '';
+    precioSel = parseInt(String((b && b.getAttribute('data-precio')) || '').replace(/\D/g, ''), 10) || 0;
+    generoSel = String(card.getAttribute('data-genero') || '').toLowerCase();
+    tallasAct = expandTallas(card.getAttribute('data-tallas'))
+      || expandTallas(esDama() ? TALLAS_DEF_DAMA : TALLAS_DEF);
+    // el modal toma el acento del género (mismos colores de las tarjetas)
+    var modalBox = document.querySelector('.vm-modal-box');
+    if (modalBox) modalBox.style.setProperty('--gacc',
+      generoSel === 'dama' ? 'oklch(0.70 0.17 356)'
+      : generoSel === 'caballero' ? 'oklch(0.66 0.14 240)'
+      : 'oklch(0.75 0.14 160)');
+    selTalla = ''; cant = 1; cantEl.textContent = '1';
+    enviando = false;
+    pintarChips();
+    form.classList.remove('abierto');
+    box.hidden = false;
+    limpiarErr(); total();
+    setBtn('<i class="ti ti-shopping-bag"></i> Comprar', false);
+  };
+
+  chips.addEventListener('click', function(e){
+    var c = e.target.closest('.vm-talla'); if (!c) return;
+    selTalla = c.getAttribute('data-talla');
+    pintarChips();
+    limpiarErr(); total();
+  });
+  // CO / EU / US: solo cambia cómo se LEE la talla (siempre se vende la CO)
+  document.querySelectorAll('.vm-sys-b').forEach(function(sb){
+    sb.addEventListener('click', function(){
+      sistema = sb.getAttribute('data-sys');
+      document.querySelectorAll('.vm-sys-b').forEach(function(x){
+        var on = x === sb;
+        x.classList.toggle('on', on);
+        x.setAttribute('aria-pressed', on);
+      });
+      pintarChips();
+    });
+  });
+  $('vm-cant-menos').addEventListener('click', function(){ cant = Math.max(1, cant - 1); cantEl.textContent = cant; total(); });
+  $('vm-cant-mas').addEventListener('click', function(){ cant = Math.min(5, cant + 1); cantEl.textContent = cant; total(); });
+
+  function comprarPaso(){
+    if (enviando) return; // ya hay una petición en vuelo (Enter + clic, etc.)
+    limpiarErr();
+    if (!selTalla){ mostrarErr('Elige tu talla primero \u{1F45F}'); return; }
+    if (!form.classList.contains('abierto')){
+      form.classList.add('abierto');
+      formAbiertoEn = Date.now();
+      setBtn('<i class="ti ti-lock"></i> Ir a pagar', false);
+      total();
+      var n = $('vc-nombre'); if (n) n.focus();
+      return;
+    }
+    // el segundo clic de un doble clic no debe regañar por el nombre vacío
+    if (Date.now() - formAbiertoEn < 450) return;
+    var nombre = $('vc-nombre').value.trim();
+    var pref = ($('vc-prefijo') && $('vc-prefijo').value) || '57';
+    var cel = $('vc-celular').value.replace(/\D/g, '');
+    var dir = $('vc-direccion').value.trim();
+    if (cel.indexOf(pref) === 0 && cel.length > 10) cel = cel.slice(pref.length); // pegaron el número con prefijo
+    if (nombre.length < 2){ mostrarErr('Escribe tu nombre.'); return; }
+    if (pref === '57' && !/^3\d{9}$/.test(cel)){ mostrarErr('Escribe tu WhatsApp: 10 dígitos empezando por 3.'); return; }
+    if (pref !== '57' && !/^\d{6,12}$/.test(cel)){ mostrarErr('Revisa el número de WhatsApp (solo dígitos, sin el prefijo).'); return; }
+    if (dir.length < 5){ mostrarErr('Escribe la dirección de envío (ciudad y barrio).'); return; }
+    enviando = true;
+    setBtn('Creando tu pago seguro…', true);
+    fetch('/api/comprar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ref: refSel, talla: selTalla, cantidad: cant, nombre: nombre, celular: pref + cel, direccion: dir })
+    }).then(function(r){ return r.json().then(function(j){ return { ok: r.ok, j: j }; }); })
+      .then(function(res){
+        if (res.ok && res.j && res.j.url){ location.assign(res.j.url); return; }
+        throw new Error((res.j && res.j.error) || 'sin url');
+      })
+      .catch(function(){
+        enviando = false;
+        setBtn('<i class="ti ti-lock"></i> Ir a pagar', false);
+        mostrarErr('No pudimos crear el pago. Intenta de nuevo o escríbenos por WhatsApp (botón verde).');
+      });
+  }
+  document.addEventListener('click', function(e){
+    if (e.target.closest('.vm-modal-wa')){ e.preventDefault(); comprarPaso(); }
+  });
+  form.addEventListener('submit', function(e){ e.preventDefault(); comprarPaso(); });
+
+  // Botones de las tarjetas: de "Pedir por WhatsApp" a "Comprar" (ícono bolsa).
+  // El markup original queda intacto: con COMPRA_WOMPI=false no se toca nada.
+  window.vmActualizarBotonesCompra = function(root){
+    (root || document).querySelectorAll('.prod-btn.js-wa').forEach(function(b){
+      b.setAttribute('aria-label', 'Elegir talla y comprar');
+      b.innerHTML = '<i class="ti ti-shopping-bag"></i>';
+    });
+  };
+  window.vmActualizarBotonesCompra(document);
+
+  // Regreso del checkout: solo un mensaje de gracias — el estado REAL del pago
+  // lo decide el webhook del bot; aquí no se marca nada como pagado.
+  try {
+    var q = new URLSearchParams(location.search);
+    if (q.get('compra') === 'gracias' || q.get('id')){
+      var ban = document.createElement('div');
+      ban.className = 'vm-banner-gracias';
+      ban.setAttribute('role', 'status');
+      ban.innerHTML = '\u{1F9E1} <b>¡Gracias!</b> Estamos confirmando tu pago con Wompi. Apenas se apruebe te escribimos por WhatsApp para coordinar el envío.';
+      document.body.appendChild(ban);
+      setTimeout(function(){ if (ban.parentNode) ban.parentNode.removeChild(ban); }, 15000);
+      if (window.history && history.replaceState) history.replaceState(null, '', location.pathname);
+    }
+  } catch(e){}
+})();
+</script>
+<script>
+/* ─── Catálogo dinámico: se administra desde la app VarMan (pestaña Tienda) ───
+   Lee el catálogo publicado en Firebase (solo lectura pública, nadie puede
+   escribir desde aquí). Si no hay internet a Firebase o el catálogo aún no se
+   importó, la página deja las tarjetas fijas de arriba — nunca queda en blanco. */
+(function(){
+  if (!window.fetch || !window.Promise || !window.IntersectionObserver) return;
+  var BASE = 'https://firestore.googleapis.com/v1/projects/varman-crew/databases/(default)/documents/tiendas/varman/';
+  var LBL = { deportivas:'Deportivas', casuales:'Casuales', urbanas:'Urbanas' };
+  var PLACEHOLDER = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="600" height="600"><rect width="100%" height="100%" fill="#17171c"/></svg>');
+
+  function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+  function val(f){ // convierte un valor tipado de la API REST de Firestore a JS
+    if (!f) return null;
+    if ('stringValue' in f) return f.stringValue;
+    if ('integerValue' in f) return parseInt(f.integerValue, 10);
+    if ('doubleValue' in f) return f.doubleValue;
+    if ('booleanValue' in f) return f.booleanValue;
+    if ('arrayValue' in f) return (f.arrayValue.values || []).map(val);
+    return null;
+  }
+  function fmt(n){ try { return Number(n).toLocaleString('es-CO'); } catch(e){ return String(n); } }
+
+  /* Caché de fotos en el navegador (IndexedDB): las visitas repetidas cargan al instante */
+  var dbP = new Promise(function(res){
+    if (!window.indexedDB) return res(null);
+    try {
+      var rq = indexedDB.open('vm-catalogo-cache', 1);
+      rq.onupgradeneeded = function(){ rq.result.createObjectStore('fotos'); };
+      rq.onsuccess = function(){ res(rq.result); };
+      rq.onerror = function(){ res(null); };
+    } catch(e){ res(null); }
+  });
+  function cacheGet(id){ return dbP.then(function(db){
+    if (!db) return null;
+    return new Promise(function(res){
+      try {
+        var rq = db.transaction('fotos').objectStore('fotos').get(id);
+        rq.onsuccess = function(){ res(rq.result || null); };
+        rq.onerror = function(){ res(null); };
+      } catch(e){ res(null); }
+    });
+  }); }
+  function cachePut(id, data){ dbP.then(function(db){
+    if (!db) return;
+    try { db.transaction('fotos', 'readwrite').objectStore('fotos').put(data, id); } catch(e){}
+  }); }
+
+  var enCurso = {};
+  function cargarFoto(img){
+    var id = img.getAttribute('data-foto');
+    if (!id || img.getAttribute('data-ok')) return;
+    if (enCurso[id]) { enCurso[id].push(img); return; }
+    enCurso[id] = [img];
+    cacheGet(id).then(function(hit){
+      if (hit) return hit;
+      return fetch(BASE + 'catalogoFotos/' + encodeURIComponent(id)).then(function(r){
+        if (!r.ok) throw new Error('foto');
+        return r.json();
+      }).then(function(doc){
+        var data = doc.fields && doc.fields.data && doc.fields.data.stringValue;
+        if (data) cachePut(id, data);
+        return data || null;
+      });
+    }).then(function(data){
+      (enCurso[id] || []).forEach(function(im){ if (data){ im.src = data; im.setAttribute('data-ok','1'); } });
+      delete enCurso[id];
+    }).catch(function(){ delete enCurso[id]; });
+  }
+
+  function initCarousels(root){
+    var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduce) return;
+    root.querySelectorAll('.prod-carousel').forEach(function(c){
+      var imgs = c.querySelectorAll('.cv');
+      if (imgs.length < 2) return;
+      var i = 0, timer = null;
+      function step(){ imgs[i].classList.remove('active'); i = (i+1) % imgs.length; imgs[i].classList.add('active'); }
+      var io = new IntersectionObserver(function(entries){
+        entries.forEach(function(en){
+          if (en.isIntersecting){ if (!timer) timer = setInterval(step, 2600 + Math.floor(Math.random()*1400)); }
+          else if (timer){ clearInterval(timer); timer = null; }
+        });
+      }, { threshold: 0.25 });
+      io.observe(c);
+    });
+  }
+
+  function initLazyFotos(root){
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(en){
+        if (!en.isIntersecting) return;
+        en.target.querySelectorAll('img[data-foto]').forEach(cargarFoto);
+        io.unobserve(en.target);
+      });
+    }, { rootMargin: '500px 0px' });
+    root.querySelectorAll('.prod-carousel').forEach(function(c){ io.observe(c); });
+  }
+
+  function render(prods){
+    var grid = document.querySelector('.prod-grid');
+    if (!grid || !prods.length) return;
+    var html = '';
+    prods.forEach(function(p){
+      var lbl = LBL[p.cat] || esc(p.cat);
+      var precio = fmt(p.precio);
+      var imgs = '';
+      p.fotos.forEach(function(fid, i){
+        imgs += '<img class="cv' + (i === 0 ? ' active' : '') + '" src="' + PLACEHOLDER + '" data-foto="' + esc(fid) + '" alt="">';
+      });
+      var tag = p.tag ? '<div class="prod-tag">' + esc(p.tag) + '</div>' : '';
+      // genero y tallas se marcan en la app (pestaña Tienda): genero filtra
+      // Dama/Caballero (vacío = ambos) y tallas arma el selector al comprar.
+      var gen = String(p.genero || '').toLowerCase();
+      var genLbl = gen === 'dama' ? 'Dama' : gen === 'caballero' ? 'Caballero' : 'Unisex';
+      var genChip = '<div class="prod-gen">' + genLbl + '</div>';
+      html += '<div class="prod-card" data-cat="' + esc(p.cat) + '" data-genero="' + esc(gen) + '" data-tallas="' + esc(p.tallas || '') + '" role="button" tabindex="0" aria-label="Ver ' + lbl + ' ' + genLbl + ', $' + precio + ' COP">'
+        + '<div class="prod-img prod-carousel">' + imgs + tag + genChip
+        + '<span class="prod-zoom" aria-hidden="true"><i class="ti ti-arrows-maximize"></i></span></div>'
+        + '<div class="prod-info"><div class="prod-cat">' + lbl + '</div>'
+        + '<div class="prod-foot"><div class="prod-price">$ ' + precio + ' <small>COP</small></div>'
+        + '<button class="prod-btn js-wa" data-ref="' + esc(p.ref) + '" data-precio="' + precio + '" aria-label="Pedir por WhatsApp"><i class="ti ti-brand-whatsapp"></i></button>'
+        + '</div></div></div>';
+    });
+    grid.innerHTML = html;
+    if (window.COMPRA_WOMPI && window.vmActualizarBotonesCompra) window.vmActualizarBotonesCompra(grid);
+    initCarousels(grid);
+    initLazyFotos(grid);
+    // efecto del cursor sobre las tarjetas nuevas (solo escritorio)
+    var ring = document.getElementById('cursorRing');
+    if (ring) grid.querySelectorAll('.prod-card').forEach(function(el){
+      el.addEventListener('mouseenter', function(){ ring.style.width='60px'; ring.style.height='60px'; ring.style.borderColor='rgba(255,107,0,0.8)'; });
+      el.addEventListener('mouseleave', function(){ ring.style.width='36px'; ring.style.height='36px'; ring.style.borderColor='rgba(255,107,0,0.5)'; });
+    });
+    // conserva el filtro que el visitante tenga activo
+    var act = document.querySelector('.f-btn.active');
+    if (act && typeof window.applyFilter === 'function') window.applyFilter(act.dataset.filter);
+    if (window.ScrollTrigger) { try { ScrollTrigger.refresh(); } catch(e){} }
+  }
+
+  fetch(BASE + 'catalogo?pageSize=300')
+    .then(function(r){ if (!r.ok) throw new Error('catalogo'); return r.json(); })
+    .then(function(j){
+      var prods = (j.documents || []).map(function(d){
+        var f = d.fields || {};
+        return {
+          ref: val(f.ref) || '', cat: val(f.cat) || '', precio: val(f.precio) || 0,
+          tag: val(f.tag) || '', orden: val(f.orden) || 0,
+          activo: val(f.activo) !== false, fotos: val(f.fotos) || [],
+          genero: val(f.genero) || '', tallas: val(f.tallas) || ''
+        };
+      }).filter(function(p){ return p.activo && p.fotos.length; });
+      prods.sort(function(a, b){ return (a.orden - b.orden) || String(a.ref).localeCompare(String(b.ref)); });
+      if (prods.length) render(prods);
+    })
+    .catch(function(){ /* sin conexión o catálogo aún no importado → quedan las tarjetas fijas */ });
+})();
+</script>
+</body>

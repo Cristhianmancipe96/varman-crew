@@ -1,0 +1,290 @@
+{
+  "id": "VarmanBotV4Ped01",
+  "name": "Bot WhatsApp VarMan - COMPLETO Fase 1 (pasos 4-8)",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "whatsapp",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "40000000-0000-4000-8000-000000000001",
+      "name": "Webhook verificacion (GET)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "40000000-0000-4000-8000-000000000001"
+    },
+    {
+      "parameters": {
+        "jsCode": "const q = $input.first().json.query || {};\nconst ok = q['hub.mode'] === 'subscribe' && q['hub.verify_token'] === $env.WEBHOOK_VERIFY_TOKEN;\nreturn [{ json: { body: ok ? q['hub.challenge'] : 'token invalido', statusCode: ok ? 200 : 403 } }];"
+      },
+      "id": "40000000-0000-4000-8000-000000000002",
+      "name": "Verificar token",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.body }}",
+        "options": {
+          "responseCode": "={{ $json.statusCode }}"
+        }
+      },
+      "id": "40000000-0000-4000-8000-000000000003",
+      "name": "Responder a Meta",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "whatsapp",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "40000000-0000-4000-8000-000000000004",
+      "name": "Webhook mensajes (POST)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        260
+      ],
+      "webhookId": "40000000-0000-4000-8000-000000000004"
+    },
+    {
+      "parameters": {
+        "jsCode": "const out = [];\nfor (const item of $input.all()) {\n  const body = item.json.body || item.json;\n  for (const e of (body.entry || [])) {\n    for (const ch of (e.changes || [])) {\n      const v = ch.value || {};\n      const contacto = (v.contacts && v.contacts[0]) || {};\n      for (const m of (v.messages || [])) {\n        let texto = '';\n        let inter_id = '';\n        let imagen_id = '';\n        if (m.type === 'text') texto = (m.text && m.text.body) || '';\n        else if (m.type === 'image') imagen_id = (m.image && m.image.id) || '';\n        else if (m.type === 'interactive') {\n          const it = m.interactive || {};\n          if (it.type === 'list_reply') inter_id = (it.list_reply && it.list_reply.id) || '';\n          else if (it.type === 'button_reply') inter_id = (it.button_reply && it.button_reply.id) || '';\n        }\n        out.push({ json: {\n          wa_id: m.from,\n          nombre: (contacto.profile && contacto.profile.name) || '',\n          tipo: m.type,\n          texto,\n          inter_id,\n          imagen_id,\n          message_id: m.id\n        }});\n      }\n    }\n  }\n}\nreturn out;"
+      },
+      "id": "40000000-0000-4000-8000-000000000005",
+      "name": "Parsear mensaje",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://firestore.googleapis.com/v1/projects/varman-crew/databases/(default)/documents/tiendas/varman/catalogo?pageSize=300",
+        "options": {}
+      },
+      "id": "40000000-0000-4000-8000-000000000006",
+      "name": "Leer catalogo (Firestore)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        260
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============ TEXTOS DEL BOT (tono de venta) — EDITAR AQUÍ ============\n// TODO el texto que ve el cliente (y los avisos al dueño) vive en este archivo.\n// Para cambiar el tono o adaptar el bot a OTRO negocio: editar SOLO este\n// archivo y regenerar el workflow con:\n//   node workflows\\build-v4-pedidos.js\n// (el build pega este archivo antes del cerebro dentro del nodo Code).\n//\n// Los {placeholders} entre llaves se reemplazan en tiempo de ejecución\n// (p. ej. {ref}, {precio}, {talla}) — conservarlos al editar los textos.\n// *asteriscos* = negrilla en WhatsApp. Los emojis son parte del tono.\n\nconst TEXTOS = {\n  // --- identidad de la marca ---\n  marca: 'VarMan Crew',\n  telefonoAtencion: '+57 320 225 0619',\n\n  // --- catálogo: lista de categorías ---\n  categoriasHeader: 'VarMan Crew 👟',\n  categoriasBody: '¡Hola! Bienvenido a *VarMan Crew*. Estos son nuestros estilos. ¿Cuál quieres ver?',\n  categoriasFooter: 'Toca «Ver categorías»',\n  categoriasBoton: 'Ver categorías',\n  categoriasSeccion: 'Categorías',\n  categoriasFilaDesc: '{n} modelos disponibles',\n\n  // --- catálogo: lista de modelos de una categoría ---\n  modelosHeader: 'VarMan Crew · {categoria}',\n  modelosBodyMuchos: 'Estos son algunos de nuestros modelos {categoria} (los primeros 10 de {total}). Toca el que te guste 👇',\n  modelosBodyPocos: 'Nuestros modelos {categoria}. Toca el que te guste 👇',\n  modelosFooter: 'Envíos a todo el país',\n  modelosBoton: 'Ver modelos',\n  modelosFilaTitulo: 'Referencia {ref}',\n\n  // --- flujo de pedido ---\n  eligeReferencia: '¡Buena elección! 🔥\\n\\nLa *Referencia {ref}* cuesta *{precio}*.\\n\\n¿Qué talla buscas? Escríbeme el número (tenemos de la 36 a la 45). Si quieres empezar de nuevo, escribe *cancelar*.',\n  refNoEncontrada: 'No encontré esa referencia 😅. Escribe *hola* para ver el catálogo de nuevo.',\n  tallaAnotada: '¡Talla {talla} anotada! ✅\\n\\nAhora regálame en un solo mensaje los datos de envío:\\n\\n*Nombre completo*\\n*Dirección*\\n*Ciudad*\\n*Teléfono de contacto*',\n  tallaInvalida: 'Manejamos tallas de la *36 a la 45* 👟. Escríbeme solo el número (ej: *40*), o *cancelar* para empezar de nuevo.',\n  datosIncompletos: 'Creo que faltan datos 🙈. Mándame en un solo mensaje: *nombre completo, dirección, ciudad y teléfono*.',\n  pedidoCancelado: 'Listo, cancelé el pedido 👍. Cuando quieras retomar, escribe *hola* y te muestro el catálogo.',\n\n  // --- pago ---\n  pagoBody: '¡Perfecto! 📦 Tu pedido va quedando listo.\\n\\nTotal a pagar: *{total}*\\n\\n¿Cómo prefieres pagar?',\n  // al tocar el botón del método de pago:\n  pagoInstruccionesBoton: 'Pagas por *{metodo}* a este número/llave:\\n\\n👉 {dato}\\n\\nTotal: *{total}*\\n\\nCuando hagas el pago, mándame la *foto del comprobante* aquí mismo 📸 y dejamos tu pedido confirmado.',\n  // si escribió el método por texto en vez de tocar el botón:\n  pagoInstruccionesTexto: 'Pagas por *{metodo}* a este número/llave:\\n\\n👉 {dato}\\n\\nTotal: *{total}*\\n\\nCuando hagas el pago, mándame la *foto del comprobante* aquí mismo 📸.',\n  pideComprobante: 'Cuando puedas, mándame la *foto del comprobante* 📸 para confirmar tu pedido. Si quieres cambiar algo, escribe *cancelar*.',\n\n  // --- cierre del pedido ---\n  pedidoRecibido: '¡Pedido recibido! 🎉\\n\\n*Referencia {ref}* · Talla {talla} · {total}\\n\\nVamos a verificar tu pago y te confirmamos el envío por aquí mismo. ¡Gracias por comprar en VarMan Crew! 👟',\n  avisoPedidoDueno: '🛒 *NUEVO PEDIDO (por verificar)*\\n\\nRef: {ref} · Talla {talla}\\nTotal: {total} por {metodo}\\nCliente: {cliente} · +{wa}\\nEnvío: {envio}\\n\\n{comprobante}\\nPedido guardado: {ruta}',\n  avisoComprobanteOk: '📎 Comprobante guardado (visible en la app).',\n  avisoComprobanteFallo: '📎 Comprobante en el chat del cliente (no se pudo descargar).',\n\n  // --- handoff a humano ---\n  handoffCliente: '¡Claro! Ya le avisé a nuestro equipo 😊. En un momento te escriben desde el +57 320 225 0619.',\n  handoffAvisoDueno: '🔔 *Cliente pide atención humana*\\n\\nNombre: {cliente}\\nWhatsApp: +{wa}\\nÚltimo mensaje: \"{texto}\"',\n\n  // --- respuestas generales ---\n  otroDefault: 'Con gusto te ayudamos 😊. ¿Quieres ver el catálogo? Escribe *hola* o dime qué necesitas.',\n  comprarIntro: 'Mira nuestro catálogo y toca el modelo que buscas 👇',\n  botPausado: '¡Hola! 🙌 En este momento te estamos atendiendo en persona. Ya te escribimos por aquí en un momento, gracias por la paciencia.',\n  errorTecnico: 'Ups, tuvimos un problemita técnico 🙈. Escríbeme *hola* en un momento y seguimos, o si es urgente te atendemos en el +57 320 225 0619.',\n\n  // --- comandos admin (mensajes al dueño / 320) ---\n  adminSinPendientes: '📋 No hay pedidos pendientes ahora mismo 🎉',\n  adminListaTitulo: '📋 *Últimos {n} pedidos pendientes*\\n\\n{lineas}',\n  adminPausado: '⏸ Bot en *mantenimiento*. A los clientes les responderé: «ya te escribimos». Escribe *activar* para reactivarlo.',\n  adminActivo: '▶️ Bot *activo* de nuevo. Los clientes vuelven al flujo normal.',\n  adminAyuda: '🛠 *Comandos admin*\\n• *pedidos* — últimos 5 pendientes\\n• *pausar* — bot en mantenimiento\\n• *activar* — reactivar el bot\\n\\nCualquier otro mensaje tuyo pasa por el flujo normal de cliente (sirve para probar el bot).'\n};\n\n// Prompt de sistema para Gemini (clasificador de intenciones). También es\n// \"tono de marca\": menciona el negocio, el rango de precios y los medios de pago.\nconst GEMINI_SISTEMA = 'Eres el clasificador de intenciones del bot de WhatsApp de VarMan Crew, una tienda colombiana de zapatos (tenis/sneakers). Analiza el mensaje del cliente y responde SOLO un JSON valido (sin markdown) con esta forma: {\"intent\":\"<una de: saludo|ver_catalogo|pregunta_precio|comprar|hablar_humano|otro>\",\"respuesta\":\"<respuesta corta y calida en español colombiano, tono vendedor amable, max 2 frases, puede usar 1 emoji>\"} Reglas: \"saludo\": saludos o inicios de conversacion, la respuesta da la bienvenida a VarMan Crew. \"ver_catalogo\": pide ver zapatos, modelos, catalogo, fotos, o pregunta por un modelo o marca. \"pregunta_precio\": pregunta precios en general o de una categoria. \"comprar\": ya quiere comprar o pedir algo concreto. \"hablar_humano\": pide hablar con una persona, asesor o el dueño. \"otro\": nada de lo anterior (quejas, envios, etc.), da una respuesta util y ofrece ver el catalogo o hablar con un asesor. Contexto: precios entre $235.000 y $480.000 COP, envios a todo Colombia, pagos por Nequi/Daviplata/Bre-B.';\n\n// Reemplaza {placeholders} por sus valores: T(TEXTOS.eligeReferencia, { ref: '05', precio: '$250.000' })\nfunction T(plantilla, vars) {\n  return String(plantilla).replace(/\\{(\\w+)\\}/g, (m, k) => (vars && k in vars) ? String(vars[k]) : m);\n}\n\n// ============ CEREBRO DEL BOT v4.1 (sesiones + pedidos + admin + Gemini) ============\n// Fuente legible del nodo Code \"Cerebro (sesion+pedido+Gemini)\".\n// NO editar el JSON del workflow a mano: editar ESTE archivo y correr\n//   node workflows\\build-v4-pedidos.js\n// TEXTOS DE VENTA/TONO: viven en src\\textos.js (TEXTOS, GEMINI_SISTEMA y el\n// helper T). El build pega textos.js ANTES de este archivo en el mismo nodo\n// Code, así que aquí se usan directo. Para cambiar el tono: editar textos.js.\n// Novedades v4.1 (2026-07-06, Agente 1):\n//   - Descarga del comprobante via Graph API y guardado en Firestore\n//     tiendas/varman/comprobantes/{idPedido} (b64 + mime). El pedido lleva\n//     comprobante_guardado true/false. Ver briefs\\CAMBIOS-PEDIDOS.md.\n//   - estado del pedido = 'pagado_por_verificar' (contrato congelado del brief).\n//   - Comandos admin desde OWNER_WHATSAPP: pedidos / pausar / activar / admin.\n//   - Pausa global en tiendas/varman/botConfig/general {pausado}.\n//   - try/catch global + log de errores a tiendas/varman/botErrores.\n//   - Reintento 1x en llamadas a Graph API (descarga de media).\nconst H = this.helpers;\nconst crypto = require('crypto');\n\nconst CAT_LABEL = { deportivas: 'Deportivas', casuales: 'Casuales', urbanas: 'Urbanas' };\nconst CAT_ORDER = ['deportivas', 'casuales', 'urbanas'];\nconst FS_BASE = 'https://firestore.googleapis.com/v1/projects/varman-crew/databases/(default)/documents';\nconst CFG_PATH = 'tiendas/varman/botConfig/general';\nconst GRAPH = 'https://graph.facebook.com/v21.0';\n\n// ---------- utilidades ----------\nfunction fmtPrecio(n) {\n  return '$' + String(n).replace(/\\B(?=(\\d{3})+(?!\\d))/g, '.');\n}\nfunction unwrap(v) {\n  if (v == null) return null;\n  if ('integerValue' in v) return parseInt(v.integerValue, 10);\n  if ('doubleValue' in v) return v.doubleValue;\n  if ('booleanValue' in v) return v.booleanValue;\n  if ('stringValue' in v) return v.stringValue;\n  if ('arrayValue' in v) return (v.arrayValue.values || []).map(unwrap);\n  return null;\n}\nfunction parseCatalogo(fsJson) {\n  const docs = (fsJson.documents || []);\n  const items = docs.map((d) => {\n    const f = d.fields || {}; const o = {};\n    for (const k in f) o[k] = unwrap(f[k]);\n    return o;\n  }).filter((o) => o.activo !== false);\n  items.sort((a, b) => (a.orden || 999) - (b.orden || 999));\n  return items;\n}\nfunction toFs(obj) {\n  const fields = {};\n  for (const k in obj) {\n    const v = obj[k];\n    if (v === undefined || v === null) continue;\n    if (typeof v === 'number') fields[k] = { integerValue: String(Math.round(v)) };\n    else if (typeof v === 'boolean') fields[k] = { booleanValue: v };\n    else fields[k] = { stringValue: String(v) };\n  }\n  return fields;\n}\nfunction fromFs(doc) {\n  if (!doc || !doc.fields) return null;\n  const o = {};\n  for (const k in doc.fields) o[k] = unwrap(doc.fields[k]);\n  return o;\n}\nfunction fechaCorta(iso) {\n  try {\n    return new Date(iso).toLocaleString('es-CO', {\n      timeZone: 'America/Bogota', day: '2-digit', month: '2-digit',\n      hour: '2-digit', minute: '2-digit', hour12: false\n    });\n  } catch (e) { return iso || ''; }\n}\n// reintento 1x (2 intentos en total) para llamadas de red criticas\nasync function con1Reintento(fn) {\n  try { return await fn(); }\n  catch (e) {\n    await new Promise((r) => setTimeout(r, 1200));\n    return await fn();\n  }\n}\n\n// ---------- acceso admin a Firestore (service account) ----------\nfunction b64url(buf) {\n  return Buffer.from(buf).toString('base64').replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '');\n}\nasync function tokenAdmin() {\n  const sa = JSON.parse(Buffer.from($env.FIREBASE_SA_B64, 'base64').toString('utf8'));\n  const now = Math.floor(Date.now() / 1000);\n  const header = b64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));\n  const claims = b64url(JSON.stringify({\n    iss: sa.client_email,\n    scope: 'https://www.googleapis.com/auth/datastore',\n    aud: 'https://oauth2.googleapis.com/token',\n    iat: now, exp: now + 3600\n  }));\n  const signer = crypto.createSign('RSA-SHA256');\n  signer.update(header + '.' + claims);\n  const jwt = header + '.' + claims + '.' + b64url(signer.sign(sa.private_key));\n  const r = await con1Reintento(() => H.httpRequest({\n    method: 'POST', url: 'https://oauth2.googleapis.com/token',\n    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },\n    body: 'grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=' + jwt,\n    timeout: 15000, json: true\n  }));\n  return r.access_token;\n}\nasync function fsGet(tok, path) {\n  try {\n    const d = await H.httpRequest({ method: 'GET', url: FS_BASE + '/' + path,\n      headers: { Authorization: 'Bearer ' + tok }, json: true, timeout: 15000 });\n    return fromFs(d);\n  } catch (e) { return null; }\n}\nasync function fsSet(tok, path, obj) {\n  await H.httpRequest({ method: 'PATCH', url: FS_BASE + '/' + path,\n    headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' },\n    body: { fields: toFs(obj) }, json: true, timeout: 15000 });\n}\nasync function fsDel(tok, path) {\n  try {\n    await H.httpRequest({ method: 'DELETE', url: FS_BASE + '/' + path,\n      headers: { Authorization: 'Bearer ' + tok }, json: true, timeout: 15000 });\n  } catch (e) {}\n}\nasync function fsAdd(tok, colPath, obj) {\n  const d = await H.httpRequest({ method: 'POST', url: FS_BASE + '/' + colPath,\n    headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' },\n    body: { fields: toFs(obj) }, json: true, timeout: 15000 });\n  return d.name.split('/documents/')[1];\n}\n// ultimos pedidos por fecha (el filtro de estado se hace en JS para no\n// requerir indices compuestos en Firestore)\nasync function fsUltimosPedidos(tok, n) {\n  const r = await H.httpRequest({ method: 'POST', url: FS_BASE + '/tiendas/varman:runQuery',\n    headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' },\n    body: { structuredQuery: {\n      from: [{ collectionId: 'pedidos' }],\n      orderBy: [{ field: { fieldPath: 'creado' }, direction: 'DESCENDING' }],\n      limit: n\n    } }, json: true, timeout: 15000 });\n  return (Array.isArray(r) ? r : []).filter((x) => x.document).map((x) => {\n    const o = fromFs(x.document) || {};\n    o._id = x.document.name.split('/').pop();\n    return o;\n  });\n}\n// log de errores del bot (mejor esfuerzo: si el log falla, no rompe el flujo)\nasync function logError(tok, origen, err, extra) {\n  try {\n    await fsAdd(tok, 'tiendas/varman/botErrores', {\n      fecha: new Date().toISOString(),\n      origen,\n      error: String((err && err.message) || err).slice(0, 800),\n      wa_id: (extra && extra.wa_id) || '',\n      contexto: (extra && extra.contexto) || ''\n    });\n  } catch (e) {}\n}\n\n// ---------- descarga del comprobante (Graph API, reintento 1x) ----------\n// GET /{media_id} -> { url, mime_type } ; GET url (Bearer) -> binario.\n// La URL de media de Meta caduca en ~5 min: se descarga de inmediato.\nasync function descargarComprobante(mediaId) {\n  const auth = { Authorization: 'Bearer ' + $env.WHATSAPP_TOKEN };\n  const meta = await con1Reintento(() => H.httpRequest({\n    method: 'GET', url: GRAPH + '/' + mediaId,\n    headers: auth, json: true, timeout: 20000\n  }));\n  if (!meta || !meta.url) throw new Error('media sin URL (id ' + mediaId + ')');\n  const bin = await con1Reintento(() => H.httpRequest({\n    method: 'GET', url: meta.url,\n    headers: Object.assign({ 'User-Agent': 'curl/8.4.0' }, auth),\n    encoding: 'arraybuffer', timeout: 30000\n  }));\n  const buf = Buffer.isBuffer(bin) ? bin : Buffer.from(bin);\n  const b64 = buf.toString('base64');\n  // limite de documento en Firestore ~1 MiB: si no cabe, se conserva solo el media_id\n  if (b64.length > 900000) throw new Error('comprobante demasiado grande (' + buf.length + ' bytes)');\n  return { mime: meta.mime_type || 'image/jpeg', b64, bytes: buf.length };\n}\n\n// ---------- constructores de mensajes WhatsApp ----------\nfunction msjTexto(to, body) {\n  return { messaging_product: 'whatsapp', to, type: 'text', text: { body } };\n}\nfunction listaCategorias(to, catalogo, bodyTexto) {\n  const counts = {};\n  for (const p of catalogo) counts[p.cat] = (counts[p.cat] || 0) + 1;\n  const rows = CAT_ORDER.filter((c) => counts[c]).map((c) => ({\n    id: 'cat:' + c, title: CAT_LABEL[c], description: T(TEXTOS.categoriasFilaDesc, { n: counts[c] })\n  }));\n  return { messaging_product: 'whatsapp', to, type: 'interactive', interactive: {\n    type: 'list',\n    header: { type: 'text', text: TEXTOS.categoriasHeader },\n    body: { text: (bodyTexto || TEXTOS.categoriasBody).slice(0, 1024) },\n    footer: { text: TEXTOS.categoriasFooter },\n    action: { button: TEXTOS.categoriasBoton, sections: [{ title: TEXTOS.categoriasSeccion, rows }] }\n  }};\n}\nfunction listaModelos(to, catalogo, cat) {\n  const label = CAT_LABEL[cat] || cat;\n  let modelos = catalogo.filter((p) => p.cat === cat);\n  const total = modelos.length;\n  const hayMas = total > 10;\n  modelos = modelos.slice(0, 10);\n  const rows = modelos.map((p) => {\n    const desc = fmtPrecio(p.precio) + (p.tag ? '  ·  ' + p.tag : '');\n    return { id: 'ref:' + p.ref, title: T(TEXTOS.modelosFilaTitulo, { ref: p.ref }), description: desc.slice(0, 72) };\n  });\n  const bodyTxt = hayMas\n    ? T(TEXTOS.modelosBodyMuchos, { categoria: label.toLowerCase(), total })\n    : T(TEXTOS.modelosBodyPocos, { categoria: label.toLowerCase() });\n  return { messaging_product: 'whatsapp', to, type: 'interactive', interactive: {\n    type: 'list',\n    header: { type: 'text', text: T(TEXTOS.modelosHeader, { categoria: label }) },\n    body: { text: bodyTxt },\n    footer: { text: TEXTOS.modelosFooter },\n    action: { button: TEXTOS.modelosBoton, sections: [{ title: label, rows }] }\n  }};\n}\nfunction botonesPago(to, total) {\n  return { messaging_product: 'whatsapp', to, type: 'interactive', interactive: {\n    type: 'button',\n    body: { text: T(TEXTOS.pagoBody, { total: fmtPrecio(total) }) },\n    action: { buttons: [\n      { type: 'reply', reply: { id: 'pay:nequi', title: 'Nequi' } },\n      { type: 'reply', reply: { id: 'pay:daviplata', title: 'Daviplata' } },\n      { type: 'reply', reply: { id: 'pay:breb', title: 'Bre-B' } }\n    ]}\n  }};\n}\nconst PAGOS = {\n  nequi: { nombre: 'Nequi', dato: () => $env.PAGO_NEQUI },\n  daviplata: { nombre: 'Daviplata', dato: () => $env.PAGO_DAVIPLATA },\n  breb: { nombre: 'Bre-B', dato: () => $env.PAGO_BREB }\n};\n\n// ---------- flujo principal ----------\nconst parsed = $('Parsear mensaje').item.json;\nconst catalogo = parseCatalogo($json);\nconst to = parsed.wa_id;\nconst sel = (parsed.inter_id || '').trim();\nconst texto = (parsed.texto || '').trim();\nconst dueno = String($env.OWNER_WHATSAPP || '').replace(/\\D/g, '');\nconst esDueno = !!dueno && to === dueno;\nconst mensajes = [];\nlet tok = null;\nlet ses = null;\n\nasync function modoAdmin(cmd) {\n  if (cmd === 'pedidos') {\n    const PENDIENTES = ['nuevo', 'pagado_por_verificar', 'pagado (por verificar)'];\n    const todos = await fsUltimosPedidos(tok, 30);\n    const pend = todos.filter((p) => PENDIENTES.indexOf(p.estado) >= 0).slice(0, 5);\n    if (!pend.length) {\n      mensajes.push(msjTexto(to, TEXTOS.adminSinPendientes));\n      return;\n    }\n    const lineas = pend.map((p, i) =>\n      (i + 1) + '. *Ref ' + p.ref + '* · Talla ' + (p.talla || '?') + ' · ' + fmtPrecio(p.total) +\n      ' · ' + (p.metodo_pago || '?') + '\\n   ' + (p.cliente_nombre || '(sin nombre)') + ' · +' + (p.cliente_wa || '?') +\n      ' · ' + fechaCorta(p.creado) + '\\n   Estado: ' + p.estado +\n      (p.comprobante_guardado ? ' · 📎 comprobante guardado' : ''));\n    mensajes.push(msjTexto(to, T(TEXTOS.adminListaTitulo, { n: pend.length, lineas: lineas.join('\\n\\n') })));\n  } else if (cmd === 'pausar') {\n    await fsSet(tok, CFG_PATH, { pausado: true, actualizado: new Date().toISOString(), por: 'admin-320' });\n    mensajes.push(msjTexto(to, TEXTOS.adminPausado));\n  } else if (cmd === 'activar') {\n    await fsSet(tok, CFG_PATH, { pausado: false, actualizado: new Date().toISOString(), por: 'admin-320' });\n    mensajes.push(msjTexto(to, TEXTOS.adminActivo));\n  } else { // 'admin'\n    mensajes.push(msjTexto(to, TEXTOS.adminAyuda));\n  }\n}\n\nasync function principal() {\n  tok = await tokenAdmin();\n\n  // ---- comandos admin del dueño (solo palabras exactas; el resto fluye\n  //      como cliente para poder probar el bot desde el 320)\n  const cmd = texto.toLowerCase();\n  if (esDueno && /^(pedidos|pausar|activar|admin)$/.test(cmd)) {\n    await modoAdmin(cmd);\n    return;\n  }\n\n  // ---- pausa global (mantenimiento)\n  if (!esDueno) {\n    const cfg = await fsGet(tok, CFG_PATH);\n    if (cfg && cfg.pausado === true) {\n      mensajes.push(msjTexto(to, TEXTOS.botPausado));\n      return;\n    }\n  }\n\n  const SES_PATH = 'tiendas/varman/botSesiones/' + to;\n  ses = await fsGet(tok, SES_PATH);\n  // sesion vieja (>24h) = sesion muerta\n  if (ses && ses.updatedAt && (Date.now() - Date.parse(ses.updatedAt)) > 24 * 3600 * 1000) {\n    await fsDel(tok, SES_PATH);\n    ses = null;\n  }\n  async function guardarSes(obj) {\n    await fsSet(tok, SES_PATH, Object.assign({}, obj, { updatedAt: new Date().toISOString() }));\n  }\n\n  if (/^(cancelar|cancela|cancel)$/i.test(texto) && ses) {\n    await fsDel(tok, SES_PATH);\n    mensajes.push(msjTexto(to, TEXTOS.pedidoCancelado));\n\n  } else if (sel.startsWith('cat:')) {\n    if (ses) await fsDel(tok, SES_PATH); // volvio a navegar\n    mensajes.push(listaModelos(to, catalogo, sel.slice(4)));\n\n  } else if (sel.startsWith('ref:')) {\n    const ref = sel.slice(4);\n    const p = catalogo.find((x) => x.ref === ref);\n    if (p) {\n      await guardarSes({ estado: 'talla', ref, precio: p.precio, nombrePerfil: parsed.nombre || '' });\n      mensajes.push(msjTexto(to, T(TEXTOS.eligeReferencia, { ref, precio: fmtPrecio(p.precio) })));\n    } else {\n      mensajes.push(msjTexto(to, TEXTOS.refNoEncontrada));\n    }\n\n  } else if (sel.startsWith('pay:') && ses && (ses.estado === 'pago' || ses.estado === 'comprobante')) {\n    const clave = sel.slice(4);\n    const met = PAGOS[clave];\n    if (met) {\n      await guardarSes(Object.assign({}, ses, { estado: 'comprobante', metodo: met.nombre }));\n      mensajes.push(msjTexto(to, T(TEXTOS.pagoInstruccionesBoton, { metodo: met.nombre, dato: met.dato(), total: fmtPrecio(ses.precio) })));\n    }\n\n  } else if (ses && ses.estado === 'talla') {\n    const m = texto.match(/\\b(3[6-9]|4[0-5])\\b/);\n    if (m) {\n      await guardarSes(Object.assign({}, ses, { estado: 'datos', talla: m[1] }));\n      mensajes.push(msjTexto(to, T(TEXTOS.tallaAnotada, { talla: m[1] })));\n    } else {\n      mensajes.push(msjTexto(to, TEXTOS.tallaInvalida));\n    }\n\n  } else if (ses && ses.estado === 'datos') {\n    if (texto.length >= 15) {\n      await guardarSes(Object.assign({}, ses, { estado: 'pago', datosEnvio: texto.slice(0, 500) }));\n      mensajes.push(botonesPago(to, ses.precio));\n    } else {\n      mensajes.push(msjTexto(to, TEXTOS.datosIncompletos));\n    }\n\n  } else if (ses && ses.estado === 'pago') {\n    // escribio texto en vez de tocar el boton\n    const m = texto.match(/nequi|daviplata|bre/i);\n    if (m) {\n      const clave = m[0].toLowerCase().startsWith('bre') ? 'breb' : m[0].toLowerCase();\n      const met = PAGOS[clave];\n      await guardarSes(Object.assign({}, ses, { estado: 'comprobante', metodo: met.nombre }));\n      mensajes.push(msjTexto(to, T(TEXTOS.pagoInstruccionesTexto, { metodo: met.nombre, dato: met.dato(), total: fmtPrecio(ses.precio) })));\n    } else {\n      mensajes.push(botonesPago(to, ses.precio));\n    }\n\n  } else if (ses && ses.estado === 'comprobante') {\n    if (parsed.imagen_id) {\n      // 1) descargar el comprobante (mejor esfuerzo; si falla queda el media_id)\n      let comp = null;\n      try {\n        comp = await descargarComprobante(parsed.imagen_id);\n      } catch (e) {\n        await logError(tok, 'descarga-comprobante', e, { wa_id: to, contexto: 'media_id=' + parsed.imagen_id });\n      }\n      // 2) crear el pedido (estado segun contrato congelado del brief)\n      const pedido = {\n        cliente_nombre: ses.nombrePerfil || parsed.nombre || '',\n        cliente_wa: to,\n        datos_envio: ses.datosEnvio || '',\n        ref: ses.ref,\n        talla: ses.talla || '',\n        cantidad: 1,\n        total: ses.precio,\n        metodo_pago: ses.metodo || '',\n        comprobante_media_id: parsed.imagen_id,\n        comprobante_guardado: false,\n        estado: 'pagado_por_verificar',\n        canal: 'whatsapp-bot',\n        creado: new Date().toISOString()\n      };\n      const pedidoPath = await fsAdd(tok, 'tiendas/varman/pedidos', pedido);\n      const pedidoId = pedidoPath.split('/').pop();\n      // 3) guardar la imagen en tiendas/varman/comprobantes/{idPedido} y marcar el pedido\n      if (comp) {\n        try {\n          await fsSet(tok, 'tiendas/varman/comprobantes/' + pedidoId, {\n            pedido_id: pedidoId, mime: comp.mime, b64: comp.b64,\n            bytes: comp.bytes, creado: new Date().toISOString()\n          });\n          pedido.comprobante_guardado = true;\n          await fsSet(tok, pedidoPath, pedido);\n        } catch (e) {\n          await logError(tok, 'guardar-comprobante', e, { wa_id: to, contexto: 'pedido=' + pedidoId });\n        }\n      }\n      await fsDel(tok, SES_PATH);\n      mensajes.push(msjTexto(to, T(TEXTOS.pedidoRecibido, { ref: ses.ref, talla: ses.talla, total: fmtPrecio(ses.precio) })));\n      if (dueno && dueno !== to) {\n        mensajes.push(msjTexto(dueno, T(TEXTOS.avisoPedidoDueno, {\n          ref: ses.ref, talla: ses.talla, total: fmtPrecio(ses.precio),\n          metodo: ses.metodo || '?', cliente: ses.nombrePerfil || '(sin nombre)', wa: to,\n          envio: ses.datosEnvio || '',\n          comprobante: pedido.comprobante_guardado ? TEXTOS.avisoComprobanteOk : TEXTOS.avisoComprobanteFallo,\n          ruta: pedidoPath\n        })));\n      }\n    } else {\n      mensajes.push(msjTexto(to, TEXTOS.pideComprobante));\n    }\n\n  } else {\n    // ---------- sin sesion: texto libre -> Gemini ----------\n    const SISTEMA = GEMINI_SISTEMA;\n    let intent = 'saludo';\n    let respuesta = '';\n    if (texto) {\n      try {\n        const r = await H.httpRequest({\n          method: 'POST',\n          url: 'https://generativelanguage.googleapis.com/v1beta/models/' + ($env.GEMINI_MODEL || 'gemini-2.5-flash-lite') + ':generateContent',\n          headers: { 'Content-Type': 'application/json', 'x-goog-api-key': $env.GEMINI_API_KEY },\n          body: {\n            system_instruction: { parts: [{ text: SISTEMA }] },\n            contents: [{ role: 'user', parts: [{ text: texto.slice(0, 500) }] }],\n            generationConfig: { temperature: 0.3, maxOutputTokens: 200, responseMimeType: 'application/json' }\n          },\n          json: true, timeout: 15000\n        });\n        const out = JSON.parse(r.candidates[0].content.parts[0].text);\n        if (out && out.intent) { intent = out.intent; respuesta = out.respuesta || ''; }\n      } catch (e) { intent = 'saludo'; respuesta = ''; }\n    }\n    if (intent === 'hablar_humano') {\n      mensajes.push(msjTexto(to, respuesta || TEXTOS.handoffCliente));\n      if (dueno && dueno !== to) {\n        mensajes.push(msjTexto(dueno, T(TEXTOS.handoffAvisoDueno, { cliente: parsed.nombre || '(sin nombre)', wa: to, texto })));\n      }\n    } else if (intent === 'otro') {\n      mensajes.push(msjTexto(to, respuesta || TEXTOS.otroDefault));\n    } else if (intent === 'comprar') {\n      if (respuesta) mensajes.push(msjTexto(to, respuesta));\n      mensajes.push(listaCategorias(to, catalogo, TEXTOS.comprarIntro));\n    } else {\n      mensajes.push(listaCategorias(to, catalogo, respuesta || undefined));\n    }\n  }\n}\n\ntry {\n  await principal();\n} catch (e) {\n  // error inesperado: log a botErrores + respuesta amable (nunca dejar al cliente en silencio)\n  if (tok) await logError(tok, 'Cerebro', e, { wa_id: to, contexto: 'ses=' + (ses && ses.estado || 'sin sesion') + ' texto=' + texto.slice(0, 80) });\n  if (!mensajes.length) {\n    mensajes.push(msjTexto(to, TEXTOS.errorTecnico));\n  }\n}\n\nreturn mensajes.map((m) => ({ json: m }));\n"
+      },
+      "id": "40000000-0000-4000-8000-000000000007",
+      "name": "Cerebro (sesion+pedido+Gemini)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v21.0/{{ $env.WHATSAPP_PHONE_NUMBER_ID }}/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.WHATSAPP_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "40000000-0000-4000-8000-000000000008",
+      "name": "Enviar a WhatsApp",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        260
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 2000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============ LOG DE ERRORES DE ENVÍO (salida de error de \"Enviar a WhatsApp\") ============\n// El nodo \"Enviar a WhatsApp\" tiene retryOnFail (2 intentos). Si aun así falla,\n// el item cae por la salida de error y este nodo lo registra en\n// tiendas/varman/botErrores. Nunca lanza: un fallo aquí no debe tumbar nada.\nconst H = this.helpers;\nconst crypto = require('crypto');\nconst FS_BASE = 'https://firestore.googleapis.com/v1/projects/varman-crew/databases/(default)/documents';\n\nfunction b64url(buf) {\n  return Buffer.from(buf).toString('base64').replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '');\n}\nasync function tokenAdmin() {\n  const sa = JSON.parse(Buffer.from($env.FIREBASE_SA_B64, 'base64').toString('utf8'));\n  const now = Math.floor(Date.now() / 1000);\n  const header = b64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));\n  const claims = b64url(JSON.stringify({\n    iss: sa.client_email,\n    scope: 'https://www.googleapis.com/auth/datastore',\n    aud: 'https://oauth2.googleapis.com/token',\n    iat: now, exp: now + 3600\n  }));\n  const signer = crypto.createSign('RSA-SHA256');\n  signer.update(header + '.' + claims);\n  const jwt = header + '.' + claims + '.' + b64url(signer.sign(sa.private_key));\n  const r = await H.httpRequest({\n    method: 'POST', url: 'https://oauth2.googleapis.com/token',\n    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },\n    body: 'grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=' + jwt,\n    timeout: 15000, json: true\n  });\n  return r.access_token;\n}\nfunction toFs(obj) {\n  const fields = {};\n  for (const k in obj) {\n    const v = obj[k];\n    if (v === undefined || v === null) continue;\n    if (typeof v === 'number') fields[k] = { integerValue: String(Math.round(v)) };\n    else if (typeof v === 'boolean') fields[k] = { booleanValue: v };\n    else fields[k] = { stringValue: String(v) };\n  }\n  return fields;\n}\n\nconst out = [];\ntry {\n  const tok = await tokenAdmin();\n  for (const item of $input.all()) {\n    const j = item.json || {};\n    const err = j.error || {};\n    const registro = {\n      fecha: new Date().toISOString(),\n      origen: 'Enviar a WhatsApp',\n      error: String(err.message || err.description || JSON.stringify(err)).slice(0, 800),\n      wa_id: String(j.to || ''),\n      contexto: 'tipo=' + String(j.type || '?')\n    };\n    try {\n      await H.httpRequest({ method: 'POST', url: FS_BASE + '/tiendas/varman/botErrores',\n        headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' },\n        body: { fields: toFs(registro) }, json: true, timeout: 15000 });\n      out.push({ json: { registrado: true, wa_id: registro.wa_id, error: registro.error } });\n    } catch (e) {\n      out.push({ json: { registrado: false, motivo: String(e.message || e) } });\n    }\n  }\n} catch (e) {\n  out.push({ json: { registrado: false, motivo: 'sin token admin: ' + String(e.message || e) } });\n}\nreturn out.length ? out : [{ json: { registrado: false, motivo: 'sin items' } }];\n"
+      },
+      "id": "40000000-0000-4000-8000-000000000009",
+      "name": "Log error envio (Firestore)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "daysInterval": 1,
+              "triggerAtHour": 3,
+              "triggerAtMinute": 15
+            }
+          ]
+        }
+      },
+      "id": "40000000-0000-4000-8000-00000000000a",
+      "name": "Cada dia 3:15am",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============ LIMPIEZA DIARIA DE SESIONES CADUCADAS (>24h) ============\n// Corre con el Schedule Trigger (diario 3:15am Bogotá) mientras el workflow\n// esté ACTIVO. Complementa la limpieza al vuelo del Cerebro (que solo borra la\n// sesión caducada cuando ESE cliente vuelve a escribir): este barrido elimina\n// las sesiones de clientes que nunca volvieron.\n// Usa el updateTime de Firestore (metadato) como respaldo si falta updatedAt.\nconst H = this.helpers;\nconst crypto = require('crypto');\nconst FS_BASE = 'https://firestore.googleapis.com/v1/projects/varman-crew/databases/(default)/documents';\n\nfunction b64url(buf) {\n  return Buffer.from(buf).toString('base64').replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '');\n}\nasync function tokenAdmin() {\n  const sa = JSON.parse(Buffer.from($env.FIREBASE_SA_B64, 'base64').toString('utf8'));\n  const now = Math.floor(Date.now() / 1000);\n  const header = b64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));\n  const claims = b64url(JSON.stringify({\n    iss: sa.client_email,\n    scope: 'https://www.googleapis.com/auth/datastore',\n    aud: 'https://oauth2.googleapis.com/token',\n    iat: now, exp: now + 3600\n  }));\n  const signer = crypto.createSign('RSA-SHA256');\n  signer.update(header + '.' + claims);\n  const jwt = header + '.' + claims + '.' + b64url(signer.sign(sa.private_key));\n  const r = await H.httpRequest({\n    method: 'POST', url: 'https://oauth2.googleapis.com/token',\n    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },\n    body: 'grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=' + jwt,\n    timeout: 15000, json: true\n  });\n  return r.access_token;\n}\n\nconst LIMITE_MS = 24 * 3600 * 1000;\nconst tok = await tokenAdmin();\nlet revisadas = 0, borradas = 0, errores = 0;\nlet pageToken = '';\ndo {\n  const url = FS_BASE + '/tiendas/varman/botSesiones?pageSize=300' + (pageToken ? '&pageToken=' + encodeURIComponent(pageToken) : '');\n  const r = await H.httpRequest({ method: 'GET', url,\n    headers: { Authorization: 'Bearer ' + tok }, json: true, timeout: 20000 });\n  for (const d of (r.documents || [])) {\n    revisadas++;\n    const f = d.fields || {};\n    const updatedAt = (f.updatedAt && f.updatedAt.stringValue) || d.updateTime;\n    const edad = Date.now() - Date.parse(updatedAt);\n    if (isNaN(edad) || edad > LIMITE_MS) {\n      try {\n        await H.httpRequest({ method: 'DELETE', url: 'https://firestore.googleapis.com/v1/' + d.name,\n          headers: { Authorization: 'Bearer ' + tok }, json: true, timeout: 15000 });\n        borradas++;\n      } catch (e) { errores++; }\n    }\n  }\n  pageToken = r.nextPageToken || '';\n} while (pageToken);\n\nreturn [{ json: { fecha: new Date().toISOString(), revisadas, borradas, errores } }];\n"
+      },
+      "id": "40000000-0000-4000-8000-00000000000b",
+      "name": "Limpiar sesiones caducadas",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        560
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook verificacion (GET)": {
+      "main": [
+        [
+          {
+            "node": "Verificar token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verificar token": {
+      "main": [
+        [
+          {
+            "node": "Responder a Meta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook mensajes (POST)": {
+      "main": [
+        [
+          {
+            "node": "Parsear mensaje",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parsear mensaje": {
+      "main": [
+        [
+          {
+            "node": "Leer catalogo (Firestore)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leer catalogo (Firestore)": {
+      "main": [
+        [
+          {
+            "node": "Cerebro (sesion+pedido+Gemini)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cerebro (sesion+pedido+Gemini)": {
+      "main": [
+        [
+          {
+            "node": "Enviar a WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar a WhatsApp": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Log error envio (Firestore)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cada dia 3:15am": {
+      "main": [
+        [
+          {
+            "node": "Limpiar sesiones caducadas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Bogota"
+  },
+  "pinData": {}
+}

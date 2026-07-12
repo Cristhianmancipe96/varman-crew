@@ -1,0 +1,28 @@
+PRUEBAS-WOMPI — probar la compra web en SANDBOX sin desplegar nada
+==================================================================
+(2026-07-11 · BRIEF-WEB-COMPRA-WOMPI · esta carpeta NO se sube a Cloudflare:
+ solo se despliega web\publicar)
+
+1) ARRANCAR LA WEB LOCAL (usa las llaves de PRUEBA del .env del bot,
+   solo en memoria; si detecta llaves de producción NO arranca):
+
+   cd web\pruebas-wompi
+   ..\..\bot_n8n\herramientas\node\node.exe servidor-local.js
+
+   → abre http://localhost:8788 : es la tienda con el botón Comprar.
+     Pagar con la tarjeta de prueba de Wompi 4242 4242 4242 4242
+     (cualquier fecha futura y CVC).
+
+2) SI EL PEDIDO SE QUEDA EN "pago_pendiente" (porque la URL de eventos de
+   sandbox no está registrada en el panel de Wompi), se puede simular el
+   evento firmado hacia el webhook del bot:
+
+   ..\..\bot_n8n\herramientas\node\node.exe simular-webhook.js ^
+       <payment_link_id> <transaction_id> <monto_en_centavos>
+
+   (el payment_link_id queda en el pedido de Firestore; el transaction_id
+    sale en la URL de regreso del checkout, parámetro "id")
+
+3) El pedido de prueba queda en la colección tiendas/varman/pedidos con
+   cliente "PRUEBA SANDBOX". En la app se puede ocultar (socios) o se
+   borra desde la consola de Firebase.

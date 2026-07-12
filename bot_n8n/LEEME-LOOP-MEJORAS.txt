@@ -1,0 +1,77 @@
+========================================================================
+  LOOP DE MEJORA CONTINUA DEL BOT — VarMan Crew   (guia rapida)
+========================================================================
+
+QUE ES
+  Un solo agente de Claude Code que corre EN BUCLE y, en cada vuelta, hace
+  UNA mejora completa del bot (Gemini + venta), la prueba, la documenta y
+  para. Tu solo revisas y despliegas cuando quieras.
+
+  Modo: PREPARAR Y PROBAR. El agente edita el codigo, regenera el JSON y deja
+  los tests en verde. NO despliega a la VM, NO toca credenciales, NO hace
+  git push. Eso lo haces tu.
+
+ARCHIVOS (todos en bot_n8n\)
+  briefs\BRIEF-AGENTE-LOOP-MEJORA-CONTINUA.md  <- las reglas de cada vuelta
+  briefs\BITACORA-MEJORAS.md                   <- la MEMORIA del agente:
+                                                  que ya se hizo y que sigue
+  loop-mejoras.ps1                             <- el bucle (PowerShell)
+  correr-loop-mejoras.bat                      <- doble clic para arrancar
+  notas-mejoras\NOTA-MEJORA-<N>.md             <- las deja el agente (1 x mejora)
+
+ANTES DE ARRANCAR (una vez)
+  1) Ten Claude Code instalado:   claude --version
+  2) Ten Node instalado:          node --version
+  3) Prueba UNA vuelta a mano para ver que todo corre bien:
+       cd  ...\Proyecto_zapatos\bot_n8n
+       claude -p "Lee y ejecuta briefs\BRIEF-AGENTE-LOOP-MEJORA-CONTINUA.md: haz UNA mejora y termina."
+     Si esa vuelta deja los tests en verde y actualiza la bitacora, ya esta.
+
+ARRANCAR EL BUCLE
+  - Doble clic en  correr-loop-mejoras.bat
+    (o)  powershell -ExecutionPolicy Bypass -File .\loop-mejoras.ps1
+
+PARAR
+  - Ctrl + C  (o cierra la ventana). Termina la vuelta actual y no lanza otra.
+
+REVISAR LO QUE HIZO
+  - briefs\BITACORA-MEJORAS.md  -> tabla "Hechas" (fecha, mejora, flag, test).
+  - notas-mejoras\NOTA-MEJORA-*.md -> el detalle y como revertir cada mejora.
+  - loop-mejoras.log -> todo lo que fue imprimiendo el agente.
+
+DESPLEGAR (cuando estes conforme)  -> lo haces tu, como siempre:
+  - Sube el bot-varman.json regenerado a la VM y reimporta el workflow.
+  - Enciende los flags nuevos SOLO cuando quieras probar la mejora
+    (con el flag apagado, el bot se comporta igual que hoy).
+  - Guia: bot_n8n\LEEME-BOT.txt  y  briefs\RUNBOOK-DEPLOY-V6-2026-07-08.md
+
+------------------------------------------------------------------------
+  OPCION B: QUE CORRA SOLO DE NOCHE (tarea programada de Windows)
+------------------------------------------------------------------------
+  En vez del bucle sin parar, puedes dejar que haga unas pocas mejoras
+  cada noche, solo:
+
+  PROGRAMARLO (una vez):
+    - Doble clic en  programar-tarea-nocturna.bat
+      -> crea una tarea de Windows: cada noche 02:00, hace 3 mejoras y para.
+    - Cambiar hora/cantidad: abre programar-tarea-nocturna.bat y edita, o corre
+        powershell -ExecutionPolicy Bypass -File .\programar-tarea-nocturna.ps1 -Hora 03:30 -Vueltas 5
+
+  QUITARLO:
+    - Doble clic en  quitar-tarea-nocturna.bat
+
+  REVISAR EN LA MAANA:
+    - briefs\BITACORA-MEJORAS.md (Hechas) y mejoras-nocturnas.log
+
+  OJO con la tarea nocturna:
+    - Corre cuando tu sesion de Windows esta INICIADA y el PC encendido o
+      suspendido (no apagado del todo). Si estaba dormido, corre al despertar.
+    - Es la MISMA logica del bucle, solo que acotada; sigue en modo "preparar y
+      probar": no despliega, tu revisas y subes.
+    - No corras la tarea nocturna y el bucle manual a la vez (un solo escritor).
+
+OJO
+  - Corre UNA sola instancia a la vez (OneDrive + edicion paralela = perdidas).
+  - El bucle gasta cupo/tokens de Claude en cada vuelta; la pausa entre vueltas
+    y el tope de vueltas se ajustan arriba en loop-mejoras.ps1.
+========================================================================

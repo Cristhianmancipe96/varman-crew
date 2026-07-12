@@ -1,0 +1,122 @@
+==========================================================
+  BOT DE WHATSAPP (n8n)  —  MAPA DE ESTA CARPETA
+  (actualizado 2026-07-10 — v6 EN PRODUCCIÓN)
+==========================================================
+
+ESTADO ACTUAL (2026-07-10):
+  [x] Bot v6 COMPLETO corriendo en la VM de Google Cloud (Docker),
+      dominio fijo bot.varmancrew.com (sin túnel).
+  [x] Número del negocio en WhatsApp: +57 304 291 6972
+      (Phone Number ID 1129717360235397, WABA 1572485474895736).
+  [x] Ya atendió conversaciones reales de la campaña + una compra de prueba.
+  [x] Wompi: cuenta APROBADA (pago automático listo detrás de flag).
+  [x] Contra entrega (solo Bogotá) y robustez conversacional activas.
+  [ ] Afinar la lógica de Gemini (bajar errores) -> briefs\BRIEF-GEMINI-*.md
+  [ ] Pasar Wompi a llaves de PRODUCCIÓN el día del lanzamiento pleno.
+
+QUÉ HACE EL BOT (v6):
+  Catálogo con fotos -> elegir referencia (ficha foto+info) -> talla
+  (acepta europea, o convierte de nacional/US según género) -> datos de
+  envío -> pago (Nequi/Daviplata/Bre-B con comprobante, o link Wompi, o
+  contra entrega en Bogotá) -> guarda el pedido en Firestore
+  (tiendas/varman/pedidos) + te avisa a tu WhatsApp (320). Además:
+  búsqueda por marca, "¿cómo va mi pedido?", lista de espera de stock,
+  carrito abandonado, reseña post-entrega y guía de envío, atribución de
+  pauta (campo fuente), anti-spam, resumen diario y handoff a humano.
+
+==========================================================
+  CÓMO SE EDITA EL BOT (IMPORTANTÍSIMO)
+==========================================================
+El workflow de n8n se GENERA desde código legible. NO editar el JSON a mano.
+
+  workflows/
+    src/                     -> EDITAR AQUÍ
+        textos.js            -> TODOS los textos de venta + los DOS prompts
+                                de Gemini (GEMINI_SISTEMA = clasificador;
+                                GEMINI_ASISTENTE = asistente a mitad de flujo)
+        cerebro-v4.js        -> la lógica (sesiones, pedido, pago, Gemini)
+        wompi-webhook.js     -> valida la firma del webhook de Wompi
+        notificaciones.js, limpiar-sesiones.js, log-error-envio.js
+    build-v4-pedidos.js      -> pega src/*.js en los nodos Code y regenera:
+                                  node workflows/build-v4-pedidos.js
+    bot-varman.json          -> EL BOT COMPLETO v6 (lo genera el build)
+    respaldo/                -> versiones anteriores (para rollback)
+  tests/
+    test-offline-v4.js       -> prueba offline (Firestore REAL, WhatsApp y
+                                Wompi mockeados): node tests/test-offline-v4.js
+
+REGLAS QUE NO SE NEGOCIAN:
+  - Editar src/ y regenerar con build; nunca el JSON a mano.
+  - Todo lo nuevo ADITIVO + detrás de un flag (si la variable no está, el
+    bot se comporta EXACTO como antes) + ROLLBACK en 1 paso (respaldo del
+    JSON antes de importar).
+  - Dejar la batería de tests en VERDE (y agregar casos para lo nuevo).
+  - Credenciales/.env JAMÁS a git ni a los deploys.
+
+==========================================================
+  DEPLOY A LA VM (Google Cloud, Docker)
+==========================================================
+Guía completa y lecciones del primer deploy real:
+  - plantilla\LECCIONES-DEPLOY-REAL-2026-07.md  (los tropiezos y sus fixes)
+  - bot_n8n\deploy\GUIA-GCP.md
+  - bot_n8n\briefs\RUNBOOK-DEPLOY-V6-2026-07-08.md
+
+Puntos clave (VM e2-micro, 1 GB — es chica):
+  - Subir archivos: SSH del navegador de GCP -> ⚙ -> "Subir archivo".
+  - Recargar variables del .env: docker compose up -d --force-recreate n8n
+    (un simple "up -d" NO recarga si el contenedor ya existe).
+  - n8n 2.x: activar/desactivar workflows con publish:workflow /
+    unpublish:workflow (ya NO existe update:workflow --active).
+  - n8n tarda 3-5 min en arrancar en la VM (el webhook ~1 min más). Espera
+    antes de correr verificar-salud.sh.
+  - El .env de la VM es de PRODUCCIÓN: NUNCA sobrescribir con el local;
+    solo AGREGAR variables.
+
+==========================================================
+  GEMINI (la "inteligencia" del bot)
+==========================================================
+  - Modelo: GEMINI_MODEL=gemini-flash-lite-latest (en el .env de la VM).
+  - Dos usos: (1) clasificar la intención cuando NO hay pedido en curso
+    (prompt GEMINI_SISTEMA en textos.js), y (2) asistir a mitad de flujo
+    cuando el cliente escribe libre mientras se le pide un dato (prompt
+    GEMINI_ASISTENTE, detrás del flag BOT_ROBUSTEZ).
+  - Fallback seguro: si Gemini falla o hay timeout, el bot no se rompe
+    (sigue con la lógica determinista / muestra el catálogo).
+  - CUMPLIMIENTO: usar el tier de PAGO de Gemini (no entrena con los datos)
+    -> ver CUMPLIMIENTO-IA-WHATSAPP.md. El bot cumple; migrar a pago cuando
+    haya volumen.
+  - EN CURSO: se están arreglando errores de la lógica de Gemini con 5
+    agentes de Claude Code -> briefs\BRIEF-GEMINI-0-COORDINACION.md y
+    BRIEF-GEMINI-1..5.
+
+==========================================================
+  WOMPI (pago automático) — CUENTA APROBADA
+==========================================================
+El link de pago + webhook ya están construidos (detrás de flag por llaves).
+Para encenderlo en producción (lo hace Cristhian):
+  1. Panel Wompi -> Desarrolladores -> copiar llaves de PRODUCCIÓN.
+  2. En el .env de la VM: WOMPI_PUB_KEY / WOMPI_PRV_KEY / WOMPI_EVENTS_SECRET
+     y WOMPI_ENV=production -> docker compose up -d.
+  3. Registrar la URL de eventos: https://bot.varmancrew.com/webhook/wompi
+  4. Una compra de prueba pequeña real.
+Sin llaves, el método Wompi no aparece y el bot cobra como siempre.
+Detalle: fase2\WOMPI-INTEGRACION.md y fase2\WOMPI-PASOS-CRISTHIAN.md.
+
+==========================================================
+  CONTRATO CON LA APP
+==========================================================
+El esquema del pedido lo define el bot; la app lo consume. Los cambios se
+piden por escrito en briefs\CAMBIOS-PEDIDOS.md. Colecciones internas del
+bot (no exponer a la app): botSesiones, botConfig, botErrores,
+botProcesados (dedup), botRate (anti-spam).
+
+==========================================================
+  OJO (cosas que rompen si se tocan)
+==========================================================
+  - Token de WhatsApp: SOLO como header "Authorization: Bearer <token>".
+  - .env: conservar N8N_BLOCK_ENV_ACCESS_IN_NODE=false y
+    NODE_FUNCTION_ALLOW_BUILTIN=crypto.
+  - Los workflows comparten el path del webhook: solo UNO activo a la vez.
+  - Tras arrancar n8n, los webhooks tardan 30-60s en registrarse (404
+    transitorio: esperar y reintentar).
+==========================================================

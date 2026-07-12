@@ -1,0 +1,171 @@
+==========================================================
+  VARMAN CREW  —  MAPA DE LA CARPETA  (actualizado 2026-07-10)
+==========================================================
+
+EN VIVO AHORA MISMO:
+  - Tienda (clientes):   https://varmancrew.com   (dominio propio ✅)
+                         (también https://varmancrew.pages.dev)
+  - App de inventario:   https://varmanapp.pages.dev
+  - Bot de WhatsApp:     corriendo en la VM de Google Cloud
+                         (bot.varmancrew.com) · número +57 304 291 6972
+  - Datos:               Firebase, proyecto "varman-crew"
+
+La carpeta tiene 4 partes + el bot + un acceso directo:
+
+  Proyecto_zapatos/
+    app/       -> LA APP DE INVENTARIO (uso interno)
+    web/       -> LA TIENDA WEB (lo que ven los clientes)
+    bot_n8n/   -> EL BOT DE WHATSAPP (n8n) — la automatización
+    data/      -> DATOS (Excel original, respaldos)
+    plantilla/ -> guía para REPLICAR todo esto en otro negocio
+    iniciar-varman.bat  -> doble clic para abrir la app en el computador
+
+==========================================================
+  LO NUEVO (del 1 al 10 de julio) — LÉELO PRIMERO
+==========================================================
+1) TODO SE MUDÓ A CLOUDFLARE PAGES (ya NO es Netlify).
+   - Tienda: proyecto "varmancrew" en Cloudflare Pages, con dominio
+     propio varmancrew.com.
+   - App: proyecto "varmanapp" en Cloudflare Pages.
+   - Para actualizar cualquiera: dash.cloudflare.com -> Workers & Pages
+     -> el proyecto -> Create deployment -> arrastrar la carpeta
+     (app\ para la app; web\publicar\ para la tienda).
+
+2) EL BOT YA ESTÁ EN PRODUCCIÓN EN UN SERVIDOR REAL.
+   - Vive en una VM de Google Cloud (varman-bot, e2-micro, Docker), con
+     dominio fijo bot.varmancrew.com (sin túnel temporal).
+   - Es la versión v6: hace el pedido completo solo (catálogo -> talla ->
+     datos -> pago -> guarda el pedido y te avisa a tu WhatsApp 320).
+   - Ya atendió conversaciones reales de la campaña + una compra de prueba.
+   - Cómo subir cambios: se hace desde la VM (Docker). Guía y lecciones en
+     plantilla\LECCIONES-DEPLOY-REAL-2026-07.md y bot_n8n\deploy\GUIA-GCP.md.
+
+3) WOMPI: CUENTA APROBADA ✅.
+   - El pago automático con tarjeta/PSE/Nequi por link ya está construido
+     en el bot (detrás de un interruptor). Con la cuenta aprobada, el
+     único paso que falta es poner las llaves de PRODUCCIÓN en el .env de
+     la VM y registrar la URL del webhook. Pasos exactos abajo y en
+     bot_n8n\fase2\WOMPI-PASOS-CRISTHIAN.md.
+
+4) CONTRA ENTREGA (solo Bogotá): nueva opción de pago; el cliente paga al
+   recibir, sin comprobante. Ya está en el bot y se ve en la app.
+
+5) ROBUSTEZ CONVERSACIONAL: el bot entiende lenguaje libre en cualquier
+   momento (pasar a un humano, preguntas extra, datos fuera de lugar).
+
+----------------------------------------------------------
+1) app/  — LA APP DE INVENTARIO (uso interno)
+----------------------------------------------------------
+Controla stock, ventas, PEDIDOS del bot y fotos/precios del catálogo.
+Publicada en:  https://varmanapp.pages.dev
+
+  - app.jsx          -> TODO el código de la app
+  - index.html       -> pantalla de la app (carga app.jsx)
+  - reglas-firestore.txt -> reglas de Firebase (Cristhian las pega en la
+                            consola cuando cambian)
+  - vendor/          -> librerías (React/Babel) locales
+  - manifest.json, sw.js, icon.png -> para instalarla en el celular
+  - seed-catalogo.json, importar-datos.html -> carga inicial de datos
+  - servidor.py, iniciar-varman.bat -> para abrirla en el computador
+
+SUBIR CAMBIOS A INTERNET (Cloudflare Pages):
+  dash.cloudflare.com -> Workers & Pages -> varmanapp -> Create deployment
+  -> arrastrar la carpeta "app" COMPLETA (con vendor\) -> Save and Deploy.
+  En ~1 minuto queda en varmanapp.pages.dev.
+
+La pestaña "Tienda" de la app edita el catálogo de la página (precios,
+fotos, referencias); la pestaña "Pedidos" muestra y gestiona los pedidos
+que crea el bot. La página LEE el catálogo desde Firebase (solo lectura
+pública). Si Firebase no responde, muestra un catálogo fijo de respaldo.
+
+----------------------------------------------------------
+2) web/  — LA TIENDA WEB (para clientes)
+----------------------------------------------------------
+Publicada en:  https://varmancrew.com  (y varmancrew.pages.dev)
+
+  - publicar/    -> carpeta LISTA para Cloudflare (arrastra ESTA)
+        index.html, img/ (fotos), og-image.jpg, favicon.png, _headers,
+        privacidad.html
+  - varman_crew (19).html -> plantilla original (diseño base)
+  - assets/      -> og-image y favicon (fuente)
+  - marketing/   -> calendario de contenido, textos de anuncios, guiones
+                    de TikTok/Reels, estilo de marca
+  - generar-web.ps1 -> generador VIEJO/desconectado. NO usarlo (apunta a
+                       carpetas que ya no existen). El catálogo se edita
+                       desde la app (pestaña Tienda).
+
+SUBIR CAMBIOS: dash.cloudflare.com -> varmancrew -> Create deployment ->
+arrastrar "web\publicar" -> Save and Deploy.
+
+El número del bot en la web es 573042916972 (ya correcto en el sitio
+publicado). Botón "Pedir por WhatsApp" y ref directa ("Hola! Quiero la
+Ref 05") que arranca el pedido en el bot.
+
+----------------------------------------------------------
+3) bot_n8n/  — EL BOT DE WHATSAPP (n8n)  ⭐ el corazón
+----------------------------------------------------------
+Toda la automatización. Corre en la VM de Google Cloud (Docker).
+Mapa detallado: bot_n8n\LEEME-BOT.txt
+
+  - workflows/   -> el flujo de n8n (fuente de verdad)
+        bot-varman.json           -> EL BOT COMPLETO v6 (producción)
+        src/                      -> CÓDIGO LEGIBLE (editar AQUÍ):
+            textos.js       -> TODOS los textos + los 2 prompts de Gemini
+            cerebro-v4.js   -> la lógica del bot
+            wompi-webhook.js, notificaciones.js, limpiar-sesiones.js ...
+        build-v4-pedidos.js       -> regenera el JSON desde src/
+                                     (node workflows/build-v4-pedidos.js)
+        respaldo/                 -> versiones anteriores (rollback)
+  - tests/test-offline-v4.js -> batería de pruebas offline (Firestore real,
+                                WhatsApp/Wompi mockeados)
+  - fase2/       -> Wompi, catálogo nativo de WhatsApp
+  - briefs/      -> los planes/encargos para los agentes de Claude Code
+  - deploy/      -> scripts y guía del servidor (GCP)
+  - credenciales/ -> PRIVADO, NO COMPARTIR (llaves, tokens, .env)
+  - .env         -> variables y secretos (NO compartir)
+
+REGLA DE ORO del bot: se edita src/ (no el JSON a mano) y se regenera con
+build-v4-pedidos.js. Todo lo nuevo va detrás de un interruptor (flag) para
+poder revertir en 1 paso. Antes de importar, se deja copia en respaldo/.
+
+----------------------------------------------------------
+4) data/  — DATOS
+----------------------------------------------------------
+  - BASE GENERAL.xlsx / BASE GENERAL definitivo (2026-07-02).xlsx -> inventario
+  - datos-varman-v2.json -> datos convertidos del Excel definitivo
+  - backups/ -> respaldos
+
+----------------------------------------------------------
+5) plantilla/  — REPLICAR EN OTRO NEGOCIO
+----------------------------------------------------------
+Guías para montar lo mismo (web + app + bot) en otra tienda sin repetir
+los tropiezos del primer despliegue:
+  - PLAYBOOK-REPLICACION.md, LECCIONES-DEPLOY-REAL-2026-07.md
+  - 01-web.md, 02-app.md, 03-bot.md, 04-infra.md
+
+==========================================================
+  PENDIENTES DE CRISTHIAN (lo que falta de tu lado)
+==========================================================
+1) REGLAS DE FIRESTORE: pegar la última versión de app\reglas-firestore.txt
+   en console.firebase.google.com -> varman-crew -> Firestore -> Reglas ->
+   Publicar. (Necesario para "Ocultar pedido de prueba" y comprobantes.)
+2) RE-SUBIR LA APP a Cloudflare (arrastrar app\) para ver los botones nuevos.
+3) WOMPI (cuenta ya aprobada): cuando lances con el número en Live, copia
+   las llaves de PRODUCCIÓN del panel Wompi -> ponlas en el .env de la VM
+   (WOMPI_PUB_KEY / WOMPI_PRV_KEY / WOMPI_EVENTS_SECRET, WOMPI_ENV=production)
+   -> docker compose up -d -> registra la URL de eventos
+   https://bot.varmancrew.com/webhook/wompi en el panel Wompi -> una compra
+   de prueba pequeña. Detalle: bot_n8n\fase2\WOMPI-PASOS-CRISTHIAN.md.
+4) BOT / GEMINI: se está afinando la lógica de conversación (Gemini) para
+   bajar errores — ver los briefs bot_n8n\briefs\BRIEF-GEMINI-*.md.
+
+==========================================================
+  IMPORTANTE
+==========================================================
+- El index.html de app/ es la APP; el de web/publicar/ es la TIENDA.
+  No los confundas.
+- Credenciales y .env NUNCA se suben a git ni a los deploys.
+- El bot: nunca actualizar n8n a mano en la VM sin leer las lecciones de
+  deploy (plantilla\LECCIONES-DEPLOY-REAL-2026-07.md).
+- Las fotos del catálogo que usa la tienda están en web\publicar\img\.
+==========================================================

@@ -1,0 +1,9 @@
+# Configuración de Netlify para VarMan (esta carpeta se arrastra a Deploys)
+[functions]
+  directory = "netlify/functions"
+
+# La app llama a /api/analizar-cuaderno; aquí lo redirigimos a la función.
+[[redirects]]
+  from = "/api/analizar-cuaderno"
+  to = "/.netlify/functions/analizar-cuaderno"
+  status = 200

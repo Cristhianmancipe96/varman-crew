@@ -1,0 +1,98 @@
+==========================================================
+  APP DE INVENTARIO VARMAN (carpeta app\) — MAPA Y DEPLOY
+  (creado 2026-07-06 por el Agente 2)
+==========================================================
+
+QUÉ ES: la app del equipo (PWA instalable en el celular) con
+inventario, ventas, estadísticas, tienda, caja de socios y —
+desde hoy— la pestaña PEDIDOS del bot de WhatsApp.
+En producción: https://varmanapp.pages.dev (Cloudflare Pages,
+proyecto "varmanapp").
+
+  app/
+    app.jsx              -> TODA la app (React en un solo archivo)
+    index.html           -> carga React/Babel de vendor\ + Firebase
+    reglas-firestore.txt -> reglas de seguridad para pegar en la
+                            consola de Firebase (ver PENDIENTE abajo)
+    vendor/              -> React, ReactDOM y Babel locales
+    manifest.json, sw.js, icon.png -> app instalable (PWA)
+    servidor.py / iniciar-varman.bat -> abrir la app en este PC
+                            (http://localhost:8000, sin caché)
+    seed-catalogo.json, importar-datos.html -> carga inicial de datos
+    netlify/ , netlify.toml -> restos de Netlify (ya se usa Cloudflare)
+
+CÓMO SE ACTUALIZA LA APP EN INTERNET (2 minutos):
+  1. Entrar a https://dash.cloudflare.com -> Workers & Pages
+     -> proyecto "varmanapp".
+  2. Pestaña "Deployments" -> botón "Create deployment".
+  3. ARRASTRAR LA CARPETA app\ COMPLETA a la zona de subida
+     (con vendor\ incluida; el .py y el .bat no estorban).
+  4. "Save and Deploy". En ~1 minuto queda en varmanapp.pages.dev.
+  En el celular: cerrar y volver a abrir la app (o F5) para ver lo nuevo.
+
+----------------------------------------------------------
+HECHO EL 2026-07-06 (Agente 2 — pestaña Pedidos):
+  - Nueva pestaña "Pedidos" en la barra de abajo, visible para
+    socios Y vendedor (a diferencia de la Caja). Los pedidos que
+    crea el bot de WhatsApp aparecen solos, el más reciente arriba,
+    con globito rojo con el número de pedidos por verificar.
+  - Detalle de cada pedido: cliente, referencia+talla, total y
+    método de pago, datos de envío tal como los escribió el
+    cliente, foto del comprobante (se descarga al abrir; si el bot
+    no pudo bajarla, muestra el aviso + ID de Meta), botón para
+    escribirle al cliente por WhatsApp y nota interna del equipo.
+  - Flujo de estados con un botón por paso:
+    pago por verificar -> ✓ verificado -> 📦 enviado -> 🏁 entregado
+    (+ cancelar con confirmación). El bot escribe el estado inicial;
+    el resto lo maneja el equipo desde la app.
+  - OJO: la referencia del pedido es la del CATÁLOGO web (01-33) y
+    NO está cruzada con el inventario (VRM001-080). La app lo
+    recuerda con un aviso: verificar stock a mano antes de aprobar.
+    (Decisión pendiente: bot_n8n\briefs\DECISION-CATALOGO-INVENTARIO.md)
+  - Esquema del pedido acordado con el bot en
+    bot_n8n\briefs\CAMBIOS-PEDIDOS.md (la app solo escribe
+    estado/notas; el resto es del bot).
+  - Probado en local con pedidos de ejemplo: pestaña, filtros,
+    badge, detalle, avisos y botones OK; sin errores de consola.
+
+----------------------------------------------------------
+HECHO EL 2026-07-06 (Agente 2 — RONDA 2):
+  - EXPORTAR PEDIDOS A EXCEL: botón verde "Exportar Excel" arriba
+    de la pestaña Pedidos (mismo estilo de Inventario/Ventas/Caja).
+    Baja un CSV con TODOS los pedidos, el más reciente arriba:
+    fecha, cliente, teléfono, referencia, talla, total, método de
+    pago, estado y nota interna. El teléfono va con espacios para
+    que Excel no lo convierta en "5,73E+11".
+  - ENLACE OPCIONAL CATÁLOGO <-> INVENTARIO (apagado por defecto):
+    en la pestaña Tienda, al editar una referencia hay un selector
+    nuevo "Referencia del inventario (opcional)" con las VRM del
+    inventario (VRM001-080, con modelo y color para reconocerlas).
+      · Si se enlaza: el detalle de cada pedido de esa referencia
+        muestra el STOCK REAL de esa VRM en la talla pedida
+        (verde si hay pares, rojo si 0), sin quitar el consejo de
+        confirmar antes de aprobar. Si esa VRM entró del Excel sin
+        tallas separadas, muestra el stock TOTAL con la aclaración
+        (en vez de un "0" engañoso).
+      · Si se deja "Sin enlazar": TODO sigue como antes (verificar
+        stock a mano). Cristhian puede enlazar poco a poco, sin
+        migraciones. Es la respuesta no invasiva a
+        bot_n8n\briefs\DECISION-CATALOGO-INVENTARIO.md.
+    El campo se guarda como "refInventario" en tiendas/varman/
+    catalogo; la página web lo ignora. Las reglas de Firestore NO
+    cambian (catalogo ya lo escribe el equipo con login), así que
+    la pegada pendiente del punto 1 de abajo sigue siendo la misma.
+  - Probado en local con datos de ejemplo: exportación (columnas y
+    formato OK), selector en Tienda, guardado sin pisar campos,
+    stock real en el detalle (con pares, agotado y sin enlace) y
+    actualización en vivo; sin errores de consola.
+  - Documentada la capa app para replicar el sistema en otros
+    negocios: plantilla\02-app.md.
+
+PENDIENTE (lo hace Cristhian, 2 minutos):
+  1. Pegar las reglas de app\reglas-firestore.txt en la consola de
+     Firebase (Firestore -> Reglas -> borrar todo, pegar, Publicar).
+     Son las MISMAS de la Caja + las nuevas de pedidos/comprobantes:
+     una sola pegada activa todo. Sin esto, la pestaña Pedidos sale
+     vacía por permisos.
+  2. Subir app\ a Cloudflare Pages (pasos de arriba).
+==========================================================

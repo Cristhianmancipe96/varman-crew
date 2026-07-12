@@ -1,0 +1,212 @@
+{
+  "id": "VarmanBotV2Cat01",
+  "name": "Bot WhatsApp VarMan - catalogo (Paso 4)",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "whatsapp",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "10000000-0000-4000-8000-000000000001",
+      "name": "Webhook verificacion (GET)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "10000000-0000-4000-8000-000000000001"
+    },
+    {
+      "parameters": {
+        "jsCode": "const q = $input.first().json.query || {};\nconst ok = q['hub.mode'] === 'subscribe' && q['hub.verify_token'] === $env.WEBHOOK_VERIFY_TOKEN;\nreturn [{ json: { body: ok ? q['hub.challenge'] : 'token invalido', statusCode: ok ? 200 : 403 } }];"
+      },
+      "id": "10000000-0000-4000-8000-000000000002",
+      "name": "Verificar token",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.body }}",
+        "options": {
+          "responseCode": "={{ $json.statusCode }}"
+        }
+      },
+      "id": "10000000-0000-4000-8000-000000000003",
+      "name": "Responder a Meta",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "whatsapp",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "10000000-0000-4000-8000-000000000004",
+      "name": "Webhook mensajes (POST)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        260
+      ],
+      "webhookId": "10000000-0000-4000-8000-000000000004"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Payload de Meta: entry[].changes[].value.messages[]\n// Extrae texto y, si es respuesta a una lista/boton interactivo, su id.\nconst out = [];\nfor (const item of $input.all()) {\n  const body = item.json.body || item.json;\n  for (const e of (body.entry || [])) {\n    for (const ch of (e.changes || [])) {\n      const v = ch.value || {};\n      const contacto = (v.contacts && v.contacts[0]) || {};\n      for (const m of (v.messages || [])) {\n        let texto = '';\n        let inter_id = '';\n        if (m.type === 'text') {\n          texto = (m.text && m.text.body) || '';\n        } else if (m.type === 'interactive') {\n          const it = m.interactive || {};\n          if (it.type === 'list_reply') inter_id = (it.list_reply && it.list_reply.id) || '';\n          else if (it.type === 'button_reply') inter_id = (it.button_reply && it.button_reply.id) || '';\n        }\n        out.push({ json: {\n          wa_id: m.from,\n          nombre: (contacto.profile && contacto.profile.name) || '',\n          tipo: m.type,\n          texto,\n          inter_id,\n          message_id: m.id\n        }});\n      }\n    }\n  }\n}\nreturn out;"
+      },
+      "id": "10000000-0000-4000-8000-000000000005",
+      "name": "Parsear mensaje",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://firestore.googleapis.com/v1/projects/varman-crew/databases/(default)/documents/tiendas/varman/catalogo?pageSize=300",
+        "options": {}
+      },
+      "id": "10000000-0000-4000-8000-000000000006",
+      "name": "Leer catalogo (Firestore)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const CAT_LABEL = { deportivas: 'Deportivas', casuales: 'Casuales', urbanas: 'Urbanas' };\nconst CAT_ORDER = ['deportivas', 'casuales', 'urbanas'];\n\nfunction fmtPrecio(n) {\n  return '$' + String(n).replace(/\\B(?=(\\d{3})+(?!\\d))/g, '.');\n}\nfunction unwrap(v) {\n  if (v == null) return null;\n  if ('integerValue' in v) return parseInt(v.integerValue, 10);\n  if ('doubleValue' in v) return v.doubleValue;\n  if ('booleanValue' in v) return v.booleanValue;\n  if ('stringValue' in v) return v.stringValue;\n  if ('arrayValue' in v) return (v.arrayValue.values || []).map(unwrap);\n  return null;\n}\nfunction parseCatalogo(fsJson) {\n  const docs = (fsJson.documents || []);\n  const items = docs.map((d) => {\n    const f = d.fields || {}; const o = {};\n    for (const k in f) o[k] = unwrap(f[k]);\n    return o;\n  }).filter((o) => o.activo !== false);\n  items.sort((a, b) => (a.orden || 999) - (b.orden || 999));\n  return items;\n}\nfunction construir(parsed, catalogo) {\n  const to = parsed.wa_id;\n  const sel = (parsed.inter_id || '').trim();\n\n  if (sel.startsWith('cat:')) {\n    const cat = sel.slice(4);\n    const label = CAT_LABEL[cat] || cat;\n    let modelos = catalogo.filter((p) => p.cat === cat);\n    const total = modelos.length;\n    const hayMas = total > 10;\n    modelos = modelos.slice(0, 10);\n    const rows = modelos.map((p) => {\n      const desc = fmtPrecio(p.precio) + (p.tag ? '  ·  ' + p.tag : '');\n      return { id: 'ref:' + p.ref, title: 'Referencia ' + p.ref, description: desc.slice(0, 72) };\n    });\n    const bodyTxt = hayMas\n      ? 'Estos son algunos de nuestros modelos ' + label.toLowerCase() + ' (los primeros 10 de ' + total + '). Toca el que te guste 👇'\n      : 'Nuestros modelos ' + label.toLowerCase() + '. Toca el que te guste 👇';\n    return { messaging_product: 'whatsapp', to, type: 'interactive', interactive: {\n      type: 'list',\n      header: { type: 'text', text: 'VarMan Crew · ' + label },\n      body: { text: bodyTxt },\n      footer: { text: 'Envíos a todo el país' },\n      action: { button: 'Ver modelos', sections: [{ title: label, rows }] }\n    }};\n  }\n\n  if (sel.startsWith('ref:')) {\n    const ref = sel.slice(4);\n    const p = catalogo.find((x) => x.ref === ref);\n    const precio = p ? fmtPrecio(p.precio) : '';\n    const texto = p\n      ? '¡Buena elección! 🔥\\n\\nLa *Referencia ' + ref + '* cuesta *' + precio + '*.\\n\\n¿Qué talla buscas? Escríbeme el número (ej: 40) y te confirmo disponibilidad y el envío. 👟'\n      : 'No encontré esa referencia 😅. Escribe *catálogo* para ver los modelos de nuevo.';\n    return { messaging_product: 'whatsapp', to, type: 'text', text: { body: texto } };\n  }\n\n  const counts = {};\n  for (const p of catalogo) counts[p.cat] = (counts[p.cat] || 0) + 1;\n  const rows = CAT_ORDER.filter((c) => counts[c]).map((c) => ({\n    id: 'cat:' + c, title: CAT_LABEL[c], description: counts[c] + ' modelos disponibles'\n  }));\n  return { messaging_product: 'whatsapp', to, type: 'interactive', interactive: {\n    type: 'list',\n    header: { type: 'text', text: 'VarMan Crew 👟' },\n    body: { text: '¡Hola! Bienvenido a *VarMan Crew*. Estos son nuestros estilos. ¿Cuál quieres ver?' },\n    footer: { text: 'Toca «Ver categorías»' },\n    action: { button: 'Ver categorías', sections: [{ title: 'Categorías', rows }] }\n  }};\n}\n\nconst parsed = $('Parsear mensaje').item.json;\nconst catalogo = parseCatalogo($json);\nreturn [{ json: construir(parsed, catalogo) }];"
+      },
+      "id": "10000000-0000-4000-8000-000000000007",
+      "name": "Construir respuesta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v21.0/{{ $env.WHATSAPP_PHONE_NUMBER_ID }}/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.WHATSAPP_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "10000000-0000-4000-8000-000000000008",
+      "name": "Enviar a WhatsApp",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        260
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook verificacion (GET)": {
+      "main": [
+        [
+          {
+            "node": "Verificar token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verificar token": {
+      "main": [
+        [
+          {
+            "node": "Responder a Meta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook mensajes (POST)": {
+      "main": [
+        [
+          {
+            "node": "Parsear mensaje",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parsear mensaje": {
+      "main": [
+        [
+          {
+            "node": "Leer catalogo (Firestore)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leer catalogo (Firestore)": {
+      "main": [
+        [
+          {
+            "node": "Construir respuesta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Construir respuesta": {
+      "main": [
+        [
+          {
+            "node": "Enviar a WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Bogota"
+  },
+  "pinData": {}
+}
