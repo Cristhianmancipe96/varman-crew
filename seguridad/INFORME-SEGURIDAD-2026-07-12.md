@@ -86,6 +86,33 @@
   y el pedido salen del catálogo/código (nunca del texto de Gemini), y los
   descuentos los aplica un humano. Impacto máximo: una respuesta de chat rara.
 
+## Ciclo C — infraestructura de la VM (GCP · Docker · n8n) (2026-07-12)
+
+**Verificado 🟢 (auditado desde los archivos de deploy del repo):**
+- Imagen de n8n **fijada** a versión exacta (`n8n:2.28.6`, no `latest`) — las
+  actualizaciones son conscientes, como manda la lección de deploy.
+- Puerto 5678 de n8n atado a `127.0.0.1` (invisible desde internet); el
+  firewall de GCP solo abre 80/443 para Caddy (TLS automático Let's Encrypt).
+- **Backups bien hechos**: el `.env` va CIFRADO (AES-256) y la clave de
+  descifrado vive aparte en `credenciales/` — un backup robado no expone llaves.
+- Telemetría de n8n apagada (`DIAGNOSTICS/PERSONALIZATION=false`).
+
+**Recomendaciones 🟡 (decide el dueño, ninguna urgente):**
+1. **El editor de n8n es alcanzable públicamente** en bot.varmancrew.com
+   (protegido por el login de n8n). Y ojo: quien entre al editor puede leer
+   TODAS las llaves (los nodos Code usan `$env`, que debe seguir habilitado).
+   → Mínimo: contraseña LARGA y única para la cuenta de n8n + 2FA si la
+   versión lo ofrece. Opcional más fuerte: restringir el editor por IP en
+   Caddy dejando públicos solo los `/webhook/*` (complica administrar desde
+   otros lugares; evaluar).
+2. `N8N_SECURE_COOKIE=false`: como todo el acceso real ya es por HTTPS (Caddy),
+   se puede probar `true` en el próximo mantenimiento (si el login falla,
+   revertir — cambio de 1 línea en el compose).
+3. **Mantenimiento programado**: revisar cada 1-2 meses si hay versión nueva de
+   n8n con parches de seguridad y actualizar el número de versión del compose
+   (leyendo primero `LECCIONES-DEPLOY-REAL`, nunca a ciegas).
+
 ---
-*Ciclos A y B — 2026-07-12. Próximo ciclo: checklist de infraestructura de la
-VM (GCP, Docker, actualizaciones) y endurecimiento del panel de n8n.*
+*Ciclos A, B y C — 2026-07-12. Cobertura: código de las 3 piezas + reglas de
+datos + infraestructura. Siguiente si el loop continúa: prueba activa de
+endpoints en producción (headers reales de varmancrew.com y bot.varmancrew.com).*
