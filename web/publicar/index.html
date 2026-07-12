@@ -504,8 +504,8 @@ section { padding: var(--s9) var(--s7); }
 .filters { display: flex; gap: var(--s2); flex-wrap: wrap; }
 .f-btn {
   font-size: var(--t-xs); font-weight: 700;
-  padding: 9px var(--s5); min-height: 40px;
-  border-radius: 20px;
+  padding: 9px var(--s5); min-height: 44px; /* target táctil (auditoría 2026-07-12) */
+  border-radius: 22px;
   border: 1.5px solid oklch(1 0 0 / 0.1);
   color: var(--ink-2); background: transparent;
   letter-spacing: 0.12em; text-transform: uppercase;
@@ -1111,7 +1111,7 @@ footer {
 .vm-compra{margin-bottom:16px;}
 .vm-compra-lbl{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-2,#b8b8c0);margin-bottom:8px;}
 .vm-tallas{display:flex;flex-wrap:wrap;gap:8px;}
-.vm-talla{min-width:44px;height:40px;padding:0 10px;border-radius:10px;border:1.5px solid var(--border,rgba(255,255,255,.12));background:transparent;color:var(--ink,#fff);font-weight:700;font-size:14px;cursor:pointer;transition:border-color .15s ease, background .15s ease;}
+.vm-talla{min-width:44px;height:44px;padding:0 10px;border-radius:10px;border:1.5px solid var(--border,rgba(255,255,255,.12));background:transparent;color:var(--ink,#fff);font-weight:700;font-size:14px;cursor:pointer;transition:border-color .15s ease, background .15s ease;}
 .vm-talla:hover{border-color:var(--brand,#ff6b00);}
 .vm-talla.on{background:var(--gacc,var(--brand,#ff6b00));border-color:var(--gacc,var(--brand,#ff6b00));color:oklch(0.13 0.01 0);font-weight:800;}
 /* el modal hereda el acento del género del producto (lo pone vmPrepararCompra) */
@@ -1129,7 +1129,7 @@ footer {
 .vm-tel-row select:focus{border-color:var(--brand,#ff6b00);outline:none;}
 .vm-tel-row input{flex:1;min-width:0;}
 .vm-cant{display:flex;align-items:center;gap:10px;}
-.vm-cant button{width:40px;height:40px;border-radius:10px;border:1.5px solid var(--border,rgba(255,255,255,.12));background:transparent;color:var(--ink,#fff);font-size:20px;line-height:1;cursor:pointer;transition:border-color .15s ease;}
+.vm-cant button{width:44px;height:44px;border-radius:10px;border:1.5px solid var(--border,rgba(255,255,255,.12));background:transparent;color:var(--ink,#fff);font-size:20px;line-height:1;cursor:pointer;transition:border-color .15s ease;}
 .vm-cant button:hover{border-color:var(--brand,#ff6b00);}
 .vm-cant-n{min-width:28px;text-align:center;font-weight:800;font-size:16px;}
 .vm-compra-err{display:none;color:#ff8a8a;font-size:12.5px;font-weight:600;margin:10px 0 0;}
@@ -1206,11 +1206,11 @@ document.documentElement.classList.add('no-gsap');
     <div class="hero-logo-big" id="anim-logo">
       <img src="img/p001.png" alt="VarMan Crew logo">
     </div>
-    <div class="hero-title" id="anim-title">
+    <h1 class="hero-title" id="anim-title">
       <span class="text-reveal-wrap"><span class="text-reveal-inner">LLEVA</span></span><br>
       <span class="text-reveal-wrap"><span class="text-reveal-inner">CONTIGO</span></span><br>
       <span class="text-reveal-wrap"><span class="text-reveal-inner">LA <span class="accent">FRESCURA</span></span></span>
-    </div>
+    </h1>
     <div class="hero-tagline" id="anim-tagline">— Lleva contigo la frescura Crew —</div>
     <p class="hero-desc" id="anim-desc">
       <strong>VarMan Crew</strong> — moda urbana, deportiva y casual.<br>
@@ -1265,7 +1265,7 @@ document.documentElement.classList.add('no-gsap');
 <!-- CATEGORIES -->
 <section class="categories" id="catalogo-section">
   <div class="s-label">Explorar por estilo</div>
-  <div class="s-title">LO QUE<br><span style="color:var(--brand)">BUSCAS</span></div>
+  <h2 class="s-title">LO QUE<br><span style="color:var(--brand)">BUSCAS</span></h2>
   <div class="cat-grid">
     <div class="cat-card">
       <div class="cat-num">01</div>
@@ -1296,7 +1296,7 @@ document.documentElement.classList.add('no-gsap');
   <div class="catalog-top">
     <div>
       <div class="s-label">Lo que tenemos</div>
-      <div class="s-title" style="margin-bottom:0">SNEAKERS</div>
+      <h2 class="s-title" style="margin-bottom:0">SNEAKERS</h2>
     </div>
     <div class="filters" role="group" aria-label="Filtrar catálogo">
       <button class="f-btn active" data-filter="todos" aria-pressed="true">Todos</button>
@@ -1783,7 +1783,7 @@ document.documentElement.classList.add('no-gsap');
     </div>
     <div class="about-text">
       <div class="s-label">Nuestra historia</div>
-      <div class="s-title">SOMOS<br><span style="color:var(--brand)">VARMAN CREW</span></div>
+      <h2 class="s-title">SOMOS<br><span style="color:var(--brand)">VARMAN CREW</span></h2>
       <p class="about-desc">
         Nacimos para llevar la <strong>frescura del crew</strong> a cada rincón. Somos más que ropa — somos una actitud, una comunidad, un estilo de vida urbano que no pide permiso.<br><br>
         Cada prenda está pensada para quienes se mueven con confianza y expresan quiénes son sin filtros.
@@ -1801,7 +1801,7 @@ document.documentElement.classList.add('no-gsap');
 <!-- CONTACT -->
 <section class="contact" id="contacto">
   <div class="s-label">Habla con nosotros</div>
-  <div class="s-title">CONTACTO</div>
+  <h2 class="s-title">CONTACTO</h2>
   <div class="contact-inner">
     <div>
       <p class="contact-desc">
@@ -1848,7 +1848,7 @@ document.documentElement.classList.add('no-gsap');
 <!-- CÓMO COMPRAR (el enlace de WhatsApp del paso 2 se arma con var WHATSAPP_NUMERO en el script del final — aquí no hay nada que cambiar en EL CORTE) -->
 <section class="howbuy" id="como-comprar" aria-label="Cómo comprar">
   <div class="s-label">Así de fácil</div>
-  <div class="s-title">¿CÓMO<br><span style="color:var(--brand)">COMPRAR?</span></div>
+  <h2 class="s-title">¿CÓMO<br><span style="color:var(--brand)">COMPRAR?</span></h2>
   <div class="hb-grid">
     <a class="hb-step" href="#catalogo">
       <div class="hb-num" aria-hidden="true">1</div>
