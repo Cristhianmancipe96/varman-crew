@@ -112,7 +112,25 @@
    n8n con parches de seguridad y actualizar el número de versión del compose
    (leyendo primero `LECCIONES-DEPLOY-REAL`, nunca a ciegas).
 
+## Ciclo D — verificación ACTIVA en producción (2026-07-12)
+
+Pruebas reales (solo lecturas y payloads inválidos, sin efectos):
+
+- **🟢 varmancrew.com** responde con TODOS los headers de seguridad del
+  `_headers`: HSTS (1 año), `X-Frame-Options: DENY`, `nosniff`,
+  `Referrer-Policy`, `Permissions-Policy`. La CSP va como `<meta>` dentro del
+  HTML (válida); no hace falta duplicarla como header.
+- **🟢 /api/comprar en producción FUNCIONA y valida**: con una referencia
+  inexistente responde `400 "la referencia ya no está disponible"` — es decir,
+  las variables de Cloudflare quedaron bien puestas y la validación server-side
+  está activa en vivo.
+- **🟢 El webhook del bot traga basura sin romperse**: un POST con `{}` responde
+  200 y no procesa nada (el nodo exige `data.transaction` + firma válida).
+- **🟡 Confirmado**: `bot.varmancrew.com/` muestra la pantalla de login del
+  editor n8n públicamente — refuerza la recomendación C1 (contraseña fuerte +
+  2FA; opcional restringir por IP).
+
 ---
-*Ciclos A, B y C — 2026-07-12. Cobertura: código de las 3 piezas + reglas de
-datos + infraestructura. Siguiente si el loop continúa: prueba activa de
-endpoints en producción (headers reales de varmancrew.com y bot.varmancrew.com).*
+*Ciclos A–D — 2026-07-12. Cobertura completa: código de las 3 piezas, reglas de
+datos, infraestructura y producción en vivo. Siguiente: revisión de versiones y
+CVEs de las dependencias fijadas (n8n 2.28.6, caddy:2, GSAP 3.12.5, Firebase SDK).*
