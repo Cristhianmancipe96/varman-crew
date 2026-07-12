@@ -1,5 +1,9 @@
-REGLAS DE FIRESTORE — VarMan Crew (actualizadas 2026-07-09: pedidosOcultos +
-2026-07-07: ANULAR VENTAS + mapaCatalogo/proveedores/listaEspera/notificacionesPendientes del v5)
+REGLAS DE FIRESTORE — VarMan Crew (actualizadas 2026-07-12: ENDURECIDAS — todo
+exige ser del EQUIPO por lista de correos, ya no basta "estar autenticado".
+Antes: 2026-07-09 pedidosOcultos · 2026-07-07 ANULAR VENTAS + colecciones v5)
+
+⚠ HAY QUE VOLVER A PEGARLAS EN LA CONSOLA (2 min, pasos abajo). Si el vendedor
+tiene cuenta propia, primero agrega su correo en esEquipo().
 ================================================================================
 
 PARA QUÉ:
@@ -36,6 +40,21 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // ── ENDURECIDO 2026-07-12 (revisión de seguridad) ──
+    // Antes bastaba "estar autenticado" para leer/escribir pedidos, inventario
+    // y catálogo. Cualquiera que lograra crearse una cuenta en el proyecto
+    // habría podido leer datos de clientes o dañar la tienda. Ahora TODO exige
+    // ser del EQUIPO (lista de correos). Al contratar/cambiar vendedor: agregar
+    // su correo aquí y volver a publicar las reglas.
+    function esEquipo() {
+      return request.auth != null
+        && request.auth.token.email in [
+          'c.mancipe.96@gmail.com',
+          'andresvargasm91@gmail.com'
+          // , 'correo-del-vendedor@gmail.com'   ← agregar el del vendedor si tiene cuenta
+        ];
+    }
+
     // Los dos socios: los ÚNICOS que pueden ver y tocar la caja
     function esSocio() {
       return request.auth != null
@@ -47,16 +66,16 @@ service cloud.firestore {
 
     match /tiendas/{tienda} {
       // Documento de la tienda (guarda el logo)
-      allow read, write: if request.auth != null;
+      allow read, write: if esEquipo();
 
       // Catálogo público de la página web (la página lee SIN login)
       match /catalogo/{doc} {
         allow read: if true;
-        allow write: if request.auth != null;
+        allow write: if esEquipo();
       }
       match /catalogoFotos/{doc} {
         allow read: if true;
-        allow write: if request.auth != null;
+        allow write: if esEquipo();
       }
 
       // CAJA DE LOS SOCIOS: solo los dos correos de arriba
@@ -65,53 +84,53 @@ service cloud.firestore {
       }
 
       // Inventario y fotos: todo el equipo con login (incluye vendedor)
-      match /products/{doc} { allow read, write: if request.auth != null; }
-      match /fotos/{doc}    { allow read, write: if request.auth != null; }
+      match /products/{doc} { allow read, write: if esEquipo(); }
+      match /fotos/{doc}    { allow read, write: if esEquipo(); }
 
       // VENTAS: todo el equipo registra/edita/borra ventas normales, pero
       // ANULAR (los campos anulada*) es solo de socios. Las reglas se suman
       // con "o": basta que una permita.
       match /sales/{doc} {
-        allow read: if request.auth != null;
+        allow read: if esEquipo();
         // socios: pueden todo (incluido anular y borrar anuladas)
         allow write: if esSocio();
         // el resto del equipo: solo escrituras SIN campos de anulación…
-        allow create, update: if request.auth != null
+        allow create, update: if esEquipo()
           && !request.resource.data.keys().hasAny(
                ['anulada', 'anulada_fecha', 'anulada_por', 'anulada_motivo']);
         // …y solo puede borrar ventas que NO estén anuladas
-        allow delete: if request.auth != null && !('anulada' in resource.data);
+        allow delete: if esEquipo() && !('anulada' in resource.data);
       }
 
       // PEDIDOS DEL BOT DE WHATSAPP: todo el equipo con login los ve y los
       // gestiona (verificar pago, marcar enviado/entregado, cancelar, notas).
       // El bot los crea por su cuenta con la llave maestra (no usa esta regla).
-      match /pedidos/{doc}  { allow read, write: if request.auth != null; }
+      match /pedidos/{doc}  { allow read, write: if esEquipo(); }
 
       // Fotos de los comprobantes de pago (una por pedido, en colección aparte
       // para que la lista de pedidos no pese): el equipo solo las LEE; las
       // escribe el bot con la llave maestra.
-      match /comprobantes/{doc} { allow read: if request.auth != null; }
+      match /comprobantes/{doc} { allow read: if esEquipo(); }
 
       // ---- NUEVAS 2026-07-07 (v5, punto 5-bis y backlog 10-13) ----
 
       // Mapa catálogo↔inventario (PRIVADO: aquí van los códigos VRM y los
       // proveedores externos de cada ref). Lo edita el equipo desde la
       // pestaña Tienda; el bot lo LEE con la llave maestra.
-      match /mapaCatalogo/{doc} { allow read, write: if request.auth != null; }
+      match /mapaCatalogo/{doc} { allow read, write: if esEquipo(); }
 
       // Nombres de bodegas externas reutilizables (los crea la pestaña Tienda)
-      match /proveedores/{doc}  { allow read, write: if request.auth != null; }
+      match /proveedores/{doc}  { allow read, write: if esEquipo(); }
 
       // Lista de espera de stock ("avísame cuando llegue la talla X"): la
       // escribe el bot; el equipo la ve en Pedidos y marca "ya avisé".
-      match /listaEspera/{doc}  { allow read, write: if request.auth != null; }
+      match /listaEspera/{doc}  { allow read, write: if esEquipo(); }
 
       // Avisos que la app le deja al bot (reseña post-entrega, guía de envío).
       // La app solo CREA (y puede borrar un error); el bot los marca enviados
       // con la llave maestra.
       match /notificacionesPendientes/{doc} {
-        allow read, create, delete: if request.auth != null;
+        allow read, create, delete: if esEquipo();
       }
 
       // ---- NUEVA 2026-07-09 ----
