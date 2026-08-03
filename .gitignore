@@ -1,27 +1,34 @@
 # ── Credenciales y secretos — NUNCA subir a git ni a hosting ──
+# Regla 1 (la que de verdad protege): carpetas completas.
 bot_n8n/credenciales/
 **/.env
 **/.env.*
-*.env.produccion-gcp
+
+# Regla 2 (defensa en profundidad): archivos sueltos, por si alguno
+# se escribe FUERA de credenciales/. Con comodines a ambos lados,
+# porque los nombres reales llevan prefijos ("Clave wompi.txt").
+**/*wompi*.txt
+**/*vm.txt
+**/*PRIVADO*
+**/*bussiness*.txt
+**/*BORRAR-DESPUES*
+**/tunnel-url.txt
 
 # Llaves y respaldos sensibles
-varman-crew-firebase-adminsdk-*.json
+*-firebase-adminsdk-*.json
+serviceAccount*.json
+*.pem
+*.key
 *.tar.gz
 *.tar.gz.*
-
-# Archivos de llaves sueltos
-**/wompi.txt
-**/vm.txt
-**/*vm.txt
-**/*PRIVADO*.txt
-**/bussiness.txt
-**/*BORRAR-DESPUES*
 
 # Node portable (pesado; borrar si algún día se instala Node en el sistema)
 bot_n8n/herramientas/
 
 # Temporales / dependencias
 node_modules/
+dist/
 *.log
 .DS_Store
 Thumbs.db
+desktop.ini
