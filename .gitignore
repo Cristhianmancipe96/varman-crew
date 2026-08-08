@@ -32,3 +32,6 @@ dist/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Local-only vault, never ship
+_ARCHIVO-NO-SUBIR/

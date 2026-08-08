@@ -1,0 +1,3 @@
+# Firebase web app config key - public by design (ships in the client bundle).
+# Security is enforced by Firestore rules + API key restrictions, not secrecy (see app/app.jsx:37-38).
+d35eab54513d0f9befe0dd40cdebe96b18f97754:app/app.jsx:gcp-api-key:40
