@@ -14,7 +14,7 @@ const src = (f) => fs.readFileSync(path.join(DIR, 'src', f), 'utf8');
 const SALIDA = path.join(DIR, 'bot-varman.json');
 // Versión: cada valor nuevo deja su propio respaldo en respaldo/ para rollback.
 // Subir SOLO cuando haya un cambio que quieras poder revertir por separado.
-const VERSION = '11.0';
+const VERSION = '11.1';
 
 const wf = {
   // OJO: el id NO se cambia — importar-workflows.sh de la VM activa por id
@@ -71,6 +71,38 @@ const wf = {
       type: 'n8n-nodes-base.code',
       typeVersion: 2,
       position: [220, 260]
+    },
+    {
+      // [BUZON] (flag BOT_BUZON, 16-ago-2026) Guarda el mensaje y termina la
+      // ejecucion, en vez de contestar de una. Con el flag OFF devuelve los
+      // items TAL CUAL: el nodo es transparente y el bot se comporta igual
+      // que hoy. Quien junta y responde es "Buzon recoger (cada minuto)".
+      parameters: { jsCode: src('buzon-guardar.js') },
+      id: '40000000-0000-4000-8000-000000000012',
+      name: 'Buzon guardar (BOT_BUZON)',
+      type: 'n8n-nodes-base.code',
+      typeVersion: 2,
+      position: [330, 120]
+    },
+    {
+      // [BUZON] el que despierta cada minuto a mirar quien ya cumplio su
+      // ventana de 45 s. Con el flag OFF devuelve [] sin tocar Firestore.
+      parameters: {
+        rule: { interval: [{ field: 'minutes', minutesInterval: 1 }] }
+      },
+      id: '40000000-0000-4000-8000-000000000013',
+      name: 'Cada minuto',
+      type: 'n8n-nodes-base.scheduleTrigger',
+      typeVersion: 1.2,
+      position: [0, 1360]
+    },
+    {
+      parameters: { jsCode: src('buzon-recoger.js') },
+      id: '40000000-0000-4000-8000-000000000014',
+      name: 'Buzon recoger (cada minuto)',
+      type: 'n8n-nodes-base.code',
+      typeVersion: 2,
+      position: [220, 1360]
     },
     {
       parameters: {
@@ -226,7 +258,15 @@ const wf = {
     'Webhook verificacion (GET)': { main: [[{ node: 'Verificar token', type: 'main', index: 0 }]] },
     'Verificar token': { main: [[{ node: 'Responder a Meta', type: 'main', index: 0 }]] },
     'Webhook mensajes (POST)': { main: [[{ node: 'Parsear mensaje', type: 'main', index: 0 }]] },
-    'Parsear mensaje': { main: [[{ node: 'Leer catalogo (Firestore)', type: 'main', index: 0 }]] },
+    // [BUZON] el mensaje pasa por el buzon antes de llegar al catalogo. Con
+    // BOT_BUZON OFF el nodo devuelve los items tal cual y la cadena es
+    // exactamente la de siempre (Parsear -> catalogo -> Cerebro).
+    'Parsear mensaje': { main: [[{ node: 'Buzon guardar (BOT_BUZON)', type: 'main', index: 0 }]] },
+    'Buzon guardar (BOT_BUZON)': { main: [[{ node: 'Leer catalogo (Firestore)', type: 'main', index: 0 }]] },
+    // [BUZON] la otra entrada al mismo camino: los mensajes ya juntados entran
+    // al catalogo y al Cerebro con la MISMA forma que trae "Parsear mensaje".
+    'Cada minuto': { main: [[{ node: 'Buzon recoger (cada minuto)', type: 'main', index: 0 }]] },
+    'Buzon recoger (cada minuto)': { main: [[{ node: 'Leer catalogo (Firestore)', type: 'main', index: 0 }]] },
     'Leer catalogo (Firestore)': { main: [[{ node: 'Cerebro (sesion+pedido+Gemini)', type: 'main', index: 0 }]] },
     'Cerebro (sesion+pedido+Gemini)': { main: [[{ node: 'Enviar a WhatsApp', type: 'main', index: 0 }]] },
     // salida 0 = exito (no va a ningun lado), salida 1 = error -> log
