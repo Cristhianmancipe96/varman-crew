@@ -1,4 +1,4 @@
-// ============ BUILD del workflow v4 (bot-whatsapp-v4-pedidos.json) ============
+﻿// ============ BUILD del workflow v4 (bot-whatsapp-v4-pedidos.json) ============
 // El código de los nodos Code vive legible en workflows\src\*.js.
 // Este script arma el JSON completo del workflow. Correr con:
 //   node "workflows\build-v4-pedidos.js"      (desde bot_n8n\)
@@ -14,7 +14,7 @@ const src = (f) => fs.readFileSync(path.join(DIR, 'src', f), 'utf8');
 const SALIDA = path.join(DIR, 'bot-varman.json');
 // Versión: cada valor nuevo deja su propio respaldo en respaldo/ para rollback.
 // Subir SOLO cuando haya un cambio que quieras poder revertir por separado.
-const VERSION = '6.3';
+const VERSION = '11.0';
 
 const wf = {
   // OJO: el id NO se cambia — importar-workflows.sh de la VM activa por id
@@ -64,7 +64,7 @@ const wf = {
     },
     {
       parameters: {
-        jsCode: "const out = [];\nfor (const item of $input.all()) {\n  const body = item.json.body || item.json;\n  for (const e of (body.entry || [])) {\n    for (const ch of (e.changes || [])) {\n      const v = ch.value || {};\n      const contacto = (v.contacts && v.contacts[0]) || {};\n      for (const m of (v.messages || [])) {\n        let texto = '';\n        let inter_id = '';\n        let imagen_id = '';\n        if (m.type === 'text') texto = (m.text && m.text.body) || '';\n        else if (m.type === 'image') imagen_id = (m.image && m.image.id) || '';\n        else if (m.type === 'interactive') {\n          const it = m.interactive || {};\n          if (it.type === 'list_reply') inter_id = (it.list_reply && it.list_reply.id) || '';\n          else if (it.type === 'button_reply') inter_id = (it.button_reply && it.button_reply.id) || '';\n        }\n        // Atribucion de pauta (v5): los webhooks de anuncios click-to-WhatsApp\n        // traen m.referral con el source_id del anuncio. Solo llega en el\n        // PRIMER mensaje; el Cerebro lo conserva en la sesion hasta el pedido.\n        let fuente = '';\n        if (m.referral) {\n          const r = m.referral;\n          fuente = 'ctwa:' + (r.source_id || r.ctwa_clid || r.source_url || 'anuncio');\n        }\n        out.push({ json: {\n          wa_id: m.from,\n          nombre: (contacto.profile && contacto.profile.name) || '',\n          tipo: m.type,\n          texto,\n          inter_id,\n          imagen_id,\n          fuente,\n          message_id: m.id\n        }});\n      }\n    }\n  }\n}\nreturn out;"
+        jsCode: "const out = [];\nfor (const item of $input.all()) {\n  const body = item.json.body || item.json;\n  for (const e of (body.entry || [])) {\n    for (const ch of (e.changes || [])) {\n      const v = ch.value || {};\n      const contacto = (v.contacts && v.contacts[0]) || {};\n      for (const m of (v.messages || [])) {\n        let texto = '';\n        let inter_id = '';\n        let imagen_id = '';\n        if (m.type === 'text') texto = (m.text && m.text.body) || '';\n        else if (m.type === 'image') imagen_id = (m.image && m.image.id) || '';\n        else if (m.type === 'interactive') {\n          const it = m.interactive || {};\n          if (it.type === 'list_reply') inter_id = (it.list_reply && it.list_reply.id) || '';\n          else if (it.type === 'button_reply') inter_id = (it.button_reply && it.button_reply.id) || '';\n        }\n        // Atribucion de pauta (v5): los webhooks de anuncios click-to-WhatsApp\n        // traen m.referral con el source_id del anuncio. Solo llega en el\n        // PRIMER mensaje; el Cerebro lo conserva en la sesion hasta el pedido.\n        let fuente = '';\n        // [FUENTE-DETALLE] detalle del referral: titulo del anuncio (headline),\n        // tipo (ad|post) y url. Se emiten SIEMPRE (campos inertes: sin referral\n        // van como strings vacios, nunca se inventa nada) — el Cerebro solo los\n        // usa cuando el flag BOT_FUENTE_DETALLE esta encendido.\n        let fuente_titulo = '';\n        let fuente_tipo = '';\n        let fuente_url = '';\n        if (m.referral) {\n          const r = m.referral;\n          fuente = 'ctwa:' + (r.source_id || r.ctwa_clid || r.source_url || 'anuncio');\n          fuente_titulo = r.headline || '';\n          fuente_tipo = r.source_type || '';\n          fuente_url = r.source_url || '';\n        }\n        out.push({ json: {\n          wa_id: m.from,\n          nombre: (contacto.profile && contacto.profile.name) || '',\n          tipo: m.type,\n          texto,\n          inter_id,\n          imagen_id,\n          fuente,\n          fuente_titulo,\n          fuente_tipo,\n          fuente_url,\n          message_id: m.id\n        }});\n      }\n      // [LOG-FALLOS] (flag BOT_LOG_FALLOS, 2026-07-18): statuses `failed` de\n      // Meta -> item especial que el Cerebro registra en botErrores. Un envio\n      // puede ser 'aceptado' (devuelve wamid, n8n en verde) y aun asi NO\n      // entregarse (ej. ventana de 24h cerrada, codigo 131047 — el caso real\n      // de los resumenes al 320). Con el flag OFF no se emite nada (identico a hoy).\n      if (/^(on|1|true|si|s[ií])$/i.test(String($env.BOT_LOG_FALLOS || '').trim())) {\n        for (const s of (v.statuses || [])) {\n          if (String(s.status) !== 'failed') continue;\n          const err = (s.errors && s.errors[0]) || {};\n          out.push({ json: {\n            tipo_evento: 'fallo_envio',\n            wa_id: '',\n            destinatario: s.recipient_id || '',\n            message_id: s.id || '',\n            error_code: String(err.code || ''),\n            error_title: String(err.title || (err.error_data && err.error_data.details) || '')\n          }});\n        }\n      }\n    }\n  }\n}\nreturn out;"
       },
       id: '40000000-0000-4000-8000-000000000005',
       name: 'Parsear mensaje',
@@ -75,7 +75,15 @@ const wf = {
     {
       parameters: {
         method: 'GET',
-        url: 'https://firestore.googleapis.com/v1/projects/varman-crew/databases/(default)/documents/tiendas/varman/catalogo?pageSize=300',
+        // [FIX-CATALOGO-PESADO] (barrido r2) este GET corre en CADA mensaje que
+        // entra, incluso en turnos que jamás miran el catálogo. Venía en JSON
+        // "bonito" (con sangrías) y trayendo TODOS los campos de las 64 refs:
+        // ~84 KB por mensaje contra una VM de 1 GB. Con prettyPrint=false y una
+        // máscara de los campos que el código realmente lee, baja a ~38 KB
+        // (-55%) sin cambiar una sola línea de lógica.
+        url: 'https://firestore.googleapis.com/v1/projects/varman-crew/databases/(default)/documents/tiendas/varman/catalogo?pageSize=300&prettyPrint=false'
+          + ['ref', 'marca', 'precio', 'orden', 'fotos', 'tallas', 'genero', 'activo', 'cat', 'tag', 'video', 'tallasWeb']
+            .map((f) => '&mask.fieldPaths=' + f).join(''),
         options: {}
       },
       id: '40000000-0000-4000-8000-000000000006',
@@ -173,6 +181,27 @@ const wf = {
       position: [220, 760]
     },
     {
+      // v7 MODO-CONVERSA: trigger cada 5 min para el rescate de los ~3 minutos
+      // de silencio. Con BOT_MODO_CONVERSA apagado el código devuelve [] sin
+      // tocar Firestore (el nodo existe pero queda inerte: cero mensajes).
+      parameters: {
+        rule: { interval: [{ field: 'minutes', minutesInterval: 5 }] }
+      },
+      id: '40000000-0000-4000-8000-000000000010',
+      name: 'Cada 5 min',
+      type: 'n8n-nodes-base.scheduleTrigger',
+      typeVersion: 1.2,
+      position: [0, 1160]
+    },
+    {
+      parameters: { jsCode: src('textos.js') + '\n' + src('rescate-conversa.js') },
+      id: '40000000-0000-4000-8000-000000000011',
+      name: 'Rescate conversa (cada 5 min)',
+      type: 'n8n-nodes-base.code',
+      typeVersion: 2,
+      position: [220, 1160]
+    },
+    {
       // v6 Wompi: webhook de confirmación de pago. onReceived → responde 200
       // de inmediato (Wompi solo necesita un 2xx). El código verifica la firma.
       parameters: { httpMethod: 'POST', path: 'wompi', responseMode: 'onReceived', options: {} },
@@ -208,6 +237,9 @@ const wf = {
     // v5 backlog 10-12: recordatorios y avisos → al cliente
     'Cada hora': { main: [[{ node: 'Recordatorios y avisos (cada hora)', type: 'main', index: 0 }]] },
     'Recordatorios y avisos (cada hora)': { main: [[{ node: 'Enviar a WhatsApp', type: 'main', index: 0 }]] },
+    // v7 modo conversa: rescate a los ~3 min de silencio → al cliente
+    'Cada 5 min': { main: [[{ node: 'Rescate conversa (cada 5 min)', type: 'main', index: 0 }]] },
+    'Rescate conversa (cada 5 min)': { main: [[{ node: 'Enviar a WhatsApp', type: 'main', index: 0 }]] },
     // v6 Wompi: webhook → procesa (verifica firma + confirma pedido) → avisa al 320
     'Wompi webhook (POST)': { main: [[{ node: 'Wompi webhook (procesa)', type: 'main', index: 0 }]] },
     'Wompi webhook (procesa)': { main: [[{ node: 'Enviar a WhatsApp', type: 'main', index: 0 }]] }
@@ -231,6 +263,15 @@ console.log('     respaldo v' + VERSION + ' ->', backup);
 // FECHADO e inconfundible (el más nuevo es SIEMPRE el correcto) y borrar los
 // "PARA-SUBIR" anteriores para que no quede ninguno viejo que confunda.
 // En la VM se renombra a bot-varman.json (ver PASOS-SUBIR-CATALOGO-WEB.txt).
+//
+// [2026-07-25] Se probó dejar la copia llamada ya `bot-varman.json` para
+// ahorrarse el renombrado en la VM y el DUEÑO LO DESCARTÓ: con ese nombre la
+// subida le falla siempre (subir un archivo que ya existe con ese mismo nombre
+// da guerra en la consola SSH y se presta para confundirlo con los viejos).
+// Se mantiene el nombre FECHADO. Lo que sí queda como paso obligatorio de la
+// guía es verificar el archivo DESPUÉS de moverlo y ANTES de importar
+// (`grep -c mancipiola`): ese es el chequeo que caza el error de verdad, y
+// funciona con cualquier nombre.
 // Va en try/catch: si no hay Escritorio (loop/CI), el build NO se rompe.
 try {
   const os = require('os');
@@ -249,3 +290,28 @@ try {
 } catch (e) {
   console.log('     (aviso: no pude dejar la copia en el Escritorio — ' + e.message + ')');
 }
+
+// --- recordatorio del error de deploy que costó dos tardes (25-jul) ---
+// El archivo subido por la consola SSH queda en ~, NO en workflows/. Sin el
+// `mv`, n8n importa el bot-varman.json VIEJO y TODO sale en verde: import sin
+// errores, verificar-salud 7/7, workflow publicado… y el bot idéntico a antes.
+// No hay ninguna señal. Por eso el build lo recuerda con el TAMAÑO exacto, que
+// sirve para cualquier versión (no depende de buscar una palabra concreta).
+console.log('');
+console.log('  ┌───────────────────────────────────────────────────────────────┐');
+console.log('  │  ANTES DE IMPORTAR EN LA VM, COMPRUEBA QUE MOVISTE EL NUEVO:  │');
+console.log('  │    ls -l ~/varman-bot/workflows/bot-varman.json               │');
+console.log('  │  Tiene que pesar EXACTAMENTE ' + String(Buffer.byteLength(json)).padEnd(33) + '│');
+console.log('  │  Si pesa otra cosa, el `mv` no se hizo y vas a importar el    │');
+console.log('  │  viejo: el import sale en verde y el bot NO cambia. Pasó 2x.  │');
+console.log('  └───────────────────────────────────────────────────────────────┘');
+
+
+
+
+
+
+
+
+
+

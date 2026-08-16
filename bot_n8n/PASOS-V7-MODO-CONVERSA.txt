@@ -1,0 +1,177 @@
+﻿==========================================================
+  BOT v8.0 — MODO CONVERSA (lógica del cuaderno) + AJUSTES DEL SOCIO
+  Guía de despliegue paso a paso (para Cristhian) — 22 jul 2026
+==========================================================
+
+LÓGICA DEL CUADERNO (v8.0, aprobada por los socios):
+  · "Hola" solo → SOLO el saludo (una burbuja); la conversación
+    arranca cuando el cliente responde con su petición.
+  · Llega preguntando PRECIO → saludo + FOTO Y PRECIO de una
+    (la ref de la publicación elegida en la app). Nunca el rango.
+  · Pide CATÁLOGO → NO se manda el link: "¿Buscas alguna
+    referencia en específica?" → SÍ → "¿qué modelo buscas?" →
+    se le muestra. NO → sondeo (¿hombre o mujer? ¿deportivos,
+    casuales o urbanos?) → 2 FOTOS con precio aquí en el chat.
+  · Modelo que NO está → "déjame lo confirmo con el equipo"
+    (te llega aviso al 320) + link del catálogo ("mira qué más
+    te puede gustar") + puerta al sondeo. El LINK solo sale ahí,
+    cuando ya vio info y no está lo que busca (o en el rescate).
+  · INTENCIÓN de compra → el bot pregunta la CIUDAD (si no la
+    tiene ya) → "manejamos TODAS las tallas disponibles, la
+    confirmamos al alistar tu pedido" → y cierra según la ciudad:
+      FUERA de Bogotá (con BOT_PAGO_PRIMERO): LINK DE WOMPI de una
+      → pagó → se le piden nombre y dirección → pedido completo.
+      Si da vueltas con el link → datos primero + otros métodos.
+      BOGOTÁ: datos (solo nombre y dirección) → contra entrega
+      o Wompi → EL BOT CIERRA.
+    El bot NUNCA pregunta la talla (se confirma al alistar).
+    El asesor solo entra si el cliente lo pide o el modelo no está.
+  · Pregunta por MÉTODOS DE PAGO o contra entrega en cualquier
+    momento → el mensaje aprobado del anticipado/contraentrega.
+
+QUÉ TRAE ESTA VERSIÓN (todo APAGADO por defecto — subir el JSON
+no cambia NADA hasta que enciendas flags en el .env):
+
+  BOT_TEXTOS_SOCIO      VarMan Crew sin asteriscos + FAQ del contra
+                        entrega (el texto aprobado, en 2 mensajes,
+                        responde en CUALQUIER paso del pedido)
+  BOT_TONO_SOCIO        La IA dice "importados" (prohibido "1.1"),
+                        tono más profesional, prohibido parcero/chimba,
+                        máx 1 emoji y 2 frases por mensaje
+  BOT_CIERRE_CONFIANZA  Tu bloque de confianza (foto/video al alistar +
+                        guía con la transportadora) en los mensajes de pago
+  BOT_DESCUENTO_CIFRA   Descuentos siempre con la cifra final en pesos
+                        y "válido por hoy" suave (tu estilo con Andrés)
+  BOT_SILENCIO_HANDOFF  Tras un handoff, el bot CALLA con ese cliente
+                        (4h por defecto, BOT_SILENCIO_HORAS) y te reenvía
+                        sus mensajes al 320 (lo que faltó con Andrés)
+  BOT_ESCAPE_DATOS      El DESATASCO de talla/datos/pago (falla real del
+                        22 jul): el bot atiende otra referencia, preguntas
+                        o el catálogo a mitad del pedido, y solo recalca
+                        los datos cuando es pertinente (2ª vez, suave)
+  BOT_PAGO_PRIMERO      (requiere BOT_MODO_CONVERSA) FUERA de Bogotá y
+                        con Wompi: el LINK DE PAGO va de una y los datos
+                        de envío se piden DESPUÉS del pago (quien pagó
+                        siempre responde). Si el cliente da vueltas con
+                        el link (pide Nequi/efectivo/otro método) → cae
+                        al camino clásico: datos primero + otros métodos
+  BOT_MODO_CONVERSA     EL GRANDE: saluda siempre primero, muestra el
+                        producto SIN número de referencia (nombre de la
+                        app, hasta 2 fotos de ESA ref), pregunta la CIUDAD,
+                        sondea si piden catálogo (sin link), y con la
+                        intención de compra EL BOT CIERRA el pedido
+                        (datos → pago; SIN talla: "todas las tallas
+                        disponibles", se confirma al alistar). Si calla
+                        ~3 min tras ver info, UNA invitación al catálogo
+
+ANTES DE EMPEZAR (prerrequisito del modo conversa):
+  ⚠️ En la APP, ponle NOMBRE/MARCA a TODAS las referencias
+     ("Adidas Samba vinotinto", no vacío). En modo conversa el
+     cliente ya no ve "Ref NN": ve ese nombre. Sin nombre, el bot
+     muestra la categoría (feo pero no roto).
+
+PASO 1 — SUBIR EL JSON A LA VM
+  1. En tu Escritorio está: bot-varman-PARA-SUBIR-v8.0-2026-07-23.json
+  2. Consola GCP → SSH del navegador → ⚙ → "Subir archivo" → ese archivo.
+  3. En la VM:
+       mv ~/bot-varman-PARA-SUBIR-v8.0-2026-07-23.json ~/n8n-bot/workflows/bot-varman.json
+       (la ruta exacta de siempre; igual que en PASOS-V6.9)
+  4. Importar y PUBLICAR — SIEMPRE con n8n DETENIDO (si está corriendo,
+     el import se cuelga peleando por la base de datos; visto 23-jul):
+       cd ~/varman-bot && docker compose stop n8n
+       docker compose run --rm --no-deps -u node n8n import:workflow --input=/workflows/bot-varman.json
+       docker compose start n8n
+       → esperar 3-5 min → botón PUBLISH en la UI (el import lo desactiva)
+  5. ./verificar-salud.sh → debe dar 7 bien / 0 fallos.
+  6. Prueba desde otro número: "hola" → debe responder IGUAL que antes
+     (flags apagados = v6.9 exacta en comportamiento).
+
+PASO 2 — ENCENDER POR TANDAS (así mides qué efecto tiene cada cosa)
+  TANDA A (bajo riesgo, el mismo día):
+    En el .env de la VM AGREGAR (nunca sobrescribir el .env):
+      BOT_TEXTOS_SOCIO=on
+      BOT_TONO_SOCIO=on
+      BOT_CIERRE_CONFIANZA=on
+      BOT_DESCUENTO_CIFRA=on
+      BOT_SILENCIO_HANDOFF=on
+      BOT_ESCAPE_DATOS=on
+    docker compose up -d --force-recreate n8n   (recarga el .env)
+    Probar: (1) "¿manejan contra entrega?" desde otro número → el texto
+    aprobado en 2 mensajes; (2) "asesor" → tras el handoff, escribir otra
+    cosa → el bot NO contesta y a ti te llega el reenvío al 320.
+  TANDA B (el cambio de fondo, cuando la Tanda A lleve 1-2 días bien):
+      BOT_MODO_CONVERSA=on
+      BOT_PAGO_PRIMERO=on
+    docker compose up -d --force-recreate n8n
+    Probar el flujo completo desde otro número:
+      "Hola" → SOLO el saludo (1 burbuja)
+      "precio?" → saludo + foto y precio de la ref de la publicación
+      "me mandas el catálogo" → "¿buscas alguna referencia en específica?"
+        → "no" → pregunta hombre/mujer + estilo → responde "hombre,
+        deportivos" → 2 fotos con precio + "¿cuál te gustó?"
+      "Quiero la Ref 05" (de la web) → saludo + hasta 2 FOTOS de ESA
+        referencia con nombre y precio (SIN "Ref", SIN talla) +
+        "¿en qué ciudad estás ubicado?" → "Cali" → "envío GRATIS,
+        1-3 días ¿te gustaría llevarlos?"
+      "Sí, los quiero" (ciudad ≠ Bogotá, PAGO-PRIMERO on) → info del
+        pago + "todas las tallas disponibles" + LINK DE WOMPI de una
+        → pagas (compra pequeña de prueba real) → el bot confirma y
+        te pide nombre y dirección → los mandas → "quedó todo
+        completo" + avisos al 320 (pedido + datos)
+      En vez de pagar, responder "no tengo tarjeta, ¿Nequi?" → el bot
+        cae a pedir nombre y dirección y luego ofrece los métodos
+        manuales (Nequi/Daviplata/Bre-B)
+      Con ciudad "Bogotá" → pide nombre y dirección (2 datos) → métodos
+        con contra entrega → EL BOT CIERRA y aviso de NUEVO PEDIDO
+        (sale con Talla "?" — la confirmas al alistar)
+      No responder los datos en 3-8 min → UN empujón: "¿Seguimos con
+        tu pedido? Solo me falta tu nombre y la dirección"
+      En el paso de DATOS escribir "¿y tienen Nike?" o "mejor la Ref 02"
+        → el bot lo atiende (ya no repite "me faltan los datos")
+      Quedarse callado 3-8 min tras ver una ficha → llega la invitación
+        al catálogo (UNA sola vez)
+
+⚠️ IMPRESCINDIBLE EN EL .env DE LA VM (aprendido el 23-jul):
+      N8N_RUNNERS_ENABLED=false
+  El task runner de n8n NO aguanta la e2-micro de 1 GB: moría por
+  heartbeat y rechazaba tareas ("Offer expired") → el bot quedaba
+  MUDO ~5 minutos. Con el runner apagado responde en segundos.
+
+ROLLBACK (1 paso, por flag):
+  Poner el flag en off en el .env → docker compose up -d --force-recreate n8n
+  Rollback total: importar workflows/respaldo/bot-varman-v6.9.json + Publish.
+
+OJO / LIMITACIONES CONOCIDAS:
+  - Con BOT_MODO_CONVERSA=on el bot conversa/sondea al inicio y CIERRA el
+    pedido él mismo (datos → pago de siempre). NUNCA pregunta la talla:
+    el pedido queda con talla vacía y el equipo la confirma al alistar
+    (aparece como "?" en el aviso al 320 y en la app).
+  - El "rescate a los 3 min" corre en un disparador cada 5 minutos: en la
+    práctica llega entre los 3 y los 8 minutos de silencio.
+  - PAGO-PRIMERO: si el cliente recibió el link y luego cambió a otro
+    método, puede quedar un pedido "pago_pendiente" duplicado del mismo
+    cliente — cancélalo en la app al verificar. El pedido pagado por
+    link llega con talla "?" y datos "(pendientes tras pago)" hasta que
+    el cliente los mande; el bot te avisa al 320 cuando estén completos.
+  - Los descuentos que la IA ofrece NO se descuentan solos del total del
+    pedido clásico (flags off) — en modo conversa no aplica porque cierras
+    tú. No prometas por el bot descuentos que no vas a aplicar.
+  - Los tests offline (node tests/test-offline-v4.js) NO se corrieron en
+    esta máquina porque no tiene Node.js instalado — la sintaxis de todo
+    el código fue validada (8 nodos OK) y tú haces la prueba en vivo.
+    Cuando tengas Node a mano, correr la batería sigue siendo buena idea.
+  - Tu 320 (dueño) NO entra al modo conversa (así puedes probar el flujo
+    clásico y los comandos admin de siempre desde tu número).
+
+Los textos nuevos se editan como siempre en workflows/src/textos.js
+(claves conversa*, faqContraentrega*, cierreConfianzaLinea, silencioReenvio)
+y se regenera el JSON con el build.
+==========================================================
+
+
+
+
+
+
+
+

@@ -21,7 +21,10 @@ const C = {
   card: "#FFFFFF",
   ink: "#101012",
   ink2: "#3A3A3E",
-  muted: "#7E7E85",
+  // Antes #7E7E85: daba 4.03:1 sobre blanco y 3.66:1 sobre el fondo, por
+  // debajo del mínimo legible (4.5:1). Este gris se ve casi igual pero llega a
+  // 5.29:1 y 4.80:1 — se lee con sol, que es donde se usa la app (el local).
+  muted: "#6B6B72",
   line: "#E8E8E5",
   accent: "#FF5A1F",
   accentSoft: "#FFF0E9",
@@ -164,6 +167,14 @@ const cardStyle = (extra = {}) => ({
 
 const fmt = (n) => "$" + (Number(n) || 0).toLocaleString("es-CO");
 
+// Nombre legible de un usuario a partir de su correo ("ana.perez@x.com" → "Ana Perez").
+// Se usa para mostrar quién vendió cada par sin llenar la pantalla de correos.
+const nombreUsuario = (email) => {
+  const base = String(email || "").split("@")[0].replace(/[._-]+/g, " ").trim();
+  if (!base) return "Sin registrar";
+  return base.replace(/\b\w/g, (c) => c.toUpperCase());
+};
+
 // Fecha de HOY en hora LOCAL (Colombia, UTC-5), NO en UTC.
 // Antes se usaba new Date().toISOString() que de noche daba la fecha del día
 // siguiente y registraba las ventas con fecha equivocada.
@@ -171,6 +182,13 @@ const hoyLocal = () => {
   const d = new Date();
   const off = d.getTimezoneOffset();
   return new Date(d.getTime() - off * 60000).toISOString().slice(0, 10);
+};
+
+// "2026-08-12" → "12/08/2026" (como se lee en el local y en los documentos
+// que se le entregan a cada bodega).
+const fechaCorta = (ymd) => {
+  const p = String(ymd || "").split("-");
+  return p.length === 3 ? p[2] + "/" + p[1] + "/" + p[0] : String(ymd || "");
 };
 
 const emptyProduct = () => ({
@@ -282,40 +300,104 @@ const CATS_INGRESO = [
   { id: "otro", label: "Otro ingreso" },
 ];
 
-// Gastos históricos del Excel de cierre de caja (27/05 → 22/06/2026).
-// Ids fijos para que el sembrado a la nube sea idempotente (nunca duplica).
-const GASTOS_INICIALES = [
-  { id: "g-seed-01", fecha: "2026-05-27", desc: "PAGO ARRIENDO BODEGA", monto: 600000, categoria: "arriendo" },
-  { id: "g-seed-02", fecha: "2026-06-01", desc: "PAGO NOMINA MARTIN", monto: 500000, categoria: "nomina" },
-  { id: "g-seed-03", fecha: "2026-06-04", desc: "PAGO CAMPAÑA META", monto: 52346, categoria: "pauta" },
-  { id: "g-seed-04", fecha: "2026-06-05", desc: "PAGO CAMPAÑA META", monto: 66619, categoria: "pauta" },
-  { id: "g-seed-05", fecha: "2026-06-06", desc: "PAGO CAMPAÑA META", monto: 21856, categoria: "pauta" },
-  { id: "g-seed-06", fecha: "2026-06-07", desc: "PAGO CAMPAÑA META", monto: 44627, categoria: "pauta" },
-  { id: "g-seed-07", fecha: "2026-06-09", desc: "PAGO CAMPAÑA META", monto: 120038, categoria: "pauta" },
-  { id: "g-seed-08", fecha: "2026-06-13", desc: "COMPRA ADIDAS MAGMA AZUL", monto: 2160000, categoria: "compra" },
-  { id: "g-seed-09", fecha: "2026-06-13", desc: "COMPRA ADIDAS MAGMA GRIS", monto: 2160000, categoria: "compra" },
-  { id: "g-seed-10", fecha: "2026-06-13", desc: "COMPRA ADIDAS MAGMA NEGRA", monto: 2160000, categoria: "compra" },
-  { id: "g-seed-11", fecha: "2026-06-13", desc: "PAGO CUOTA BANCO", monto: 3000000, categoria: "banco" },
-  { id: "g-seed-12", fecha: "2026-06-16", desc: "PAGO NOMINA MARTIN", monto: 500000, categoria: "nomina" },
-  { id: "g-seed-13", fecha: "2026-06-20", desc: "COMPRA REEBOK CLASSIC CAFE", monto: 1840000, categoria: "compra" },
-  { id: "g-seed-14", fecha: "2026-06-20", desc: "COMPRA REEBOK CLASSIC AZUL", monto: 1760000, categoria: "compra" },
-  { id: "g-seed-15", fecha: "2026-06-20", desc: "COMPRA REEBOK CLASSIC GRIS", monto: 1840000, categoria: "compra" },
-  // Del Excel de COMPRAS del usuario (2026-07-04). Las tres primeras son
-  // anteriores al ancla (22/06): completan el historial pero no mueven el
-  // saldo de hoy. La Jordan 3 (25/06) es POSTERIOR al ancla: sin ella la
-  // caja mostraría $4.560.000 de más.
-  { id: "g-seed-16", fecha: "2026-05-08", desc: "COMPRA ADIDAS BOUNCE AZUL BLANCO", monto: 240000, categoria: "compra" },
-  { id: "g-seed-17", fecha: "2026-05-21", desc: "COMPRA ADIDAS EQT BEIGE VERDE NARANJA", monto: 2040000, categoria: "compra" },
-  { id: "g-seed-18", fecha: "2026-05-21", desc: "COMPRA ADIDAS EQT CAFE AZUL", monto: 2040000, categoria: "compra" },
-  { id: "g-seed-19", fecha: "2026-06-25", desc: "COMPRA JORDAN 3 LEVIS BEIGE", monto: 4560000, categoria: "compra" },
+// ---------- LOCAL BÚNKER (libro APARTE del socio) ----------
+// El socio lleva un local con varias BODEGAS (proveedores) que le dejan
+// mercancía en consignación: él la vende y le debe a cada bodega el VALOR DE
+// COMPRA de lo que se vendió; la diferencia con el precio de venta es la
+// utilidad del local. Los pagos que le hace a cada bodega bajan esa deuda.
+//
+// REGLA DURA: este módulo NO toca inventario, ventas, caja ni pedidos de
+// VarMan Crew. Las ventas de la bodega "VARMAN" en el local ya las descuenta
+// el vendedor en la pestaña Ventas; cruzarlas aquí descontaría el stock DOS
+// veces. Aquí VARMAN es simplemente una bodega más y el módulo dice cuánto
+// le debe el local.
+//
+// SOLO estos correos ven la pestaña. Igual que con la Caja, esconder el botón
+// no protege nada: la protección real son las reglas de Firestore
+// (colecciones bunkerVentas / bunkerProveedores / bunkerPagos / bunkerGastos).
+const SOCIOS_BUNKER = ["andresvargasm91@gmail.com", "c.mancipe.96@gmail.com"];
+
+const BUNKER_KEY = "varman-bunker-v1";
+
+// Colecciones de Firestore (una por tipo de movimiento)
+const BK_COLS = {
+  ventas: "bunkerVentas",
+  proveedores: "bunkerProveedores",
+  pagos: "bunkerPagos",
+  gastos: "bunkerGastos",
+};
+
+// Medios de pago tal como están en el Excel del local. "mixto" no se puede
+// elegir a mano: solo lo produce la importación cuando una fila vieja traía
+// el pago partido entre dos columnas (ahí el detalle queda en `partes`).
+const BK_MEDIOS = [
+  { id: "efectivo", label: "Efectivo" },
+  { id: "bc", label: "BC" },
+  { id: "dv", label: "DV" },
+];
+const bkMedio = (id) => {
+  const m = BK_MEDIOS.filter((x) => x.id === id)[0];
+  return m ? m.label : id === "mixto" ? "Mixto" : "—";
+};
+
+const CATS_GASTO_BK = [
+  { id: "nomina", label: "Nómina" },
+  { id: "arriendo", label: "Arriendo" },
+  { id: "servicios", label: "Servicios" },
+  { id: "cajamenor", label: "Caja menor" },
+  { id: "otro", label: "Otro" },
 ];
 
+// id estable de una bodega a partir del nombre ("Rocío" → "rocio"). Se usa
+// como id del documento para que importar dos veces no duplique proveedores.
+const sinTildes = (s) => String(s == null ? "" : s).normalize("NFD").replace(/[̀-ͯ]/g, "");
+
+// Las tildes se quitan a propósito: "Rocío" y "ROCIO" tienen que caer en el
+// MISMO proveedor, o la deuda quedaría partida en dos bodegas fantasma.
+const bkSlug = (s) =>
+  sinTildes(normTxt(s)).replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "sin-bodega";
+
+// Gastos históricos del Excel de cierre de caja (27/05 → 22/06/2026).
+// [SEGURIDAD 2026-07-21] Vaciado a []: estos gastos ya viven en Firestore
+// (colección `gastos`, protegida por esSocio()). Estaban quemados aquí y este
+// bundle es PÚBLICO (varmanapp.pages.dev/app.jsx), así que exponían nómina,
+// cuota de banco y compras a cualquiera. El sembrado (seedIfEmpty) ya corrió,
+// así que dejarlo vacío no cambia nada en producción; solo el modo local SIN
+// internet quedaría sin los gastos semilla (caso borde: la app siempre usa
+// Firebase). Si algún día hay que re-sembrar, cargar desde un archivo local
+// NO desplegado, no volver a quemarlos aquí.
+const GASTOS_INICIALES = [];
+
 // ---------- Fotos del catálogo ----------
-// Una foto por MODELO + COLOR (se ve igual en todas las tallas de ese modelo).
-// La clave junta modelo y color normalizados para que "Nike  Air" y "nike air"
-// se traten igual.
+// [FOTO-POR-REF 2026-07-30] Una foto por REFERENCIA (se ve igual en todas las
+// tallas de esa referencia). Antes la clave era modelo+color escritos a mano:
+// bastaba con teclear "Puma Ballet Negras" en una talla y "puma ballet negro"
+// en otra para que la app las tratara como dos modelos distintos y las tallas
+// nuevas salieran SIN FOTO en Ventas. La referencia sí es única y estable, así
+// que ahora manda ella.
+//
+// En el inventario cada talla es una fila con su sub-referencia ("VRM051-40"),
+// así que la clave usa la referencia BASE (sin el "-talla"): las 10 tallas de
+// un modelo comparten foto sola.
+//
+// COMPATIBILIDAD (aditivo, no se pierde ninguna foto): las fotos ya asignadas
+// están guardadas con la clave vieja "modelo|color" y se siguen LEYENDO — si
+// una referencia no tiene foto propia, se cae a la clave vieja. Las fotos que
+// se asignen de ahora en adelante se guardan por referencia. Un producto sin
+// referencia escrita (es opcional al crearlo) sigue funcionando como antes.
 const normTxt = (s) => (s || "").toString().toLowerCase().replace(/\s+/g, " ").trim();
 const fotoKey = (modelo, color) => normTxt(modelo) + "|" + normTxt(color);
+// "VRM051-40" / "vrm051 - 40" → "vrm051". Sin referencia → "".
+const refBase = (referencia) => normTxt(referencia).replace(/\s*-\s*\d{1,3}(\.\d)?$/, "").trim();
+const fotoKeyRef = (referencia) => (refBase(referencia) ? "ref:" + refBase(referencia) : "");
+// Clave con la que se GUARDA la foto de un producto (referencia si la tiene).
+const fotoKeyProd = (p) => fotoKeyRef(p && p.referencia) || fotoKey(p && p.modelo, p && p.color);
+// Foto de un producto: primero por referencia, si no la clave vieja.
+const fotoDeProd = (fotos, p) => {
+  if (!fotos || !p) return null;
+  const kr = fotoKeyRef(p.referencia);
+  return (kr && fotos[kr]) || fotos[fotoKey(p.modelo, p.color)] || null;
+};
 
 // Comprime y redimensiona una imagen a un dataURL liviano (JPEG) para que el
 // catálogo no se ponga lento ni se llene el almacenamiento del navegador.
@@ -435,6 +517,184 @@ function downloadCSV(rows, filename) {
   URL.revokeObjectURL(url);
 }
 
+// ---------- Generar un PDF de verdad, sin librerías ----------
+// El documento que se le entrega a la bodega es texto y rayas sobre una hoja
+// CARTA: eso cabe en un PDF armado a mano. Se evita meter una librería de
+// 350 KB al bundle (que además es público y se descarga en cada celular).
+// Fuente Helvetica: es una de las 14 estándar de PDF, no hay que incrustarla.
+
+// Anchos reales de Helvetica (AFM, milésimas de em). Sirven para alinear los
+// números a la derecha y para cortar las descripciones largas SIN que se monten
+// encima de la siguiente columna.
+const HELV_W = {
+  " ": 278, "!": 278, '"': 355, "#": 556, $: 556, "%": 889, "&": 667, "'": 191, "(": 333, ")": 333,
+  "*": 389, "+": 584, ",": 278, "-": 333, ".": 278, "/": 278, ":": 278, ";": 278, "<": 584, "=": 584,
+  ">": 584, "?": 556, "@": 1015, "[": 278, "\\": 278, "]": 278, "^": 469, _: 556, "`": 333,
+  "{": 334, "|": 260, "}": 334, "~": 584,
+  A: 667, B: 667, C: 722, D: 722, E: 667, F: 611, G: 778, H: 722, I: 278, J: 500, K: 667, L: 556,
+  M: 833, N: 722, O: 778, P: 667, Q: 778, R: 722, S: 667, T: 611, U: 722, V: 667, W: 944, X: 667,
+  Y: 667, Z: 611,
+  a: 556, b: 556, c: 500, d: 556, e: 556, f: 278, g: 556, h: 556, i: 222, j: 222, k: 500, l: 222,
+  m: 833, n: 556, o: 556, p: 556, q: 556, r: 333, s: 500, t: 278, u: 556, v: 500, w: 722, x: 500,
+  y: 500, z: 500,
+};
+const anchoPDF = (txt, tam, negrita) => {
+  let w = 0;
+  for (const c of String(txt || "")) {
+    const d = /[0-9]/.test(c) ? 556 : HELV_W[c] != null ? HELV_W[c] : 556;
+    w += d;
+  }
+  // La negrita de Helvetica es ~6% más ancha; alcanza con el factor.
+  return (w / 1000) * tam * (negrita ? 1.06 : 1);
+};
+const cortarPDF = (txt, tam, maxAncho) => {
+  let s = String(txt || "");
+  if (anchoPDF(s, tam) <= maxAncho) return s;
+  while (s.length > 1 && anchoPDF(s + "…", tam) > maxAncho) s = s.slice(0, -1);
+  return s + "…";
+};
+
+// Texto → bytes WinAnsi (latin-1). Las tildes y la ñ entran; lo que no exista
+// se reemplaza para que no salga un carácter raro en la hoja.
+const textoPDF = (t) =>
+  String(t == null ? "" : t)
+    .replace(/[‘’]/g, "'").replace(/[“”]/g, '"')
+    .replace(/[–—]/g, "-").replace(/…/g, "...")
+    .replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)")
+    .split("").map((c) => (c.charCodeAt(0) > 255 ? "?" : c)).join("");
+
+// Arma el PDF (una o varias hojas carta) y lo descarga.
+// doc = { archivo, titulo, sub, derecha:[], columnas:[{txt,x,al,ancho}],
+//         filas:[[celdas]], total:{izq,der}, firmas:[a,b], pie }
+function descargarPDF(doc) {
+  const PW = 612, PH = 792, ML = 40, MT = 46, MB = 56; // carta en puntos
+  const ANCHO = PW - ML * 2;
+  const FILA = 15, TAM = 9.5, TAM_TH = 8;
+
+  const partes = [];
+  const T = (x, y, txt, tam, negrita) =>
+    partes.push("BT /" + (negrita ? "F2" : "F1") + " " + tam + " Tf " + x.toFixed(1) + " " + (PH - y).toFixed(1) + " Td (" + textoPDF(txt) + ") Tj ET");
+  const TD = (xDer, y, txt, tam, negrita) => T(xDer - anchoPDF(txt, tam, negrita), y, txt, tam, negrita);
+  const TC = (xCen, y, txt, tam, negrita) => T(xCen - anchoPDF(txt, tam, negrita) / 2, y, txt, tam, negrita);
+  const linea = (y, grosor, gris) =>
+    partes.push((gris || 0).toFixed(2) + " G " + grosor + " w " + ML + " " + (PH - y).toFixed(1) + " m " + (PW - ML) + " " + (PH - y).toFixed(1) + " l S");
+
+  // ---- Paginar ----
+  const altoCab = 74;        // título + subtítulo + raya
+  const altoTh = 16;
+  const altoCierre = 96;     // total + firmas + pie
+  const utilPrimera = PH - MT - altoCab - altoTh - MB;
+  const utilResto = PH - MT - altoTh - MB;
+  const paginas = [];
+  let resto = doc.filas.slice();
+  let primera = true;
+  while (resto.length || !paginas.length) {
+    const disponible = primera ? utilPrimera : utilResto;
+    let caben = Math.max(1, Math.floor(disponible / FILA));
+    // Si lo que queda cabe justo con el bloque de cierre, se deja todo aquí
+    if (resto.length <= Math.floor((disponible - altoCierre) / FILA)) caben = resto.length;
+    paginas.push({ filas: resto.slice(0, caben), primera });
+    resto = resto.slice(caben);
+    primera = false;
+    if (!resto.length) break;
+  }
+
+  const streams = paginas.map((pag, iPag) => {
+    partes.length = 0;
+    let y = MT;
+    if (pag.primera) {
+      T(ML, y + 14, doc.titulo, 17, true);
+      T(ML, y + 28, doc.sub, 9);
+      (doc.derecha || []).forEach((t, i) => TD(PW - ML, y + 4 + i * 11, t, 8.5));
+      y += 40;
+      linea(y, 2.2, 0.07);
+      y += 18;
+    }
+    // Cabecera de la tabla (se repite en TODAS las hojas)
+    doc.columnas.forEach((c) => {
+      if (c.al === "d") TD(c.x, y, c.txt, TAM_TH, true);
+      else if (c.al === "c") TC(c.x, y, c.txt, TAM_TH, true);
+      else T(c.x, y, c.txt, TAM_TH, true);
+    });
+    y += 5;
+    linea(y, 1.2, 0.07);
+    y += FILA - 4;
+
+    pag.filas.forEach((f) => {
+      doc.columnas.forEach((c, i) => {
+        const v = f[i] == null ? "" : String(f[i]);
+        if (c.al === "d") TD(c.x, y, v, TAM);
+        else if (c.al === "c") TC(c.x, y, v, TAM);
+        else T(c.x, y, cortarPDF(v, TAM, c.ancho || ANCHO), TAM);
+      });
+      y += 3;
+      linea(y, 0.5, 0.87);
+      y += FILA - 3;
+    });
+
+    if (iPag === paginas.length - 1) {
+      y += 8;
+      linea(y, 2.2, 0.07);
+      y += 20;
+      T(ML, y, doc.total.izq, 10);
+      TD(PW - ML, y + 2, doc.total.der, 16, true);
+      // Firmas
+      const yF = y + 76;
+      const mitad = ML + ANCHO / 2 - 14;
+      partes.push("0.07 G 0.8 w " + ML + " " + (PH - yF) + " m " + mitad + " " + (PH - yF) + " l S");
+      partes.push("0.07 G 0.8 w " + (mitad + 28) + " " + (PH - yF) + " m " + (PW - ML) + " " + (PH - yF) + " l S");
+      T(ML, yF + 11, doc.firmas[0], 8.5);
+      T(mitad + 28, yF + 11, doc.firmas[1], 8.5);
+      T(ML, yF + 30, doc.pie, 8);
+    }
+    // Pie de página
+    TD(PW - ML, PH - MB + 26, "Hoja " + (iPag + 1) + " de " + paginas.length, 8);
+    return partes.join("\n");
+  });
+
+  // ---- Ensamblar el archivo ----
+  const objs = [];
+  const nPag = streams.length;
+  const idPag = (i) => 4 + i;                 // objetos de página
+  const idStream = (i) => 4 + nPag + i;       // contenidos
+  objs[1] = "<< /Type /Catalog /Pages 2 0 R >>";
+  objs[2] = "<< /Type /Pages /Kids [" + streams.map((_, i) => idPag(i) + " 0 R").join(" ") + "] /Count " + nPag + " >>";
+  objs[3] = "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>";
+  const idBold = 4 + nPag * 2;
+  objs[idBold] = "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>";
+  streams.forEach((s, i) => {
+    objs[idPag(i)] = "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 " + PW + " " + PH + "] " +
+      "/Resources << /Font << /F1 3 0 R /F2 " + idBold + " 0 R >> >> /Contents " + idStream(i) + " 0 R >>";
+    objs[idStream(i)] = "<< /Length " + s.length + " >>\nstream\n" + s + "\nendstream";
+  });
+
+  let pdf = "%PDF-1.4\n";
+  const offsets = [];
+  for (let i = 1; i < objs.length; i++) {
+    if (!objs[i]) continue;
+    offsets[i] = pdf.length;
+    pdf += i + " 0 obj\n" + objs[i] + "\nendobj\n";
+  }
+  const inicioXref = pdf.length;
+  const maxObj = objs.length;
+  pdf += "xref\n0 " + maxObj + "\n0000000000 65535 f \n";
+  for (let i = 1; i < maxObj; i++) {
+    pdf += (offsets[i] != null ? String(offsets[i]).padStart(10, "0") + " 00000 n \n" : "0000000000 65535 f \n");
+  }
+  pdf += "trailer\n<< /Size " + maxObj + " /Root 1 0 R >>\nstartxref\n" + inicioXref + "\n%%EOF";
+
+  const bytes = new Uint8Array(pdf.length);
+  for (let i = 0; i < pdf.length; i++) bytes[i] = pdf.charCodeAt(i) & 0xff;
+  const url = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = doc.archivo;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+
 // Intenta leer un JSON aunque venga con texto/backticks alrededor
 function safeParseJSON(text) {
   if (!text) return null;
@@ -501,6 +761,15 @@ function VarmanApp() {
   const [lowOnly, setLowOnly] = useState(false); // ver solo tallas por agotarse
   const [fotos, setFotos] = useState({}); // { "modelo|color": dataURL }
   const [gastos, setGastos] = useState([]); // caja de los socios (gastos + compras)
+  // Local Búnker (libro aparte, ver SOCIOS_BUNKER). Cuatro listas planas.
+  const [bkVentas, setBkVentas] = useState([]);
+  const [bkProveedores, setBkProveedores] = useState([]);
+  const [bkPagos, setBkPagos] = useState([]);
+  const [bkGastos, setBkGastos] = useState([]);
+  // Por qué el Búnker no trae datos. Sin esto, que Firestore rechace la lectura
+  // se ve EXACTAMENTE igual que "todavía no hay nada" (el no-op silencioso):
+  // la pantalla queda en ceros y no dice cuál de las dos cosas pasó.
+  const [bkError, setBkError] = useState("");
   const [pedidos, setPedidos] = useState([]); // pedidos que crea el bot de WhatsApp
   // Pedidos ocultados por un socio (de prueba, duplicados…): vive aquí (y no
   // solo dentro de la pestaña Pedidos) para que el contador "N nuevos" de la
@@ -538,6 +807,27 @@ function VarmanApp() {
   // La pestaña Caja solo existe para los socios (correos en SOCIOS_CAJA).
   // Sin Firebase (modo local de prueba) se muestra para poder revisarla.
   const esSocio = !auth || !!(user && SOCIOS_CAJA.indexOf((user.email || "").toLowerCase()) !== -1);
+
+  // La pestaña Búnker (el local del socio) solo existe para SOCIOS_BUNKER.
+  // Sin Firebase (modo local de prueba) se muestra para poder revisarla.
+  const esBunker = !auth || !!(user && SOCIOS_BUNKER.indexOf((user.email || "").toLowerCase()) !== -1);
+
+  // Con 7 pestañas la barra de abajo ya no cabe en un celular de 375px y se
+  // desliza. Sin esto, la pestaña activa puede quedar FUERA de la pantalla
+  // (le pasó al dueño con Búnker: existía y no se veía por ningún lado).
+  // Al cambiar de pestaña, la barra se centra en la activa.
+  const navRef = useRef(null);
+  useEffect(() => {
+    const n = navRef.current;
+    if (!n || n.scrollWidth <= n.clientWidth) return;
+    const activo = n.querySelector('[data-activo="1"]');
+    if (!activo) return;
+    // Instantáneo A PROPÓSITO, no `behavior:"smooth"`: el scroll suave no corre
+    // en pestañas ocultas ni en segundo plano, y ahí la pestaña activa se
+    // quedaría fuera de pantalla — que es justo el problema que esto arregla.
+    // Además el usuario acaba de tocar el botón: no necesita ver el deslizado.
+    n.scrollLeft = activo.offsetLeft - (n.clientWidth - activo.offsetWidth) / 2;
+  }, [tab]);
 
   // ---------- Instalar la app en el celular (PWA) ----------
   const [installEvt, setInstallEvt] = useState(null);
@@ -597,6 +887,13 @@ function VarmanApp() {
         @keyframes vmRise { from { opacity:0; transform: translateY(12px);} to { opacity:1; transform:none;} }
         @keyframes vmHalo { 0% { opacity:.55; transform: scale(.6);} 70%,100% { opacity:0; transform: scale(2.6);} }
         .vm-fade { animation: vmFadeUp .3s ease both; }
+        /* Tarjetas que se pueden tocar: hunden un pelo al presionar, como un
+           botón, para que se note que abren algo. Sin mover el layout. */
+        .vm-press { transition: transform .16s cubic-bezier(.22,1,.36,1), box-shadow .16s ease; }
+        .vm-press:active { transform: scale(.985); }
+        .vm-press:focus-visible { outline: 2px solid ${C.ink}; outline-offset: 2px; }
+        /* La barra de pestañas se desliza de lado si no caben (7 con Búnker) */
+        .vm-nav::-webkit-scrollbar { display: none; }
         @media (prefers-reduced-motion: reduce) { *, .vm-fade { animation: none !important; transition: none !important; } }
       `;
       document.head.appendChild(s);
@@ -607,6 +904,7 @@ function VarmanApp() {
     // Con login activo, esperar a tener sesión antes de cargar/sincronizar
     if (auth && !user) return;
     let unsubP, unsubS, unsubM, unsubF, unsubG, unsubPed, unsubOcultos, localData = null;
+    let unsubBk = []; // suscripciones del Local Búnker (una por colección)
     (async () => {
       // 1) Cache local: muestra algo al instante y sirve de respaldo offline
       try {
@@ -625,6 +923,22 @@ function VarmanApp() {
         if (f) setFotos(f);
       } catch (e) {
         /* sin fotos aún */
+      }
+
+      // Local Búnker: respaldo local (para verlo sin internet en el local)
+      if (esBunker) {
+        try {
+          const rawB = await store.get(BUNKER_KEY);
+          if (rawB) {
+            const b = JSON.parse(rawB) || {};
+            setBkVentas(b.ventas || []);
+            setBkProveedores(b.proveedores || []);
+            setBkPagos(b.pagos || []);
+            setBkGastos(b.gastos || []);
+          }
+        } catch (e) {
+          /* primera vez: sin datos del local */
+        }
       }
 
       // Caja: los gastos solo se cargan en los dispositivos de los socios
@@ -687,6 +1001,25 @@ function VarmanApp() {
         }, (err) => console.warn("Firestore gastos:", err && err.message));
       }
 
+      // Local Búnker: SOLO los correos de SOCIOS_BUNKER se suscriben (las
+      // reglas de Firestore rechazan a cualquier otro de todas formas).
+      // A diferencia de las demás listas, aquí SÍ se acepta el snapshot vacío:
+      // borrar la última venta tiene que dejar la lista vacía, no congelarla.
+      if (esBunker) {
+        const setters = { ventas: setBkVentas, proveedores: setBkProveedores, pagos: setBkPagos, gastos: setBkGastos };
+        Object.keys(BK_COLS).forEach((que) => {
+          unsubBk.push(
+            colRef(BK_COLS[que]).onSnapshot(
+              (snap) => { setters[que](snap.docs.map((d) => d.data())); setBkError(""); },
+              (err) => {
+                console.warn("Firestore " + BK_COLS[que] + ":", err && err.message);
+                setBkError((err && err.code) || "error");
+              }
+            )
+          );
+        });
+      }
+
       // Pedidos del bot de WhatsApp: los ven socios Y vendedor (a diferencia
       // de la Caja). El bot los crea con id automático de Firestore, por eso
       // el id del documento viaja aparte en "_id".
@@ -734,7 +1067,7 @@ function VarmanApp() {
         } catch (e) { console.warn("Error subiendo datos iniciales:", e && e.message); }
       })();
     })();
-    return () => { unsubP && unsubP(); unsubS && unsubS(); unsubM && unsubM(); unsubF && unsubF(); unsubG && unsubG(); unsubPed && unsubPed(); unsubOcultos && unsubOcultos(); };
+    return () => { unsubP && unsubP(); unsubS && unsubS(); unsubM && unsubM(); unsubF && unsubF(); unsubG && unsubG(); unsubPed && unsubPed(); unsubOcultos && unsubOcultos(); unsubBk.forEach((u) => u && u()); };
   }, [user]);
 
   // Asignar / quitar foto a un grupo modelo+color.
@@ -799,6 +1132,49 @@ function VarmanApp() {
         auto: !!g.auto,
       },
     ]);
+  };
+
+  // ---------- Local Búnker: guardar ----------
+  // Una sola puerta para las cuatro listas (ventas, proveedores, pagos,
+  // gastos). Guarda en este dispositivo y sube a la nube SOLO lo que cambió.
+  const bkListas = { ventas: bkVentas, proveedores: bkProveedores, pagos: bkPagos, gastos: bkGastos };
+  const bkSetters = { ventas: setBkVentas, proveedores: setBkProveedores, pagos: setBkPagos, gastos: setBkGastos };
+
+  const persistBunker = (que, next) => {
+    const prev = bkListas[que] || [];
+    bkSetters[que](next);
+    const snap = { ...bkListas, [que]: next };
+    store.set(BUNKER_KEY, JSON.stringify(snap));
+    if (fbReady()) fbSyncList(BK_COLS[que], prev, next);
+  };
+
+  // Importación del histórico del Excel. Va por LOTES (batch) y no por
+  // fbSyncList porque son cientos de filas: 714 escrituras sueltas ahogan la
+  // conexión del celular. Es idempotente: el id de cada venta lo arma la
+  // propia fila (fecha + número de línea de ese día), así que volver a
+  // importar el mismo archivo pisa los mismos documentos y NO duplica.
+  const importarBunker = async (ventasNuevas, proveedoresNuevos) => {
+    if (!fbReady()) {
+      showToast("Sin conexión con la nube: la importación necesita internet.", true);
+      return false;
+    }
+    try {
+      const todos = [
+        ...proveedoresNuevos.map((p) => ({ col: BK_COLS.proveedores, doc: p })),
+        ...ventasNuevas.map((v) => ({ col: BK_COLS.ventas, doc: v })),
+      ];
+      // Firestore acepta máximo 500 operaciones por lote; se usan 400 por si acaso.
+      for (let i = 0; i < todos.length; i += 400) {
+        const lote = db.batch();
+        todos.slice(i, i + 400).forEach((x) => lote.set(colRef(x.col).doc(String(x.doc.id)), x.doc));
+        await lote.commit();
+      }
+      return true;
+    } catch (e) {
+      console.warn("Error importando el histórico del local:", e && e.message);
+      showToast("No se pudo importar: " + (e && e.message ? e.message : "error desconocido"), true);
+      return false;
+    }
   };
 
   // Actualiza un pedido del bot. La app SOLO escribe estado/notas (+ fecha de
@@ -933,8 +1309,10 @@ function VarmanApp() {
       </header>
 
       {/* ---------- Panel del día (firma visual) ---------- */}
-      {/* En la pestaña Caja se oculta: allí el protagonista es el saldo en caja */}
-      {tab !== "caja" && (
+      {/* Se oculta en Caja (allí el protagonista es el saldo) y en Búnker: ahí
+          las ventas de HOY y el stock son de OTRO negocio (VarMan Crew), así
+          que arriba de las cuentas del local solo estorban y confunden. */}
+      {tab !== "caja" && tab !== "bunker" && (
       <div style={{ padding: "14px 16px 0" }}>
         <div
           className="vm-fade"
@@ -991,6 +1369,8 @@ function VarmanApp() {
               asignarFoto={asignarFoto}
               quitarFoto={quitarFoto}
               registrarCompra={esSocio ? addGasto : null}
+              esSocio={esSocio}
+              userEmail={user ? user.email || "" : ""}
             />
           )}
           {(tab === "ventas" || tab === "ventas-nueva") && (
@@ -1015,14 +1395,33 @@ function VarmanApp() {
           {tab === "caja" && esSocio && (
             <Caja sales={ventasValidas} gastos={gastos} persistGastos={persistGastos} addGasto={addGasto} showToast={showToast} />
           )}
+          {tab === "bunker" && esBunker && (
+            <Bunker
+              ventas={bkVentas}
+              proveedores={bkProveedores}
+              pagos={bkPagos}
+              gastos={bkGastos}
+              persistBunker={persistBunker}
+              importarBunker={importarBunker}
+              showToast={showToast}
+              userEmail={user ? user.email || "" : ""}
+              error={bkError}
+            />
+          )}
         </>
       )}
 
       {/* ---------- Navegación flotante ---------- */}
       <nav
+        className="vm-nav"
+        ref={navRef}
         style={{
           position: "fixed", bottom: 16, left: "50%", transform: "translateX(-50%)",
           display: "flex", gap: esSocio ? 6 : 8, zIndex: 50,
+          // Con la pestaña Búnker son 7 botones y en un celular de 375px ya no
+          // caben: la barra se puede deslizar de lado en vez de desbordarse.
+          maxWidth: "calc(100vw - 16px)", overflowX: "auto", overflowY: "hidden",
+          padding: "3px 4px", scrollbarWidth: "none",
         }}
       >
         {/* Con la pestaña Pedidos los botones se compactan un poco para que
@@ -1034,6 +1433,7 @@ function VarmanApp() {
           { id: "stats", label: "Stats", icon: IconStats },
           { id: "tienda", label: "Tienda", icon: IconStore },
           ...(esSocio ? [{ id: "caja", label: "Caja", icon: IconCash }] : []),
+          ...(esBunker ? [{ id: "bunker", label: "Búnker", icon: IconBunker }] : []),
         ].map((t) => {
           const active = tab === t.id;
           const Icon = t.icon;
@@ -1043,12 +1443,13 @@ function VarmanApp() {
               key={t.id}
               onClick={() => { setLowOnly(false); setTab(t.id); }}
               aria-label={t.label + (t.badge ? " (" + t.badge + " nuevos)" : "")}
+              data-activo={active ? "1" : "0"}
               style={{
                 display: "flex", alignItems: "center", gap: 7,
                 background: active ? C.accent : C.ink,
                 color: "#fff", border: "none", cursor: "pointer",
                 borderRadius: 999, height: lado, padding: active ? (esSocio ? "0 12px" : "0 16px") : 0,
-                width: active ? "auto" : lado, justifyContent: "center",
+                width: active ? "auto" : lado, justifyContent: "center", flexShrink: 0,
                 fontFamily: "Inter, sans-serif", fontWeight: 700, fontSize: 13,
                 position: "relative",
                 boxShadow: active
@@ -1116,7 +1517,7 @@ function MiniStat({ label, value, warn, onClick }) {
 // ============================================================
 // Inventario
 // ============================================================
-function Inventario({ products, sales, persist, showToast, valorCosto, lowOnly, setLowOnly, fotos, asignarFoto, quitarFoto, registrarCompra }) {
+function Inventario({ products, sales, persist, showToast, valorCosto, lowOnly, setLowOnly, fotos, asignarFoto, quitarFoto, registrarCompra, esSocio = false, userEmail = "" }) {
   const [q, setQ] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [showFotos, setShowFotos] = useState(false);
@@ -1126,6 +1527,8 @@ function Inventario({ products, sales, persist, showToast, valorCosto, lowOnly, 
   const [editingId, setEditingId] = useState(null);
   const [confirmId, setConfirmId] = useState(null);
   const [actionProduct, setActionProduct] = useState(null); // producto tocado (menú editar/eliminar)
+  // [INV-POR-MODELO 2026-07-30] Referencia abierta en la ficha (clave del grupo).
+  const [verGrupo, setVerGrupo] = useState(null);
   const confirmTimer = useRef(null);
 
   // Abrir el formulario para EDITAR un producto ya existente (mismo form que al crear)
@@ -1150,12 +1553,70 @@ function Inventario({ products, sales, persist, showToast, valorCosto, lowOnly, 
     if (lowOnly) setQ("");
   }, [lowOnly]);
 
-  const filtered = products
-    .filter((p) =>
-      (p.referencia + " " + p.modelo + " " + p.color + " " + p.talla).toLowerCase().includes(q.toLowerCase())
-    )
-    .filter((p) => !lowOnly || (Number(p.stock) || 0) <= 2)
-    .sort((a, b) => (lowOnly ? (Number(a.stock) || 0) - (Number(b.stock) || 0) : 0));
+  const busqueda = products.filter((p) =>
+    (p.referencia + " " + p.modelo + " " + p.color + " " + p.talla).toLowerCase().includes(q.toLowerCase())
+  );
+
+  // [INV-POR-MODELO 2026-07-30] El inventario se ve por MODELO, no por talla.
+  // Antes un modelo con 10 tallas ocupaba 10 tarjetas iguales y había que
+  // desplazarse un minuto para saber qué quedaba de él. Ahora es una tarjeta
+  // por referencia con las tallas dentro; el dato "cuántas tallas me quedan"
+  // se lee sin abrir nada.
+  //
+  // Se agrupa por la REFERENCIA base ("VRM051-40" → "VRM051"), que es lo único
+  // estable. Los productos viejos sin referencia caen a modelo+color, como antes.
+  const claveGrupo = (p) => refBase(p.referencia) || fotoKey(p.modelo, p.color);
+  const grupos = (() => {
+    const orden = [];
+    const porClave = {};
+    // OJO: se agrupa con TODAS las tallas del modelo y el filtro "por agotarse"
+    // se aplica al final, sobre el grupo. Si se filtrara antes, la tarjeta diría
+    // "2 pares · 1 talla" contando solo las tallas bajas: un total falso.
+    busqueda.forEach((p) => {
+      const clave = claveGrupo(p);
+      if (!porClave[clave]) {
+        porClave[clave] = {
+          clave,
+          ref: (p.referencia || "").replace(/\s*-\s*\d{1,3}(\.\d)?$/, "").trim(),
+          modelo: p.modelo || "",
+          color: p.color || "",
+          precio: p.precio,
+          costo: p.costo,
+          tallas: [],
+          pares: 0,
+        };
+        orden.push(porClave[clave]);
+      }
+      const g = porClave[clave];
+      g.tallas.push(p);
+      g.pares += Number(p.stock) || 0;
+      // El precio del grupo es el de la primera talla que tenga uno puesto
+      if (!Number(g.precio) && Number(p.precio)) { g.precio = p.precio; g.costo = p.costo; }
+    });
+    orden.forEach((g) => {
+      g.tallas.sort((a, b) => (Number(a.talla) || 0) - (Number(b.talla) || 0));
+      g.conStock = g.tallas.filter((t) => (Number(t.stock) || 0) > 0).length;
+      g.foto = fotoDeProd(fotos, g.tallas[0]);
+      // Para el filtro "por agotarse": el modelo entra si ALGUNA talla está baja
+      g.bajas = g.tallas.filter((t) => (Number(t.stock) || 0) <= 2).length;
+    });
+    return lowOnly
+      ? orden.filter((g) => g.bajas > 0).sort((a, b) => b.bajas - a.bajas)
+      : orden;
+  })();
+  const grupoAbierto = verGrupo ? grupos.find((g) => g.clave === verGrupo) : null;
+
+  // Ventas de un modelo (para la ficha). Se cruza por productoId cuando la venta
+  // lo trae; las ventas viejas no lo tienen, así que se cae al nombre del modelo.
+  const ventasDeGrupo = (g) => {
+    if (!g) return [];
+    const ids = new Set(g.tallas.map((t) => t.id));
+    const modeloNorm = normTxt(g.modelo);
+    return sales
+      .filter((s) => !s.anulada)
+      .filter((s) => (s.productoId ? ids.has(s.productoId) : normTxt(s.modelo) === modeloNorm))
+      .sort((a, b) => String(b.fecha || "").localeCompare(String(a.fecha || "")));
+  };
 
   const adjustStock = (id, delta) => {
     persist(
@@ -1278,9 +1739,16 @@ function Inventario({ products, sales, persist, showToast, valorCosto, lowOnly, 
       showToast("No hay productos para exportar.", true);
       return;
     }
+    // Sigue saliendo una fila por talla (es lo que sirve para contar bodega),
+    // pero con la referencia del MODELO adelante: así en Excel se puede agrupar
+    // por modelo igual que se ve ahora en la app.
     const rows = [
-      ["Referencia", "Modelo", "Color", "Talla", "Stock", "Costo", "Precio"],
-      ...products.map((p) => [p.referencia, p.modelo, p.color, p.talla, p.stock, p.costo, p.precio]),
+      ["Ref. del modelo", "Referencia", "Modelo", "Color", "Talla", "Stock", "Costo", "Precio", "Valor a costo"],
+      ...products.map((p) => [
+        (p.referencia || "").replace(/\s*-\s*\d{1,3}(\.\d)?$/, "").trim(),
+        p.referencia, p.modelo, p.color, p.talla, p.stock, p.costo, p.precio,
+        (Number(p.stock) || 0) * (Number(p.costo) || 0),
+      ]),
     ];
     downloadCSV(rows, "varman-inventario-" + hoyLocal() + ".csv");
     showToast("Inventario exportado ✓");
@@ -1311,7 +1779,9 @@ function Inventario({ products, sales, persist, showToast, valorCosto, lowOnly, 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, padding: "0 4px", flexWrap: "wrap", gap: 8 }}>
         <div>
           <div style={display(19)}>{lowOnly ? "Por agotarse" : "Inventario"}</div>
-          <div style={{ fontSize: 12, color: C.muted, fontWeight: 600, marginTop: 2 }}>Valor a costo: {fmt(valorCosto)}</div>
+          <div style={{ fontSize: 12, color: C.muted, fontWeight: 600, marginTop: 2 }}>
+            {grupos.length} referencia{grupos.length === 1 ? "" : "s"} · valor a costo {fmt(valorCosto)}
+          </div>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           <button onClick={() => setShowFotos(true)} style={btnGhost({ padding: "8px 12px", borderRadius: 11, fontSize: 12 })}>
@@ -1341,7 +1811,7 @@ function Inventario({ products, sales, persist, showToast, valorCosto, lowOnly, 
         </button>
       </div>
 
-      {filtered.length === 0 && (
+      {grupos.length === 0 && (
         <EmptyState
           icon={<IconBox big />}
           title={products.length === 0 ? "Tu bodega está vacía" : "Sin resultados"}
@@ -1351,100 +1821,78 @@ function Inventario({ products, sales, persist, showToast, valorCosto, lowOnly, 
         />
       )}
 
-      {filtered.map((p) => {
-        const m = margen(p);
-        const foto = fotos[fotoKey(p.modelo, p.color)];
-        const stockN = Number(p.stock) || 0;
-        const low = stockN <= 1;          // rojo: agotado o último par
-        const lowWarn = stockN === 2;     // naranja: por agotarse
-        const confirming = confirmId === p.id;
+      {/* [INV-POR-MODELO] Una tarjeta por REFERENCIA. Las tallas van dentro como
+          chips con su stock: se ve de un vistazo qué queda sin abrir nada. */}
+      {grupos.map((g) => {
+        const agotado = g.pares === 0;
         return (
           <div
-            key={p.id}
-            onClick={() => { setConfirmId(null); setActionProduct(p); }}
-            style={cardStyle({ padding: 14, marginBottom: 10, cursor: "pointer" })}
+            key={g.clave}
+            className="vm-press"
+            role="button"
+            tabIndex={0}
+            aria-label={`${g.modelo || "Modelo"}${g.color ? " " + g.color : ""}, ${g.pares} pares, ${g.conStock} tallas disponibles`}
+            onClick={() => { setConfirmId(null); setVerGrupo(g.clave); }}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setVerGrupo(g.clave); } }}
+            style={cardStyle({ padding: 13, marginBottom: 10, cursor: "pointer", opacity: agotado ? 0.72 : 1 })}
           >
-            <div style={{ display: "flex", gap: 12 }}>
-              {/* Foto del modelo (si tiene) con la talla encima; si no, medallón */}
-              {foto ? (
-                <div
-                  onClick={(e) => { e.stopPropagation(); setShowFotos(true); }}
-                  title="Ver/cambiar fotos del catálogo"
-                  style={{
-                    width: 52, height: 52, borderRadius: 14, flexShrink: 0, position: "relative",
-                    overflow: "hidden", cursor: "pointer", background: C.bg,
-                    border: low ? `1.5px solid ${C.red}` : `1px solid ${C.line}`,
-                  }}
-                >
-                  <img src={foto} alt={p.modelo} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-                  <span
-                    style={{
-                      position: "absolute", left: 0, bottom: 0, right: 0,
-                      background: low ? "rgba(215,50,15,.9)" : "rgba(16,16,18,.72)", color: "#fff",
-                      fontSize: 11, fontWeight: 800, textAlign: "center", lineHeight: "15px",
-                    }}
-                  >
-                    {p.talla}
-                  </span>
-                </div>
-              ) : (
-                <div
-                  onClick={(e) => { e.stopPropagation(); setShowFotos(true); }}
-                  title="Agregar foto a este modelo"
-                  style={{
-                    width: 52, height: 52, borderRadius: 14, flexShrink: 0, cursor: "pointer",
-                    background: low ? C.redSoft : C.bg,
-                    display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-                  }}
-                >
-                  <span style={{ fontSize: 8.5, fontWeight: 700, letterSpacing: "0.1em", color: low ? C.red : C.muted }}>{p.talla ? "TALLA" : "REF"}</span>
-                  <span style={display(p.talla ? 19 : 15, low ? C.red : C.ink)}>{p.talla || ((p.referencia || "").replace(/^[^0-9]+/, "") || "—")}</span>
-                </div>
-              )}
+            <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+              <div
+                style={{
+                  width: 62, height: 62, borderRadius: 15, flexShrink: 0, overflow: "hidden",
+                  background: C.bg, border: `1px solid ${C.line}`,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}
+              >
+                {g.foto
+                  ? <img src={g.foto} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                  : <span style={{ ...eyebrow(C.muted), fontSize: 9 }}>SIN FOTO</span>}
+              </div>
 
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-                  <div style={{ fontWeight: 800, fontSize: 15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {p.modelo}
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "baseline" }}>
+                  <div style={{ fontWeight: 800, fontSize: 15, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {g.modelo || "(sin modelo)"}
                   </div>
-                  <div style={{ fontWeight: 800, fontSize: 15, flexShrink: 0 }}>{fmt(p.precio)}</div>
+                  <div style={{ fontWeight: 800, fontSize: 15, flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>{fmt(g.precio)}</div>
                 </div>
-                <div style={{ fontSize: 12, color: C.muted, marginTop: 2, display: "flex", justifyContent: "space-between" }}>
-                  <span>
-                    {p.color && <>{p.color} · </>}
-                    {p.referencia && <>Ref {p.referencia}</>}
-                  </span>
-                  <span>
-                    costo {fmt(p.costo)}
-                    {m !== null && (
-                      <span style={{ marginLeft: 6, background: C.greenSoft, color: C.green, fontWeight: 700, fontSize: 11, padding: "2px 7px", borderRadius: 99 }}>
-                        {m}%
-                      </span>
-                    )}
-                  </span>
+                <div style={{ fontSize: 12, color: C.ink2, marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {g.color ? g.color + " · " : ""}{g.ref ? "Ref " + g.ref : "sin referencia"}
                 </div>
-
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 10 }}>
-                  <div style={{ display: "flex", alignItems: "center", background: C.bg, borderRadius: 12, padding: "8px 14px" }}>
-                    <span style={{ ...display(16, low ? C.red : C.ink), textAlign: "center" }}>
-                      {p.stock}
-                      <span style={{ fontSize: 9, fontWeight: 700, color: C.muted, marginLeft: 3, letterSpacing: "0.06em" }}>PARES</span>
-                    </span>
-                  </div>
-                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                    {low && (
-                      <span style={{ fontSize: 10, background: C.red, color: "#fff", padding: "3px 9px", borderRadius: 99, fontWeight: 800, letterSpacing: "0.04em" }}>
-                        {stockN === 0 ? "AGOTADO" : "ÚLTIMO PAR"}
-                      </span>
-                    )}
-                    {lowWarn && (
-                      <span style={{ fontSize: 10, background: C.accent, color: "#fff", padding: "3px 9px", borderRadius: 99, fontWeight: 800, letterSpacing: "0.04em" }}>
-                        POR AGOTARSE
-                      </span>
-                    )}
-                  </div>
+                <div style={{ fontSize: 12, color: agotado ? C.red : C.ink2, fontWeight: 700, marginTop: 3, fontVariantNumeric: "tabular-nums" }}>
+                  {agotado
+                    ? "Agotado en todas las tallas"
+                    : `${g.pares} par${g.pares === 1 ? "" : "es"} · ${g.conStock} talla${g.conStock === 1 ? "" : "s"} disponible${g.conStock === 1 ? "" : "s"}`}
                 </div>
               </div>
+            </div>
+
+            {/* Tallas con su stock. El valor de esta pantalla está aquí: saber
+                qué talla queda sin entrar a ninguna parte. */}
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginTop: 11 }}>
+              {g.tallas.map((t) => {
+                const n = Number(t.stock) || 0;
+                const vacia = n === 0;
+                const ultima = n > 0 && n <= 2;
+                return (
+                  <span
+                    key={t.id}
+                    style={{
+                      display: "inline-flex", alignItems: "baseline", gap: 4,
+                      padding: "5px 9px", borderRadius: 9,
+                      background: vacia ? "transparent" : ultima ? C.accentSoft : C.bg,
+                      border: `1px solid ${vacia ? C.line : ultima ? C.accent : C.line}`,
+                      color: vacia ? C.muted : C.ink,
+                      fontSize: 12.5, fontWeight: 800, fontVariantNumeric: "tabular-nums",
+                    }}
+                  >
+                    {t.talla || "—"}
+                    <span style={{ fontSize: 10.5, fontWeight: 700, color: vacia ? C.muted : ultima ? "#A33A12" : C.muted }}>
+                      {vacia ? "agotada" : "×" + n}
+                    </span>
+                  </span>
+                );
+              })}
             </div>
           </div>
         );
@@ -1573,6 +2021,214 @@ function Inventario({ products, sales, persist, showToast, valorCosto, lowOnly, 
         />
       )}
 
+      {/* [INV-POR-MODELO] Ficha del modelo: foto, precio, qué tallas quedan y
+          quién vendió cada par. Los números de plata solo los ven los socios. */}
+      {grupoAbierto && (() => {
+        const g = grupoAbierto;
+        const ventas = ventasDeGrupo(g);
+        const mias = ventas.filter((s) => normTxt(s.vendedor) === normTxt(userEmail) && s.vendedor);
+        const lista = esSocio ? ventas : mias;
+        const paresVendidos = lista.reduce((a, s) => a + (Number(s.cantidad) || 1), 0);
+        const recaudado = lista.reduce((a, s) => a + (Number(s.precio) || 0) * (Number(s.cantidad) || 1), 0);
+        const ganancia = lista.reduce(
+          (a, s) => a + ((Number(s.precio) || 0) - (Number(s.costo) || 0)) * (Number(s.cantidad) || 1),
+          0
+        );
+        const m = margen(g);
+        return (
+          <Sheet title="Modelo" onClose={() => setVerGrupo(null)}>
+            {/* Foto grande: es lo que el equipo usa para reconocer el par */}
+            <div
+              style={{
+                borderRadius: 16, overflow: "hidden", background: C.card, border: `1px solid ${C.line}`,
+                aspectRatio: "4 / 3", display: "flex", alignItems: "center", justifyContent: "center",
+                marginBottom: 12,
+              }}
+            >
+              {g.foto
+                ? <img src={g.foto} alt={g.modelo} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                : (
+                  <div style={{ textAlign: "center", padding: 20 }}>
+                    <div style={{ ...eyebrow(C.muted), marginBottom: 8 }}>Sin foto</div>
+                    <button
+                      onClick={() => { setVerGrupo(null); setShowFotos(true); }}
+                      style={btnPrimary({ padding: "11px 16px", fontSize: 13.5 })}
+                    >
+                      Poner foto a este modelo
+                    </button>
+                  </div>
+                )}
+            </div>
+
+            <div style={{ marginBottom: 14 }}>
+              <div style={display(21)}>{g.modelo || "(sin modelo)"}</div>
+              <div style={{ fontSize: 13, color: C.ink2, marginTop: 5 }}>
+                {g.color ? g.color + " · " : ""}{g.ref ? "Ref " + g.ref : "sin referencia"}
+              </div>
+            </div>
+
+            {/* Precio / pares / tallas */}
+            <div style={cardStyle({ padding: 14, marginBottom: 12, display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap" })}>
+              <div>
+                <div style={{ ...eyebrow(), marginBottom: 3 }}>Precio</div>
+                <div style={{ ...display(19), fontVariantNumeric: "tabular-nums" }}>{fmt(g.precio)}</div>
+                {esSocio && (
+                  <div style={{ fontSize: 11.5, color: C.muted, fontWeight: 600, marginTop: 3 }}>
+                    costo {fmt(g.costo)}{m !== null ? ` · margen ${m}%` : ""}
+                  </div>
+                )}
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <div style={{ ...eyebrow(), marginBottom: 3 }}>En bodega</div>
+                <div style={{ ...display(19, g.pares === 0 ? C.red : C.ink), fontVariantNumeric: "tabular-nums" }}>
+                  {g.pares} par{g.pares === 1 ? "" : "es"}
+                </div>
+                <div style={{ fontSize: 11.5, color: C.muted, fontWeight: 600, marginTop: 3 }}>
+                  {g.conStock} de {g.tallas.length} tallas con stock
+                </div>
+              </div>
+            </div>
+
+            {/* Tallas: ajustar stock aquí mismo, o tocar la talla para editarla */}
+            <div style={{ ...eyebrow(), margin: "2px 4px 8px" }}>Tallas</div>
+            <div style={cardStyle({ padding: "4px 6px", marginBottom: 12 })}>
+              {g.tallas.map((t, i) => {
+                const n = Number(t.stock) || 0;
+                return (
+                  <div
+                    key={t.id}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 10, padding: "8px 8px",
+                      borderTop: i > 0 ? `1px solid ${C.line}` : "none",
+                    }}
+                  >
+                    <button
+                      onClick={() => { setVerGrupo(null); setActionProduct(t); }}
+                      aria-label={`Editar talla ${t.talla}`}
+                      style={btnGhost({
+                        minWidth: 52, height: 44, borderRadius: 12, padding: "0 10px",
+                        fontWeight: 900, fontSize: 15, fontVariantNumeric: "tabular-nums",
+                        color: n === 0 ? C.muted : C.ink,
+                      })}
+                    >
+                      {t.talla || "—"}
+                    </button>
+                    <div style={{ flex: 1, minWidth: 0, fontSize: 12, color: C.muted, fontWeight: 600 }}>
+                      {t.referencia ? t.referencia : "sin referencia"}
+                      {n === 0 && <span style={{ color: C.red, fontWeight: 800 }}> · agotada</span>}
+                      {n > 0 && n <= 2 && <span style={{ color: "#A33A12", fontWeight: 800 }}> · quedan pocas</span>}
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+                      <button
+                        onClick={() => adjustStock(t.id, -1)}
+                        disabled={n === 0}
+                        aria-label={`Quitar un par de la talla ${t.talla}`}
+                        style={btnGhost({ width: 44, height: 44, borderRadius: 12, padding: 0, fontSize: 19, fontWeight: 800, opacity: n === 0 ? 0.4 : 1, cursor: n === 0 ? "default" : "pointer" })}
+                      >
+                        −
+                      </button>
+                      <span style={{ ...display(17, n === 0 ? C.red : C.ink), minWidth: 30, textAlign: "center", fontVariantNumeric: "tabular-nums" }}>{n}</span>
+                      <button
+                        onClick={() => adjustStock(t.id, 1)}
+                        aria-label={`Sumar un par a la talla ${t.talla}`}
+                        style={btnGhost({ width: 44, height: 44, borderRadius: 12, padding: 0, fontSize: 19, fontWeight: 800 })}
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+              <button
+                onClick={() => {
+                  setVerGrupo(null);
+                  setDraft({ ...emptyProduct(), modelo: g.modelo, color: g.color, referencia: g.ref, costo: g.costo || "", precio: g.precio || "" });
+                  setTallasQty({});
+                  setEditingId(null);
+                  setDescontarCaja(true);
+                  setShowForm(true);
+                }}
+                style={btnPrimary({ flex: 1, minWidth: 150, padding: "13px", fontSize: 14 })}
+              >
+                + Agregar pares
+              </button>
+              <button
+                onClick={() => { setVerGrupo(null); setShowFotos(true); }}
+                style={btnGhost({ flex: 1, minWidth: 130, padding: "13px", fontSize: 14 })}
+              >
+                {g.foto ? "Cambiar foto" : "Poner foto"}
+              </button>
+            </div>
+
+            {/* Ventas del modelo. El socio ve todas y quién vendió cada par;
+                el vendedor ve solo las suyas (decisión del dueño, 30-jul). */}
+            <div style={{ ...eyebrow(), margin: "2px 4px 8px" }}>
+              {esSocio ? "Ventas de este modelo" : "Tus ventas de este modelo"}
+            </div>
+            {lista.length === 0 ? (
+              <div style={cardStyle({ padding: "18px 16px", fontSize: 13, color: C.ink2, textAlign: "center" })}>
+                {esSocio ? "Todavía no se ha vendido ningún par de este modelo." : "Todavía no has vendido pares de este modelo."}
+              </div>
+            ) : (
+              <>
+                <div style={cardStyle({ padding: 14, marginBottom: 8, display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap" })}>
+                  <div>
+                    <div style={{ ...eyebrow(), marginBottom: 3 }}>Vendidos</div>
+                    <div style={{ ...display(18), fontVariantNumeric: "tabular-nums" }}>{paresVendidos} par{paresVendidos === 1 ? "" : "es"}</div>
+                  </div>
+                  {esSocio && (
+                    <>
+                      <div style={{ textAlign: "right" }}>
+                        <div style={{ ...eyebrow(), marginBottom: 3 }}>Recaudado</div>
+                        <div style={{ ...display(18), fontVariantNumeric: "tabular-nums" }}>{fmt(recaudado)}</div>
+                      </div>
+                      <div style={{ width: "100%", borderTop: `1px solid ${C.line}`, paddingTop: 10, display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                        <span style={{ fontSize: 12.5, color: C.ink2, fontWeight: 700 }}>Ganancia de este modelo</span>
+                        <span style={{ ...display(18, ganancia >= 0 ? C.green : C.red), fontVariantNumeric: "tabular-nums" }}>{fmt(ganancia)}</span>
+                      </div>
+                    </>
+                  )}
+                </div>
+                <div style={cardStyle({ padding: "2px 0" })}>
+                  {lista.slice(0, 30).map((s, i) => (
+                    <div
+                      key={s.id}
+                      style={{
+                        display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10,
+                        padding: "11px 14px", borderTop: i > 0 ? `1px solid ${C.line}` : "none",
+                      }}
+                    >
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: C.ink }}>
+                          {s.vendedor ? nombreUsuario(s.vendedor) : "Sin registrar"}
+                          {s.talla ? <span style={{ color: C.muted, fontWeight: 600 }}> · talla {s.talla}</span> : null}
+                        </div>
+                        <div style={{ fontSize: 11.5, color: C.muted, marginTop: 2 }}>
+                          {formatDate(s.fecha)}{s.cliente ? " · " + s.cliente : ""}
+                        </div>
+                      </div>
+                      {esSocio && (
+                        <div style={{ fontSize: 13.5, fontWeight: 800, flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>
+                          {fmt((Number(s.precio) || 0) * (Number(s.cantidad) || 1))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  {lista.length > 30 && (
+                    <div style={{ padding: "10px 14px", fontSize: 11.5, color: C.muted, borderTop: `1px solid ${C.line}` }}>
+                      Mostrando las 30 ventas más recientes de {lista.length}.
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </Sheet>
+        );
+      })()}
+
       {actionProduct && (() => {
         const p = actionProduct;
         return (
@@ -1618,24 +2274,37 @@ function FotosManager({ products, fotos, asignarFoto, quitarFoto, showToast, onC
   const [pool, setPool] = useState([]);      // fotos de la carpeta cargadas en esta sesión
   const [cargando, setCargando] = useState(false);
   const [progreso, setProgreso] = useState({ hechas: 0, total: 0 });
-  const [pickKey, setPickKey] = useState(null); // grupo modelo+color que está eligiendo foto
+  const [pickKey, setPickKey] = useState(null); // referencia que está eligiendo foto
   const [busca, setBusca] = useState("");
+  const [soloSinFoto, setSoloSinFoto] = useState(false);
   const fileRef = useRef(null);
 
-  // Grupos únicos modelo+color del inventario
+  // [FOTO-POR-REF] Un grupo por REFERENCIA (antes era por modelo+color escrito a
+  // mano, que se partía en dos grupos con solo teclear el color distinto).
   const grupos = [];
-  const vistos = new Set();
+  const porClave = {};
   products.forEach((p) => {
-    const key = fotoKey(p.modelo, p.color);
-    if (!vistos.has(key)) {
-      vistos.add(key);
-      grupos.push({ key, modelo: p.modelo, color: p.color });
+    const clave = refBase(p.referencia) || fotoKey(p.modelo, p.color);
+    if (!porClave[clave]) {
+      porClave[clave] = {
+        clave,
+        key: fotoKeyProd(p),                 // clave con la que se GUARDA
+        keyVieja: fotoKey(p.modelo, p.color), // clave anterior (para poder quitarla)
+        ref: (p.referencia || "").replace(/\s*-\s*\d{1,3}(\.\d)?$/, "").trim(),
+        modelo: p.modelo,
+        color: p.color,
+        tallas: 0,
+      };
+      grupos.push(porClave[clave]);
     }
+    porClave[clave].tallas++;
   });
-  const gruposFiltrados = grupos.filter((g) =>
-    (g.modelo + " " + (g.color || "")).toLowerCase().includes(busca.toLowerCase())
-  );
-  const conFoto = grupos.filter((g) => fotos[g.key]).length;
+  grupos.forEach((g) => { g.foto = fotos[g.key] || fotos[g.keyVieja] || null; });
+  const gruposFiltrados = grupos
+    .filter((g) => !soloSinFoto || !g.foto)
+    .filter((g) => (g.ref + " " + g.modelo + " " + (g.color || "")).toLowerCase().includes(busca.toLowerCase()));
+  const conFoto = grupos.filter((g) => g.foto).length;
+  const sinFoto = grupos.length - conFoto;
 
   const onArchivos = async (e) => {
     const files = Array.from(e.target.files || []);
@@ -1656,14 +2325,21 @@ function FotosManager({ products, fotos, asignarFoto, quitarFoto, showToast, onC
     e.target.value = "";
   };
 
+  const grupoActivo = pickKey ? grupos.find((g) => g.clave === pickKey) : null;
+
   const elegirFoto = (data) => {
-    if (!pickKey) return;
-    asignarFoto(pickKey, data);
+    if (!grupoActivo) return;
+    asignarFoto(grupoActivo.key, data);
     setPickKey(null);
     showToast("Foto asignada ✓");
   };
 
-  const grupoActivo = pickKey ? grupos.find((g) => g.key === pickKey) : null;
+  // Quitar borra la clave nueva Y la vieja: si solo se borrara la nueva, la foto
+  // vieja de modelo+color volvería a aparecer por el respaldo de lectura.
+  const quitarDelGrupo = (g) => {
+    if (fotos[g.key]) quitarFoto(g.key);
+    if (g.keyVieja !== g.key && fotos[g.keyVieja]) quitarFoto(g.keyVieja);
+  };
 
   return (
     <Sheet title="Fotos del catálogo" onClose={onClose}>
@@ -1671,7 +2347,8 @@ function FotosManager({ products, fotos, asignarFoto, quitarFoto, showToast, onC
       <div style={cardStyle({ padding: 14, marginBottom: 12 })}>
         <div style={{ fontSize: 13, color: C.ink2, lineHeight: 1.5, marginBottom: 10 }}>
           Carga las fotos de tu carpeta (puedes seleccionar muchas a la vez). Se
-          guardan livianas y luego se las asignas a cada modelo. Quedan{" "}
+          guardan livianas y luego se las asignas a cada referencia — esa foto se
+          ve igual en el inventario y al registrar ventas. Quedan{" "}
           <b>{pool.length}</b> foto{pool.length === 1 ? "" : "s"} listas para asignar.
         </div>
         <input
@@ -1695,7 +2372,7 @@ function FotosManager({ products, fotos, asignarFoto, quitarFoto, showToast, onC
         </button>
       </div>
 
-      {/* Asignación por modelo+color */}
+      {/* Asignación por referencia */}
       {grupos.length === 0 ? (
         <EmptyState
           icon={<IconBox big />}
@@ -1705,41 +2382,58 @@ function FotosManager({ products, fotos, asignarFoto, quitarFoto, showToast, onC
       ) : (
         <>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", margin: "2px 4px 8px" }}>
-            <div style={display(15)}>Tus modelos</div>
-            <div style={{ fontSize: 12, color: C.muted, fontWeight: 600 }}>{conFoto}/{grupos.length} con foto</div>
+            <div style={display(15)}>Tus referencias</div>
+            <div style={{ fontSize: 12, color: C.ink2, fontWeight: 700 }}>{conFoto}/{grupos.length} con foto</div>
           </div>
-          {grupos.length > 6 && (
+          <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
             <input
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
-              placeholder="Buscar modelo…"
-              style={inputStyle({ borderRadius: 12, marginBottom: 10 })}
+              placeholder="Buscar referencia o modelo…"
+              style={inputStyle({ borderRadius: 12, flex: 1 })}
             />
+            {sinFoto > 0 && (
+              <button
+                onClick={() => setSoloSinFoto(!soloSinFoto)}
+                aria-pressed={soloSinFoto}
+                style={btnGhost({
+                  padding: "0 13px", borderRadius: 12, fontSize: 12.5, fontWeight: 700, whiteSpace: "nowrap",
+                  background: soloSinFoto ? C.ink : C.card, color: soloSinFoto ? "#fff" : C.ink,
+                  border: `1.5px solid ${soloSinFoto ? C.ink : C.line}`,
+                })}
+              >
+                Sin foto ({sinFoto})
+              </button>
+            )}
+          </div>
+          {gruposFiltrados.length === 0 && (
+            <div style={cardStyle({ padding: "18px 16px", fontSize: 13, color: C.ink2, textAlign: "center" })}>
+              {soloSinFoto ? "Todas las referencias tienen foto ✓" : "Ninguna referencia coincide con la búsqueda."}
+            </div>
           )}
-          {gruposFiltrados.map((g) => {
-            const foto = fotos[g.key];
-            return (
-              <div key={g.key} style={cardStyle({ padding: 10, marginBottom: 8, display: "flex", gap: 12, alignItems: "center" })}>
-                <div style={{ width: 56, height: 56, borderRadius: 12, flexShrink: 0, overflow: "hidden", background: C.bg, border: `1px solid ${C.line}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  {foto
-                    ? <img src={foto} alt={g.modelo} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                    : <span style={{ fontSize: 22 }}>📷</span>}
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 800, fontSize: 14, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{g.modelo || "(sin modelo)"}</div>
-                  <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>{g.color || "sin color"}</div>
-                </div>
-                <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                  {foto && (
-                    <button onClick={() => quitarFoto(g.key)} style={btnGhost({ padding: "8px 10px", borderRadius: 10, fontSize: 12 })} title="Quitar foto">✕</button>
-                  )}
-                  <button onClick={() => setPickKey(g.key)} style={btnPrimary({ padding: "9px 12px", fontSize: 12.5 })}>
-                    {foto ? "Cambiar" : "Elegir foto"}
-                  </button>
+          {gruposFiltrados.map((g) => (
+            <div key={g.clave} style={cardStyle({ padding: 10, marginBottom: 8, display: "flex", gap: 12, alignItems: "center" })}>
+              <div style={{ width: 56, height: 56, borderRadius: 12, flexShrink: 0, overflow: "hidden", background: C.bg, border: `1px solid ${C.line}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                {g.foto
+                  ? <img src={g.foto} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  : <span style={{ ...eyebrow(C.muted), fontSize: 9 }}>SIN FOTO</span>}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 800, fontSize: 14, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{g.modelo || "(sin modelo)"}</div>
+                <div style={{ fontSize: 12, color: C.ink2, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {g.ref ? "Ref " + g.ref : "sin referencia"}{g.color ? " · " + g.color : ""} · {g.tallas} talla{g.tallas === 1 ? "" : "s"}
                 </div>
               </div>
-            );
-          })}
+              <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                {g.foto && (
+                  <button onClick={() => quitarDelGrupo(g)} aria-label={`Quitar la foto de ${g.modelo}`} style={btnGhost({ width: 44, height: 44, padding: 0, borderRadius: 12, fontSize: 14 })} title="Quitar foto">✕</button>
+                )}
+                <button onClick={() => setPickKey(g.clave)} style={btnPrimary({ padding: "0 14px", height: 44, fontSize: 12.5 })}>
+                  {g.foto ? "Cambiar" : "Elegir foto"}
+                </button>
+              </div>
+            </div>
+          ))}
         </>
       )}
 
@@ -1750,11 +2444,18 @@ function FotosManager({ products, fotos, asignarFoto, quitarFoto, showToast, onC
           onClose={() => setPickKey(null)}
         >
           {pool.length === 0 ? (
-            <EmptyState
-              icon={<span style={{ fontSize: 24 }}>📷</span>}
-              title="No hay fotos cargadas"
-              text="Cierra esta ventana y usa “Cargar fotos de la carpeta” primero."
-            />
+            <div style={cardStyle({ padding: "28px 22px", textAlign: "center" })}>
+              <div style={{ fontWeight: 800, fontSize: 15, marginBottom: 6 }}>No hay fotos cargadas</div>
+              <div style={{ fontSize: 13, color: C.ink2, lineHeight: 1.6, marginBottom: 14 }}>
+                Elige las fotos de tu celular y aparecerán aquí para asignárselas a esta referencia.
+              </div>
+              <button
+                onClick={() => fileRef.current && fileRef.current.click()}
+                style={btnPrimary({ width: "100%", padding: 14, fontSize: 15 })}
+              >
+                Cargar fotos
+              </button>
+            </div>
           ) : (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
               {pool.map((ph) => (
@@ -1777,7 +2478,7 @@ function FotosManager({ products, fotos, asignarFoto, quitarFoto, showToast, onC
 // ============================================================
 // Escanear cuaderno
 // ============================================================
-function Escanear({ products, sales, persist, showToast, setTab }) {
+function Escanear({ products, sales, persist, showToast, setTab, userEmail = "" }) {
   const [imgPreview, setImgPreview] = useState(null);
   const [imgB64, setImgB64] = useState(null);
   const [analyzing, setAnalyzing] = useState(false);
@@ -1945,6 +2646,7 @@ Si la imagen no parece un registro de ventas, devuelve {"ventas": [], "advertenc
         costo,
         canal: v.canal || "",
         origen: "foto",
+        vendedor: userEmail || "", // [VENDEDOR] quien escaneó el cuaderno
       });
     });
     persist(nextProducts, nextSales);
@@ -2078,11 +2780,29 @@ const emptySale = () => ({
   cantidad: 1,
   cliente: "",
   canal: "",
+  fecha: hoyLocal(), // por defecto HOY; el formulario deja cambiarla
 });
 
 function Ventas({ products, sales, persist, showToast, autoOpen, onAutoOpened, fotos = {}, esSocio = false, userEmail = "" }) {
-  // Foto del catálogo para diferenciar referencias con nombres parecidos
-  const fotoDe = (modelo, color) => fotos[fotoKey(modelo, color)] || null;
+  // Foto del catálogo para diferenciar referencias con nombres parecidos.
+  // [FOTO-POR-REF] Antes se buscaba por modelo+color de la VENTA, pero la venta
+  // no guarda el color: la clave quedaba "modelo|" y nunca casaba con la del
+  // producto ("modelo|color"), así que las ventas de modelos con color salían
+  // sin miniatura. Ahora se resuelve el PRODUCTO de la venta y se le pide la
+  // foto a él (por referencia, con la clave vieja de respaldo).
+  const productoDe = (modelo, talla, productoId) => {
+    if (productoId) {
+      const exacto = products.find((x) => x.id === productoId);
+      if (exacto) return exacto;
+    }
+    const mismos = products.filter((x) => normTxt(x.modelo) === normTxt(modelo));
+    if (!mismos.length) return null;
+    return mismos.find((x) => String(x.talla) === String(talla)) || mismos[0];
+  };
+  const fotoDe = (modelo, color, talla, productoId) => {
+    const p = productoDe(modelo, talla, productoId);
+    return (p && fotoDeProd(fotos, p)) || fotos[fotoKey(modelo, color)] || null;
+  };
   const [showForm, setShowForm] = useState(false);
   const [draft, setDraft] = useState(emptySale());
   const [pq, setPq] = useState(""); // búsqueda de referencia en bodega
@@ -2315,7 +3035,7 @@ function Ventas({ products, sales, persist, showToast, autoOpen, onAutoOpened, f
         // Guardar de qué referencia salió el par: sin esto, al borrar la venta
         // no se sabe a cuál producto devolverle el stock. "" = venta libre.
         productoId: draft.productoId || "",
-        fecha: hoyLocal(),
+        fecha: draft.fecha || hoyLocal(), // la que eligió el usuario (o hoy)
         cliente: draft.cliente || "",
         modelo: draft.modelo,
         talla: draft.talla,
@@ -2324,6 +3044,10 @@ function Ventas({ products, sales, persist, showToast, autoOpen, onAutoOpened, f
         costo,
         canal: draft.canal || "",
         origen: "manual",
+        // [VENDEDOR 2026-07-30] Quién registró la venta. Las ventas anteriores a
+        // esta versión no lo traen y se muestran como "sin registrar": no se
+        // rellena a dedo porque sería inventar quién vendió.
+        vendedor: userEmail || "",
       },
     ];
     persist(nextProducts, nextSales);
@@ -2342,7 +3066,7 @@ function Ventas({ products, sales, persist, showToast, autoOpen, onAutoOpened, f
       return;
     }
     const rows = [
-      ["Fecha", "Modelo", "Talla", "Cliente", "Canal", "Pares", "Precio unit.", "Costo unit.", "Total", "Ganancia", "Origen", "Estado"],
+      ["Fecha", "Modelo", "Talla", "Cliente", "Vendedor", "Canal", "Pares", "Precio unit.", "Costo unit.", "Total", "Ganancia", "Origen", "Estado"],
       ...[...sales]
         .sort((a, b) => (a.fecha < b.fecha ? 1 : -1))
         .map((s) => {
@@ -2350,7 +3074,9 @@ function Ventas({ products, sales, persist, showToast, autoOpen, onAutoOpened, f
           const precio = Number(s.precio) || 0;
           const costo = Number(s.costo) || 0;
           return [
-            s.fecha, s.modelo, s.talla, s.cliente, s.canal,
+            s.fecha, s.modelo, s.talla, s.cliente,
+            s.vendedor ? nombreUsuario(s.vendedor) : "Sin registrar",
+            s.canal,
             cant, precio, costo, precio * cant, (precio - costo) * cant,
             s.origen === "foto" ? "desde foto" : "manual",
             s.anulada ? "ANULADA (" + (s.anulada_motivo || "sin motivo") + ")" : "activa",
@@ -2434,7 +3160,7 @@ function Ventas({ products, sales, persist, showToast, autoOpen, onAutoOpened, f
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: 11, minWidth: 0 }}>
                     {(() => {
-                      const foto = fotoDe(s.modelo, s.color);
+                      const foto = fotoDe(s.modelo, s.color, s.talla, s.productoId);
                       // Miniatura de la referencia (misma foto del inventario). La talla
                       // se muestra como distintivo sobre la foto; si no hay foto, el
                       // recuadro muestra la talla centrada como antes.
@@ -2496,7 +3222,7 @@ function Ventas({ products, sales, persist, showToast, autoOpen, onAutoOpened, f
             {draft.productoId ? (
               (() => {
                 const p = products.find((x) => x.id === draft.productoId);
-                const fotoSel = p ? fotoDe(p.modelo, p.color) : null;
+                const fotoSel = p ? fotoDeProd(fotos, p) : null;
                 return (
                   <div style={{
                     display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10,
@@ -2541,7 +3267,7 @@ function Ventas({ products, sales, persist, showToast, autoOpen, onAutoOpened, f
                       </div>
                     )}
                     {grupos.map((g, i) => {
-                      const foto = fotoDe(g.modelo, g.color);
+                      const foto = fotoDeProd(fotos, g.tallas[0]);
                       return (
                         <div
                           key={g.clave}
@@ -2658,11 +3384,12 @@ function Ventas({ products, sales, persist, showToast, autoOpen, onAutoOpened, f
               <option value="Instagram">Instagram</option>
             </select>
           </Field>
-          {editingSaleId && (
-            <Field label="Fecha de la venta">
-              <input type="date" value={draft.fecha || ""} onChange={(e) => setDraft({ ...draft, fecha: e.target.value })} style={inputStyle()} />
-            </Field>
-          )}
+          {/* Fecha de la venta: visible SIEMPRE (registrar y editar). Por defecto
+              hoy; no deja fechas futuras. Sirve para registrar ventas de días
+              pasados que no se alcanzaron a anotar. */}
+          <Field label="Fecha de la venta">
+            <input type="date" value={draft.fecha || hoyLocal()} max={hoyLocal()} onChange={(e) => setDraft({ ...draft, fecha: e.target.value })} style={inputStyle()} />
+          </Field>
           <button onClick={saveSale} style={btnPrimary({ width: "100%", marginTop: 14, padding: "15px", fontSize: 15 })}>
             {editingSaleId ? "Guardar cambios" : "✓ Registrar venta"}
           </button>
@@ -3345,6 +4072,16 @@ function TiendaWeb({ showToast, products }) {
   // ref) y nombres de bodegas externas reutilizables (colección proveedores)
   const [mapa, setMapa] = useState({});           // { ref: docMapa }
   const [proveedores, setProveedores] = useState([]); // nombres ordenados
+  // [REF-PAUTA] (2026-07-18): config del bot (botConfig/general). Aquí se elige
+  // la referencia de la PUBLICACIÓN activa: cuando un cliente le escriba al bot
+  // solo "precio" o "quiero más información", el bot responde con ESA ref.
+  // null = cargando/sin permiso (el selector se muestra igual, con "" y aviso al guardar).
+  const [botCfg, setBotCfg] = useState(null);
+  // [BOT-PANEL] Selector de referencias del bot: "pauta" | "foto" | null
+  const [botSheet, setBotSheet] = useState(null);
+  const [buscaBot, setBuscaBot] = useState("");
+  // Buscador del catálogo (con 80 referencias, filtrar por categoría no alcanza)
+  const [buscaCat, setBuscaCat] = useState("");
 
   // Referencias únicas del inventario (VRM001-080) para el enlace opcional.
   // En "products" cada referencia se repite por talla; aquí se agrupa y se
@@ -3395,6 +4132,65 @@ function TiendaWeb({ showToast, products }) {
     );
     return () => { u1(); u2(); };
   }, []);
+
+  // --- [REF-PAUTA] escuchar la config del bot (botConfig/general) ---
+  // Requiere la regla nueva de Firestore para botConfig (reglas-firestore.txt
+  // 2026-07-18). Sin la regla publicada: el snapshot falla con permisos y el
+  // selector queda en "sin elegir" (no rompe nada más de la pestaña).
+  useEffect(() => {
+    if (!fbReady()) return;
+    const u = colRef("botConfig").doc("general").onSnapshot(
+      (d) => setBotCfg(d.exists ? d.data() : {}),
+      (err) => console.warn("botConfig:", err && err.message)
+    );
+    return () => u();
+  }, []);
+  // [REFS-PAUTA-VARIAS] (pedido del dueño, 26-jul) la publicación puede llevar
+  // MÁS DE UN modelo y el bot tiene que poder responder por cualquiera de ellos.
+  // Antes era un solo valor (un <select>); ahora es una LISTA con el mismo
+  // marcar/desmarcar de las refs de foto, que el dueño ya conoce.
+  // Compatibilidad: lo que hoy está guardado es un string con UNA ref y se sigue
+  // leyendo bien — el bot también acepta las dos formas.
+  const refsPautaSel = (botCfg && Array.isArray(botCfg.refPauta))
+    ? botCfg.refPauta
+    : (botCfg && botCfg.refPauta ? [String(botCfg.refPauta)] : []);
+  // guarda SOLO refPauta (merge: no toca `pausado` ni lo demás del doc)
+  const toggleRefPauta = (ref) => {
+    if (!fbReady()) return showToast("Sin conexión con la nube.", true);
+    const cur = refsPautaSel.slice();
+    const i = cur.indexOf(ref);
+    if (i >= 0) cur.splice(i, 1);
+    else {
+      if (cur.length >= 5) return showToast("Máximo 5 modelos por publicación.", true);
+      cur.push(ref);
+    }
+    cur.sort();
+    colRef("botConfig").doc("general").set({ refPauta: cur, refPautaActualizado: new Date().toISOString() }, { merge: true })
+      .then(() => showToast(cur.length
+        ? "El bot responde por " + cur.length + (cur.length === 1 ? " modelo" : " modelos") + " de la publicación ✓"
+        : "Quitado: el bot responde \"precio\" como siempre"))
+      .catch(() => showToast("No se pudo guardar. ¿Ya publicaste las reglas nuevas de Firestore (botConfig)?", true));
+  };
+  // [FOTO-REFS] refs que el bot ofrece cuando el cliente manda una FOTO (el
+  // bot no ve imágenes: aclara que es un bot y muestra estas en una lista).
+  // Máx 9 (la lista de WhatsApp permite 10 filas y una es "Ninguna de estas").
+  const refsFotoSel = (botCfg && Array.isArray(botCfg.refsFoto)) ? botCfg.refsFoto : [];
+  const toggleRefFoto = (ref) => {
+    if (!fbReady()) return showToast("Sin conexión con la nube.", true);
+    const cur = refsFotoSel.slice();
+    const i = cur.indexOf(ref);
+    if (i >= 0) cur.splice(i, 1);
+    else {
+      if (cur.length >= 9) return showToast("Máximo 9 referencias (límite de la lista de WhatsApp).", true);
+      cur.push(ref);
+    }
+    cur.sort();
+    colRef("botConfig").doc("general").set({ refsFoto: cur, refsFotoActualizado: new Date().toISOString() }, { merge: true })
+      .then(() => showToast(cur.length
+        ? "Al recibir fotos, el bot ofrecerá " + cur.length + (cur.length === 1 ? " referencia" : " referencias") + " ✓"
+        : "Sin refs: la foto pasa al asesor como siempre"))
+      .catch(() => showToast("No se pudo guardar. ¿Ya publicaste las reglas nuevas de Firestore (botConfig)?", true));
+  };
 
   // --- Traer una foto de la nube (Firestore la deja cacheada para offline) ---
   const pedirFoto = (fid) => {
@@ -3584,8 +4380,18 @@ function TiendaWeb({ showToast, products }) {
       .catch(() => showToast("No se pudo cambiar.", true));
   };
 
-  const lista = (items || []).filter((p) => filtro === "todos" || p.cat === filtro);
+  const qCat = normTxt(buscaCat);
+  const lista = (items || [])
+    .filter((p) => filtro === "todos" || p.cat === filtro)
+    .filter((p) => !qCat || normTxt(p.ref + " " + (p.marca || "") + " " + catTiendaLabel(p.cat)).includes(qCat));
   const visibles = (items || []).filter((p) => p.activo !== false).length;
+  // [AVISO-INCOMPLETAS] El bot busca los modelos por el campo "Marca" (ahí va el
+  // nombre completo): sin ese dato la referencia SÍ está en el catálogo, pero no
+  // aparece cuando el cliente la pide por su nombre y el bot la presenta como
+  // "Deportivas". Sin foto, no la puede mostrar. Nada de esto tiene que ver con
+  // los modelos de la publicación: esos son solo contexto de la campaña.
+  const sinNombreCat = (items || []).filter((p) => p.activo !== false && !p.marca).length;
+  const sinFotoCat = (items || []).filter((p) => p.activo !== false && !(p.fotos || []).length).length;
 
   return (
     <div style={{ padding: 16 }} className="vm-fade">
@@ -3602,6 +4408,13 @@ function TiendaWeb({ showToast, products }) {
                 ? "Conectando con la nube…"
                 : visibles + (visibles === 1 ? " referencia visible" : " referencias visibles") + " en la tienda"}
             </div>
+            {(sinNombreCat > 0 || sinFotoCat > 0) && (
+              <div style={{ fontSize: 12, color: "#A33A12", fontWeight: 700, marginTop: 5, lineHeight: 1.45 }}>
+                {sinNombreCat > 0 && `${sinNombreCat} sin nombre: el bot no las encuentra si el cliente las pide por su nombre`}
+                {sinNombreCat > 0 && sinFotoCat > 0 && <br />}
+                {sinFotoCat > 0 && `${sinFotoCat} sin foto: el bot no puede mostrarlas`}
+              </div>
+            )}
           </div>
           <a
             href="https://varmancrew.com"
@@ -3613,6 +4426,150 @@ function TiendaWeb({ showToast, products }) {
           </a>
         </div>
       </div>
+
+      {/* [BOT-PANEL 2026-07-30] Antes esto eran DOS muros de 80 botones "Ref 01,
+          Ref 02, …" idénticos, uno debajo del otro: sin foto, sin nombre y sin
+          precio, imposible saber qué se estaba marcando. Ahora arriba se ve
+          SOLO lo que el bot está usando (con foto y nombre) y elegir se hace en
+          una lista buscable, no en un muro. */}
+      {fbReady() && items && items.length > 0 && (
+        <div style={cardStyle({ padding: "14px 16px", marginBottom: 12 })}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, marginBottom: 10 }}>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ ...eyebrow(), marginBottom: 3 }}>lo que el bot usa ahora</div>
+              <div style={display(16)}>Modelos de la publicación</div>
+            </div>
+            <button onClick={() => setBotSheet("pauta")} style={btnGhost({ padding: "10px 14px", borderRadius: 12, fontSize: 13, whiteSpace: "nowrap" })}>
+              {refsPautaSel.length ? "Cambiar" : "Elegir"}
+            </button>
+          </div>
+
+          {refsPautaSel.length === 0 ? (
+            <div style={{ fontSize: 12.5, color: C.ink2, lineHeight: 1.5 }}>
+              Ninguno elegido. Quien llegue del anuncio y escriba solo “precio” recibirá la
+              respuesta general en vez de la ficha del modelo que está pautado.
+            </div>
+          ) : (
+            <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 2, margin: "0 -2px" }}>
+              {refsPautaSel.map((ref) => {
+                const p = (items || []).find((x) => String(x.ref) === String(ref));
+                const src = p ? fotosCat[(p.fotos || [])[0]] : null;
+                return (
+                  <div key={"pp-" + ref} style={{ width: 92, flexShrink: 0 }}>
+                    <div style={{ width: 92, height: 92, borderRadius: 13, overflow: "hidden", background: C.bg, border: `1px solid ${C.line}` }}>
+                      {src ? <img src={src} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /> : null}
+                    </div>
+                    <div style={{ fontSize: 11.5, fontWeight: 800, marginTop: 5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {p && p.marca ? p.marca : "Ref " + ref}
+                    </div>
+                    <div style={{ fontSize: 11, color: C.muted, fontWeight: 600 }}>
+                      {p ? precioTienda(p.precio) : "ya no existe"}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* [FOTO-REFS] Respaldo para cuando el bot no reconoce la foto.
+              OJO (30-jul): el bot SÍ ve las fotos desde la v9.9; esta lista dejó
+              de ser "el bot es ciego" y es solo el plan B. El texto de antes
+              decía lo contrario y confundía. */}
+          <div style={{ borderTop: `1px solid ${C.line}`, marginTop: 12, paddingTop: 11, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 12.5, fontWeight: 700, color: C.ink }}>Si no reconoce una foto</div>
+              <div style={{ fontSize: 11.5, color: C.muted, marginTop: 2 }}>
+                {refsFotoSel.length
+                  ? `Ofrece ${refsFotoSel.length} referencia${refsFotoSel.length === 1 ? "" : "s"} para que el cliente elija`
+                  : "Pasa la foto al asesor"}
+              </div>
+            </div>
+            <button onClick={() => setBotSheet("foto")} style={btnGhost({ padding: "10px 14px", borderRadius: 12, fontSize: 13, whiteSpace: "nowrap" })}>
+              {refsFotoSel.length ? "Cambiar" : "Elegir"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Selector de referencias del bot: lista con foto, nombre y precio */}
+      {botSheet && (() => {
+        const esPauta = botSheet === "pauta";
+        const sel = esPauta ? refsPautaSel : refsFotoSel;
+        const toggle = esPauta ? toggleRefPauta : toggleRefFoto;
+        const visibles = (items || []).filter((p) => p.activo !== false);
+        const q = normTxt(buscaBot);
+        const lista = q
+          ? visibles.filter((p) => normTxt(p.ref + " " + (p.marca || "") + " " + catTiendaLabel(p.cat)).includes(q))
+          : visibles;
+        return (
+          <Sheet
+            title={esPauta ? "Modelos de la publicación" : "Si no reconoce la foto"}
+            onClose={() => { setBotSheet(null); setBuscaBot(""); }}
+          >
+            <div style={{ fontSize: 13, color: C.ink2, lineHeight: 1.55, marginBottom: 12 }}>
+              {esPauta
+                ? "Marca los modelos que estás pautando: le sirven al bot para saber de qué viene hablando quien llega del anuncio. Si el cliente escribe solo “precio”, contesta con estos en vez de preguntar a ciegas. No limita nada — el bot sigue vendiendo cualquier modelo del catálogo. Máximo 5."
+                : "El bot ve las fotos que manda el cliente, pero si no logra reconocer el modelo ofrece estas referencias en una lista para que él toque la suya. Máximo 9. Sin ninguna marcada, la foto pasa al asesor."}
+            </div>
+            <input
+              value={buscaBot}
+              onChange={(e) => setBuscaBot(e.target.value)}
+              placeholder="Buscar por nombre, marca o referencia…"
+              style={inputStyle({ borderRadius: 12, marginBottom: 10 })}
+            />
+            <div style={{ fontSize: 12, color: C.muted, fontWeight: 700, margin: "0 4px 8px" }}>
+              {sel.length} marcada{sel.length === 1 ? "" : "s"} de {esPauta ? 5 : 9}
+            </div>
+            {lista.length === 0 && (
+              <div style={cardStyle({ padding: "18px 16px", fontSize: 13, color: C.ink2, textAlign: "center" })}>
+                Ninguna referencia coincide con la búsqueda.
+              </div>
+            )}
+            {lista.map((p) => {
+              const on = sel.indexOf(p.ref) >= 0;
+              const src = fotosCat[(p.fotos || [])[0]];
+              return (
+                <div
+                  key={"sel-" + p.id}
+                  role="button"
+                  tabIndex={0}
+                  aria-pressed={on}
+                  onClick={() => toggle(p.ref)}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(p.ref); } }}
+                  className="vm-press"
+                  style={cardStyle({
+                    padding: 10, marginBottom: 8, display: "flex", gap: 12, alignItems: "center", cursor: "pointer",
+                    border: `1.5px solid ${on ? C.ink : "transparent"}`,
+                  })}
+                >
+                  <div style={{ width: 54, height: 54, borderRadius: 12, overflow: "hidden", background: C.bg, border: `1px solid ${C.line}`, flexShrink: 0 }}>
+                    {src ? <img src={src} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /> : null}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 800, fontSize: 14, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {p.marca || "Sin nombre"}
+                    </div>
+                    <div style={{ fontSize: 12, color: C.ink2, marginTop: 2 }}>
+                      Ref {p.ref} · {precioTienda(p.precio)}
+                    </div>
+                  </div>
+                  <div
+                    aria-hidden="true"
+                    style={{
+                      width: 26, height: 26, borderRadius: 9, flexShrink: 0,
+                      background: on ? C.ink : C.card, border: `1.5px solid ${on ? C.ink : C.line}`,
+                      color: "#fff", display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: 15, fontWeight: 900,
+                    }}
+                  >
+                    {on ? "✓" : ""}
+                  </div>
+                </div>
+              );
+            })}
+          </Sheet>
+        );
+      })()}
 
       {items === null ? (
         <div style={{ ...cardStyle({ height: 120 }), animation: "vmPulse 1.4s ease infinite" }} />
@@ -3639,6 +4596,14 @@ function TiendaWeb({ showToast, products }) {
         </div>
       ) : (
         <>
+          {/* Buscador: con 80 referencias el filtro por categoría no alcanza */}
+          <input
+            value={buscaCat}
+            onChange={(e) => setBuscaCat(e.target.value)}
+            placeholder="Buscar referencia, nombre o marca…"
+            style={inputStyle({ borderRadius: 14, marginBottom: 10 })}
+          />
+
           {/* Filtros por categoría */}
           <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
             {[{ id: "todos", label: "Todas" }].concat(CATS_TIENDA).map((c) => {
@@ -3670,13 +4635,17 @@ function TiendaWeb({ showToast, products }) {
               {lista.map((p) => {
                 const src = fotosCat[(p.fotos || [])[0]];
                 const oculta = p.activo === false;
+                const enPauta = refsPautaSel.indexOf(p.ref) >= 0;
+                const sinNombre = !p.marca;
                 return (
                   <div
                     key={p.id}
                     onClick={() => abrirEditar(p)}
                     role="button"
                     tabIndex={0}
+                    aria-label={`${p.marca || "Referencia " + p.ref}, ${precioTienda(p.precio)}`}
                     onKeyDown={(e) => { if (e.key === "Enter") abrirEditar(p); }}
+                    className="vm-press"
                     style={cardStyle({ padding: 0, overflow: "hidden", cursor: "pointer", opacity: oculta ? 0.6 : 1 })}
                   >
                     <div style={{ width: "100%", aspectRatio: "1 / 1", background: C.bg, position: "relative" }}>
@@ -3688,6 +4657,11 @@ function TiendaWeb({ showToast, products }) {
                           {p.tag}
                         </div>
                       ) : null}
+                      {enPauta ? (
+                        <div style={{ position: "absolute", top: 8, right: 8, background: C.accent, color: "#fff", fontSize: 10, fontWeight: 800, padding: "3px 9px", borderRadius: 99 }}>
+                          EN PAUTA
+                        </div>
+                      ) : null}
                       {oculta ? (
                         <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(244,244,242,.55)", fontWeight: 800, fontSize: 12, color: C.ink2, letterSpacing: ".1em" }}>
                           OCULTA
@@ -3695,11 +4669,16 @@ function TiendaWeb({ showToast, products }) {
                       ) : null}
                     </div>
                     <div style={{ padding: "10px 12px 12px" }}>
-                      <div style={{ fontSize: 11, color: C.muted, fontWeight: 700 }}>
+                      {/* El nombre primero: antes la tarjeta solo decía "Ref 34"
+                          y había que adivinar el modelo por la miniatura. */}
+                      <div style={{ fontWeight: 800, fontSize: 13.5, lineHeight: 1.3, color: sinNombre ? C.muted : C.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {p.marca || "Sin nombre"}
+                      </div>
+                      <div style={{ fontSize: 11, color: C.muted, fontWeight: 700, marginTop: 2 }}>
                         Ref {p.ref} · {catTiendaLabel(p.cat)}
                       </div>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 3 }}>
-                        <div style={{ fontWeight: 800, fontSize: 15 }}>{precioTienda(p.precio)}</div>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 4 }}>
+                        <div style={{ fontWeight: 800, fontSize: 15, fontVariantNumeric: "tabular-nums" }}>{precioTienda(p.precio)}</div>
                         <button
                           onClick={(e) => { e.stopPropagation(); toggleActivo(p); }}
                           title={oculta ? "Mostrar en la página" : "Ocultar de la página"}
@@ -4421,6 +5400,1665 @@ const FILTROS_PEDIDO = [
   ["todos", "Todos"],
 ];
 
+// ============================================================
+// LOCAL BÚNKER — el local del socio (libro APARTE de VarMan Crew)
+// ============================================================
+// Ver el bloque SOCIOS_BUNKER arriba para el porqué. Cuatro listas: ventas del
+// local, bodegas (proveedores), pagos a esas bodegas y gastos del local.
+// Nada de aquí toca el inventario, las ventas ni la caja de VarMan Crew.
+
+const emptyBkVenta = () => ({ fecha: hoyLocal(), desc: "", talla: "", proveedor: "", compra: "", venta: "", medio: "efectivo" });
+const emptyBkPago = () => ({ fecha: hoyLocal(), monto: "", medio: "efectivo", nota: "" });
+const emptyBkGastoBk = () => ({ fecha: hoyLocal(), desc: "", monto: "", categoria: "cajamenor" });
+
+// ---------- Lectura del CSV del Excel del local ----------
+// Acepta el archivo tal como sale de "Guardar como → CSV" en Excel: separador
+// ; , o tabulación, celdas entre comillas, y fechas en serial de Excel
+// (46204), d/m/aaaa o aaaa-mm-dd.
+function bkPartirLinea(linea, sep) {
+  const out = [];
+  let campo = "", dentro = false;
+  for (let i = 0; i < linea.length; i++) {
+    const c = linea[i];
+    if (dentro) {
+      if (c === '"') {
+        if (linea[i + 1] === '"') { campo += '"'; i++; }
+        else dentro = false;
+      } else campo += c;
+    } else if (c === '"') dentro = true;
+    else if (c === sep) { out.push(campo); campo = ""; }
+    else campo += c;
+  }
+  out.push(campo);
+  return out.map((x) => x.trim());
+}
+
+function bkFecha(v) {
+  const s = String(v == null ? "" : v).trim();
+  if (!s) return "";
+  if (/^\d{4}-\d{1,2}-\d{1,2}/.test(s)) {
+    const p = s.slice(0, 10).split("-");
+    return p[0] + "-" + String(p[1]).padStart(2, "0") + "-" + String(p[2]).padStart(2, "0");
+  }
+  // Serial de Excel = días desde el 30/12/1899 (40000 ≈ 2009, 60000 ≈ 2064)
+  if (/^\d{4,6}(\.\d+)?$/.test(s)) {
+    const n = Math.floor(Number(s));
+    if (n > 20000 && n < 80000) return new Date(Date.UTC(1899, 11, 30) + n * 86400000).toISOString().slice(0, 10);
+  }
+  // d/m/aaaa (formato de Colombia; Excel en español exporta así)
+  const m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/);
+  if (m) {
+    const a = m[3].length === 2 ? "20" + m[3] : m[3];
+    return a + "-" + String(m[2]).padStart(2, "0") + "-" + String(m[1]).padStart(2, "0");
+  }
+  return "";
+}
+
+// "$ 105.000" → 105000. Los centavos se descartan: aquí no existen.
+function bkMonto(v) {
+  let s = String(v == null ? "" : v).trim();
+  if (!s) return 0;
+  const neg = /^\(|^-/.test(s);
+  s = s.replace(/[^\d.,]/g, "").replace(/[.,]\d{1,2}$/, "").replace(/\D/g, "");
+  const n = Number(s || 0);
+  return neg ? -n : n;
+}
+
+// Convierte el texto del CSV en ventas + bodegas listas para guardar.
+// Idempotente: el id de cada venta se arma con la fecha y el número de línea
+// de ese día, así que importar dos veces el mismo archivo NO duplica nada.
+function bkLeerCSV(texto) {
+  const limpio = String(texto || "").replace(/^﻿/, "").replace(/\r\n?/g, "\n");
+  const lineas = limpio.split("\n").filter((l) => l.trim() !== "");
+  if (lineas.length < 2) return { error: "El archivo no tiene filas (solo cabecera o vacío)." };
+
+  let sep = ";", mejor = -1;
+  [";", ",", "\t"].forEach((c) => {
+    const n = bkPartirLinea(lineas[0], c).length;
+    if (n > mejor) { mejor = n; sep = c; }
+  });
+
+  const cab = bkPartirLinea(lineas[0], sep).map((h) => sinTildes(normTxt(h)));
+  const buscar = (nombres) => {
+    for (let i = 0; i < cab.length; i++) {
+      for (let j = 0; j < nombres.length; j++) if (cab[i].indexOf(nombres[j]) !== -1) return i;
+    }
+    return -1;
+  };
+  const iFecha = buscar(["fecha"]);
+  const iDesc = buscar(["descripcion", "producto", "referencia", "modelo"]);
+  const iTalla = buscar(["talla"]);
+  const iBod = buscar(["bodega", "proveedor"]);
+  const iCompra = buscar(["valor compra", "compra", "costo"]);
+  const iEfe = buscar(["efectivo"]);
+  const iBc = buscar(["bc"]);
+  const iDv = buscar(["dv"]);
+  const iVenta = buscar(["valor venta", "precio venta", "venta"]);
+  const iCant = buscar(["cantidad"]);
+
+  if (iFecha === -1 || iBod === -1 || iCompra === -1) {
+    return { error: "Falta una columna obligatoria. El archivo debe tener al menos FECHA, BODEGA y VALOR COMPRA." };
+  }
+
+  const ventas = [], bodegas = {}, avisos = [];
+  const contador = {}; // ventas ya vistas por fecha → numera el id
+  let omitidas = 0;
+
+  for (let f = 1; f < lineas.length; f++) {
+    const c = bkPartirLinea(lineas[f], sep);
+    const fecha = bkFecha(c[iFecha]);
+    const nombreBod = (c[iBod] || "").trim();
+    const compra = bkMonto(c[iCompra]);
+    if (!fecha || !nombreBod) { omitidas++; continue; }
+
+    const efe = iEfe !== -1 ? bkMonto(c[iEfe]) : 0;
+    const bc = iBc !== -1 ? bkMonto(c[iBc]) : 0;
+    const dv = iDv !== -1 ? bkMonto(c[iDv]) : 0;
+    const porMedio = efe + bc + dv;
+    const venta = porMedio > 0 ? porMedio : iVenta !== -1 ? bkMonto(c[iVenta]) : 0;
+
+    let medio = "";
+    const usados = [];
+    if (efe > 0) usados.push("efectivo");
+    if (bc > 0) usados.push("bc");
+    if (dv > 0) usados.push("dv");
+    if (usados.length === 1) medio = usados[0];
+    else if (usados.length > 1) medio = "mixto"; // pago partido de una fila vieja
+
+    const pid = bkSlug(nombreBod);
+    if (!bodegas[pid]) bodegas[pid] = { id: pid, nombre: nombreBod.toUpperCase(), activo: true, nota: "", creado: new Date().toISOString() };
+
+    contador[fecha] = (contador[fecha] || 0) + 1;
+    const venta1 = {
+      id: "bkh-" + fecha.replace(/-/g, "") + "-" + String(contador[fecha]).padStart(3, "0"),
+      fecha,
+      desc: ((iDesc !== -1 ? c[iDesc] : "") || "SIN DESCRIPCIÓN").trim().toUpperCase(),
+      talla: iTalla !== -1 ? String(c[iTalla] || "").replace(/[^\d.]/g, "").replace(/\.0+$/, "") : "",
+      cantidad: iCant !== -1 ? Math.max(1, Math.round(bkMonto(c[iCant])) || 1) : 1,
+      proveedor: pid,
+      compra,
+      venta,
+      medio,
+      origen: "excel",
+      creado: new Date().toISOString(),
+    };
+    if (medio === "mixto") venta1.partes = { efectivo: efe, bc, dv };
+    if (venta < compra) avisos.push(venta1.fecha + " · " + venta1.desc + " (venta menor que la compra)");
+    ventas.push(venta1);
+  }
+
+  if (!ventas.length) return { error: "No se pudo leer ninguna fila. Revisa que el archivo sea el CSV del Excel del local." };
+  return { ventas, bodegas: Object.keys(bodegas).map((k) => bodegas[k]), omitidas, avisos };
+}
+
+const MESES_CORTOS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+// "2026-08-12" → "12 ago" (para la barra de periodo, que tiene que caber en
+// una línea en un celular de 375px sin desbordarse)
+const diaMes = (f) => {
+  const p = String(f || "").split("-");
+  return p.length === 3 ? Number(p[2]) + " " + (MESES_CORTOS[Number(p[1]) - 1] || "") : "";
+};
+
+const BK_PERIODOS = [
+  { id: "hoy", label: "Hoy" },
+  { id: "semana", label: "Esta semana" },
+  { id: "mes", label: "Este mes" },
+  { id: "mesPasado", label: "Mes pasado" },
+  { id: "todo", label: "Todo el histórico" },
+  { id: "custom", label: "Fechas exactas…" },
+];
+
+// ---------- Paleta del panel de gráficas (fondo oscuro) ----------
+// La app ya tiene un tablero oscuro (pestaña Stats); el del local habla el
+// mismo idioma para que no parezcan dos apps distintas.
+const DK = {
+  fondo: "radial-gradient(135% 95% at 50% -10%, #1D1D26 0%, #101015 60%)",
+  ink: "#FFFFFF",
+  ink2: "rgba(255,255,255,.68)",
+  muted: "rgba(255,255,255,.52)",
+  line: "rgba(255,255,255,.11)",
+  track: "rgba(255,255,255,.08)",
+};
+
+// Colores de las series. Verificados con el validador de paletas sobre el
+// fondo oscuro (#16161D): banda de luminosidad OK, croma OK, separación para
+// daltonismo ΔE 30.6 protan / 20.8 tritan, contraste ≥3:1. NO cambiarlos "a
+// ojo": si hay que tocarlos, volver a pasar el validador.
+const SERIE = {
+  efectivo: "#E8571C",
+  bc: "#2E86FF",
+  dv: "#B58900",
+  costo: "#4C4C5C",   // la parte que NO es del local: recesiva a propósito
+  util: "#E8571C",
+};
+
+// "$1.230.000" no cabe en el eje de un celular: "1,2M"
+const compactoCOP = (n) => {
+  n = Number(n) || 0;
+  if (n >= 1e6) return "$" + (n / 1e6).toFixed(n >= 1e7 ? 0 : 1).replace(".", ",") + "M";
+  if (n >= 1000) return "$" + Math.round(n / 1000) + "k";
+  return "$" + Math.round(n);
+};
+
+function Bunker({ ventas, proveedores, pagos, gastos, persistBunker, importarBunker, showToast, userEmail, error }) {
+  const num = (x) => Number(x) || 0;
+  const qty = (v) => num(v.cantidad) || 1;
+  const fmtS = (n) => (n < 0 ? "−" + fmt(-n) : fmt(n));
+
+  const [vista, setVista] = useState("resumen"); // resumen | ventas | bodegas | gastos
+  const [periodo, setPeriodo] = useState("mes"); // hoy | semana | mes | mesPasado | todo | custom
+  const [cDesde, setCDesde] = useState(hoyLocal());
+  const [cHasta, setCHasta] = useState(hoyLocal());
+
+  // Formularios (cada uno con su hoja)
+  const [formVenta, setFormVenta] = useState(null); // {draft, editId}
+  const [formPago, setFormPago] = useState(null); // {draft, proveedor, editId}
+  const [formGasto, setFormGasto] = useState(null);
+  const [formBodega, setFormBodega] = useState(null);
+  const [detalleProv, setDetalleProv] = useState(null); // id de la bodega abierta
+  const [importar, setImportar] = useState(null); // {texto, previo}
+  const [sheetPeriodo, setSheetPeriodo] = useState(false);
+  const [menu, setMenu] = useState(false);
+  const [buscar, setBuscar] = useState("");
+  const [mostrarVentas, setMostrarVentas] = useState(60);
+  const [confirmBorrar, setConfirmBorrar] = useState(null); // {que, item}
+
+  // ---------- Rango de fechas ----------
+  const pad2 = (n) => String(n).padStart(2, "0");
+  const ymd = (d) => d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate());
+  const hoy = hoyLocal();
+  const now = new Date();
+  const lunes = new Date(now);
+  lunes.setDate(now.getDate() - ((now.getDay() + 6) % 7)); // semana que arranca el lunes
+  const rango =
+    periodo === "hoy" ? [hoy, hoy]
+      : periodo === "semana" ? [ymd(lunes), hoy]
+        : periodo === "mes" ? [ymd(new Date(now.getFullYear(), now.getMonth(), 1)), hoy]
+          : periodo === "mesPasado" ? [ymd(new Date(now.getFullYear(), now.getMonth() - 1, 1)), ymd(new Date(now.getFullYear(), now.getMonth(), 0))]
+            : periodo === "custom" ? [cDesde, cHasta]
+              : ["0000-00-00", "9999-99-99"];
+  const [desde, hasta] = rango;
+  const enR = (f) => !!f && f >= desde && f <= hasta;
+  const rangoTexto =
+    periodo === "todo" ? "Todo el histórico"
+      : desde === hasta ? "Del " + fechaCorta(desde)
+        : "Del " + fechaCorta(desde) + " al " + fechaCorta(hasta);
+  // Versión corta para la barra de periodo: "1 – 12 ago" en vez de la fecha
+  // completa, que en 375px obliga a partir la línea.
+  // En "Todo el histórico" no se repite nada al lado: la etiqueta ya lo dice.
+  const rangoCorto =
+    periodo === "todo" ? "" : desde === hasta ? diaMes(desde) : diaMes(desde) + " – " + diaMes(hasta);
+  const periodoLabel = (BK_PERIODOS.filter((p) => p.id === periodo)[0] || { label: "Periodo" }).label;
+
+  // Sin una sola venta NI bodega: el módulo está vacío de verdad (no es que no
+  // se haya vendido en el rango). Ahí manda el aviso, no los indicadores.
+  const primerArranque = !ventas.length && !proveedores.length && !error;
+
+  // ---------- Datos del rango ----------
+  const ventasR = ventas.filter((v) => enR(v.fecha));
+  const pagosR = pagos.filter((p) => enR(p.fecha));
+  const gastosR = gastos.filter((g) => enR(g.fecha));
+
+  const totalVenta = ventasR.reduce((a, v) => a + num(v.venta) * qty(v), 0);
+  const totalCompra = ventasR.reduce((a, v) => a + num(v.compra) * qty(v), 0);
+  const utilidadBruta = totalVenta - totalCompra;
+  const totalGastos = gastosR.reduce((a, g) => a + num(g.monto), 0);
+  const utilidadNeta = utilidadBruta - totalGastos;
+  const totalPagosR = pagosR.reduce((a, p) => a + num(p.monto), 0);
+  const paresR = ventasR.reduce((a, v) => a + qty(v), 0);
+
+  // Desglose de cómo entró la plata. Una fila vieja con el pago PARTIDO
+  // (medio "mixto") se reparte entre sus medios reales; lo que no tenga medio
+  // cae en "otro" para que la suma de este bloque SIEMPRE dé el total vendido
+  // (si no, la plata desaparecería sin dejar rastro).
+  const porMedio = { otro: 0 };
+  BK_MEDIOS.forEach((m) => { porMedio[m.id] = 0; });
+  ventasR.forEach((v) => {
+    const total = num(v.venta) * qty(v);
+    if (v.medio === "mixto" && v.partes) BK_MEDIOS.forEach((m) => { porMedio[m.id] += num(v.partes[m.id]); });
+    else if (v.medio && v.medio !== "mixto" && porMedio[v.medio] != null) porMedio[v.medio] += total;
+    else porMedio.otro += total;
+  });
+
+  // ---------- Bodegas y saldos ----------
+  const provPorId = {};
+  proveedores.forEach((p) => { provPorId[p.id] = p; });
+  const nombreProv = (id) => (provPorId[id] ? provPorId[id].nombre : id ? "(bodega borrada: " + id + ")" : "Sin bodega");
+
+  // Saldo de cada bodega. El "acumulado" es la deuda REAL de hoy; el "del
+  // rango" es lo que se le vendió y se le pagó en las fechas elegidas — que es
+  // lo que se le presenta a la bodega.
+  //
+  // SALDO INICIAL (ancla): el Excel del local solo tiene VENTAS, nunca los
+  // pagos que ya se hicieron, así que sin esto la app muestra como deuda todo
+  // lo vendido desde julio. Cada bodega puede llevar "al día X yo le debía $Y";
+  // lo anterior a esa fecha queda cuadrado DENTRO de ese número y solo cuentan
+  // los movimientos posteriores. Es el mismo mecanismo del ancla de la Caja.
+  const anclaDe = (id) => {
+    const p = provPorId[id];
+    return p && p.saldoFecha ? { fecha: p.saldoFecha, monto: num(p.saldoInicial) } : null;
+  };
+  const despuesDelAncla = (id, fecha) => {
+    const a = anclaDe(id);
+    return !a || (fecha || "") > a.fecha;
+  };
+
+  const saldos = {};
+  const tocar = (id) => {
+    if (!saldos[id]) saldos[id] = { id, mercAcum: 0, pagAcum: 0, mercR: 0, pagR: 0, utilR: 0, ventaR: 0, paresR: 0 };
+    return saldos[id];
+  };
+  proveedores.forEach((p) => tocar(p.id));
+  ventas.forEach((v) => {
+    const id = v.proveedor || "";
+    const s = tocar(id);
+    const c = num(v.compra) * qty(v);
+    if (despuesDelAncla(id, v.fecha)) s.mercAcum += c;
+    if (enR(v.fecha)) {
+      s.mercR += c;
+      s.ventaR += num(v.venta) * qty(v);
+      s.utilR += num(v.venta) * qty(v) - c;
+      s.paresR += qty(v);
+    }
+  });
+  pagos.forEach((p) => {
+    const id = p.proveedor || "";
+    const s = tocar(id);
+    if (despuesDelAncla(id, p.fecha)) s.pagAcum += num(p.monto);
+    if (enR(p.fecha)) s.pagR += num(p.monto);
+  });
+  const saldoDe = (id) => {
+    const s = saldos[id] || { mercAcum: 0, pagAcum: 0 };
+    const a = anclaDe(id);
+    return (a ? a.monto : 0) + s.mercAcum - s.pagAcum;
+  };
+  const filasSaldo = Object.keys(saldos)
+    .map((id) => ({ ...saldos[id], nombre: nombreProv(id), saldo: saldoDe(id), ancla: anclaDe(id) }))
+    .filter((s) => s.mercAcum || s.pagAcum || (provPorId[s.id] && provPorId[s.id].activo !== false))
+    .sort((a, b) => b.saldo - a.saldo || (a.nombre < b.nombre ? -1 : 1));
+  const deudaTotal = filasSaldo.reduce((a, s) => a + s.saldo, 0);
+
+  const bodegasActivas = proveedores.filter((p) => p.activo !== false).sort((a, b) => (a.nombre < b.nombre ? -1 : 1));
+
+  // ---------- Guardar ----------
+  const nuevoId = (pre) => pre + Date.now() + Math.floor(Math.random() * 999);
+
+  const guardarVenta = () => {
+    const d = formVenta.draft;
+    const compra = Math.round(num(d.compra)), venta = Math.round(num(d.venta));
+    if (!d.desc.trim()) return showToast("Escribe qué se vendió.", true);
+    if (!d.proveedor) return showToast("Elige de qué bodega es.", true);
+    if (compra <= 0 || venta <= 0) return showToast("El precio de compra y el de venta deben ser mayores a 0.", true);
+    const base = {
+      fecha: d.fecha || hoyLocal(),
+      desc: d.desc.trim().toUpperCase(),
+      talla: String(d.talla || "").trim(),
+      cantidad: 1,
+      proveedor: d.proveedor,
+      compra,
+      venta,
+      medio: d.medio || "efectivo",
+    };
+    if (formVenta.editId) {
+      // Si la venta venía del Excel con el pago PARTIDO ("mixto") y no se le
+      // cambió el medio, se conserva el desglose original; si eligió un medio
+      // concreto, el desglose deja de tener sentido y se limpia.
+      persistBunker("ventas", ventas.map((v) => (v.id === formVenta.editId
+        ? { ...v, ...base, partes: base.medio === "mixto" ? v.partes || null : null }
+        : v)));
+      showToast("Venta actualizada ✓");
+    } else {
+      persistBunker("ventas", [...ventas, { ...base, id: nuevoId("bv"), origen: "app", creado: new Date().toISOString(), creadoPor: userEmail || "" }]);
+      showToast("Venta registrada · utilidad " + fmt(venta - compra) + " ✓");
+    }
+    setFormVenta(null);
+  };
+
+  const guardarPago = () => {
+    const d = formPago.draft;
+    const monto = Math.round(num(d.monto));
+    if (monto <= 0) return showToast("El pago debe ser mayor a 0.", true);
+    const base = {
+      fecha: d.fecha || hoyLocal(),
+      proveedor: formPago.proveedor,
+      monto,
+      medio: d.medio || "efectivo",
+      nota: (d.nota || "").trim(),
+    };
+    if (formPago.editId) {
+      persistBunker("pagos", pagos.map((p) => (p.id === formPago.editId ? { ...p, ...base } : p)));
+      showToast("Pago actualizado ✓");
+    } else {
+      persistBunker("pagos", [...pagos, { ...base, id: nuevoId("bp"), creado: new Date().toISOString(), creadoPor: userEmail || "" }]);
+      showToast("Pago de " + fmt(monto) + " a " + nombreProv(formPago.proveedor) + " ✓");
+    }
+    setFormPago(null);
+  };
+
+  const guardarGastoBk = () => {
+    const d = formGasto.draft;
+    const monto = Math.round(num(d.monto));
+    if (!d.desc.trim() || monto <= 0) return showToast("Escribe la descripción y un monto mayor a 0.", true);
+    const base = { fecha: d.fecha || hoyLocal(), desc: d.desc.trim().toUpperCase(), monto, categoria: d.categoria || "otro" };
+    if (formGasto.editId) {
+      persistBunker("gastos", gastos.map((g) => (g.id === formGasto.editId ? { ...g, ...base } : g)));
+      showToast("Gasto actualizado ✓");
+    } else {
+      persistBunker("gastos", [...gastos, { ...base, id: nuevoId("bg"), creado: new Date().toISOString(), creadoPor: userEmail || "" }]);
+      showToast("Gasto registrado: " + fmt(monto) + " ✓");
+    }
+    setFormGasto(null);
+  };
+
+  const guardarBodega = () => {
+    const d = formBodega.draft;
+    const nombre = (d.nombre || "").trim();
+    if (!nombre) return showToast("Escribe el nombre de la bodega.", true);
+    // El saldo inicial solo cuenta si viene con fecha de corte: sin fecha no se
+    // sabría qué ventas quedan dentro de ese número y cuáles se suman aparte.
+    const conAncla = String(d.saldoInicial) !== "" && d.saldoFecha;
+    const ancla = conAncla
+      ? { saldoInicial: Math.round(num(d.saldoInicial)), saldoFecha: d.saldoFecha }
+      : { saldoInicial: 0, saldoFecha: "" };
+    if (formBodega.editId) {
+      // Cambiar el NOMBRE no cambia el id: el histórico de esa bodega se
+      // mantiene intacto (así se renombra Francy → Moisés sin perder nada).
+      persistBunker("proveedores", proveedores.map((p) => (p.id === formBodega.editId
+        ? { ...p, nombre: nombre.toUpperCase(), tel: (d.tel || "").trim(), nota: (d.nota || "").trim(), activo: d.activo !== false, ...ancla }
+        : p)));
+      showToast(conAncla ? "Saldo fijado en " + fmt(ancla.saldoInicial) + " al " + fechaCorta(ancla.saldoFecha) + " ✓" : "Bodega actualizada ✓");
+    } else {
+      const id = bkSlug(nombre);
+      if (provPorId[id]) return showToast("Ya existe una bodega con ese nombre.", true);
+      persistBunker("proveedores", [...proveedores, {
+        id, nombre: nombre.toUpperCase(), tel: (d.tel || "").trim(), nota: (d.nota || "").trim(),
+        activo: true, creado: new Date().toISOString(), ...ancla,
+      }]);
+      showToast("Bodega " + nombre.toUpperCase() + " creada ✓");
+    }
+    setFormBodega(null);
+  };
+
+  const borrar = () => {
+    const { que, item } = confirmBorrar;
+    if (que === "ventas") persistBunker("ventas", ventas.filter((v) => v.id !== item.id));
+    if (que === "pagos") persistBunker("pagos", pagos.filter((p) => p.id !== item.id));
+    if (que === "gastos") persistBunker("gastos", gastos.filter((g) => g.id !== item.id));
+    if (que === "proveedores") {
+      // Una bodega con movimientos NO se borra: se desactiva. Si se borrara,
+      // sus ventas quedarían huérfanas y la deuda desaparecería de la lista.
+      const tieneMovs = ventas.some((v) => v.proveedor === item.id) || pagos.some((p) => p.proveedor === item.id);
+      if (tieneMovs) {
+        persistBunker("proveedores", proveedores.map((p) => (p.id === item.id ? { ...p, activo: false } : p)));
+        showToast("La bodega tiene historial: quedó INACTIVA (no se borró para no perder la deuda).");
+        setConfirmBorrar(null);
+        setDetalleProv(null);
+        return;
+      }
+      persistBunker("proveedores", proveedores.filter((p) => p.id !== item.id));
+      setDetalleProv(null);
+    }
+    setConfirmBorrar(null);
+    showToast("Eliminado ✓");
+  };
+
+  // ---------- Documento por bodega (lo que se le presenta a cada una) ----------
+  const movimientosDe = (pid) => {
+    const movs = [];
+    ventas.filter((v) => v.proveedor === pid && enR(v.fecha)).forEach((v) =>
+      movs.push({ tipo: "merc", fecha: v.fecha, desc: v.desc, talla: v.talla, cant: qty(v), debe: num(v.compra) * qty(v), pago: 0, item: v })
+    );
+    pagos.filter((p) => p.proveedor === pid && enR(p.fecha)).forEach((p) =>
+      movs.push({ tipo: "pago", fecha: p.fecha, desc: "PAGO" + (p.nota ? " · " + p.nota : ""), talla: "", cant: "", debe: 0, pago: num(p.monto), item: p })
+    );
+    movs.sort((a, b) => (a.fecha !== b.fecha ? (a.fecha < b.fecha ? -1 : 1) : a.tipo === b.tipo ? 0 : a.tipo === "merc" ? -1 : 1));
+    return movs;
+  };
+
+  // Lo que se le entrega a la bodega: SOLO sus ventas del rango elegido.
+  // Nada de pagos ni de saldo acumulado — eso es cuenta del local, no de ella
+  // (decisión del dueño, 12/08). Cuatro columnas para que quepan en una hoja.
+  const ventasDe = (pid) =>
+    ventas.filter((v) => v.proveedor === pid && enR(v.fecha))
+      .sort((a, b) => (a.fecha !== b.fecha ? (a.fecha < b.fecha ? -1 : 1) : 0));
+
+  const exportarProveedor = (pid) => {
+    const vs = ventasDe(pid);
+    const total = vs.reduce((a, v) => a + num(v.compra) * qty(v), 0);
+    const pares = vs.reduce((a, v) => a + qty(v), 0);
+    const rows = [
+      ["RELACIÓN DE MERCANCÍA VENDIDA — " + nombreProv(pid)],
+      ["Local Búnker · " + rangoTexto],
+      ["Generado el " + fechaCorta(hoyLocal())],
+      [],
+      ["Fecha", "Descripción", "Talla", "Valor"],
+      ...vs.map((v) => [fechaCorta(v.fecha), v.desc, v.talla, num(v.compra) * qty(v)]),
+      [],
+      [pares + " pares", "TOTAL", "", total],
+    ];
+    downloadCSV(rows, "bunker-" + pid + "-" + hoyLocal() + ".csv");
+    showToast("Excel de " + nombreProv(pid) + " descargado ✓");
+  };
+
+  // El MISMO documento, pero como archivo PDF descargable (para mandarlo por
+  // WhatsApp sin pasar por el diálogo de impresión).
+  const pdfProveedor = (pid) => {
+    const vs = ventasDe(pid);
+    if (!vs.length) { showToast("Esa bodega no tiene ventas en las fechas elegidas.", true); return; }
+    const total = vs.reduce((a, v) => a + num(v.compra) * qty(v), 0);
+    const pares = vs.reduce((a, v) => a + qty(v), 0);
+    descargarPDF({
+      archivo: "bunker-" + pid + "-" + hoyLocal() + ".pdf",
+      titulo: nombreProv(pid),
+      sub: "Relación de mercancía vendida · Local Búnker",
+      derecha: [rangoTexto, "Generado el " + fechaCorta(hoyLocal())],
+      columnas: [
+        { txt: "#", x: 46, al: "c" },
+        { txt: "FECHA", x: 100, al: "c" },
+        { txt: "DESCRIPCIÓN", x: 138, al: "i", ancho: 268 },
+        { txt: "TALLA", x: 432, al: "c" },
+        { txt: "VALOR", x: 572, al: "d" },
+      ],
+      filas: vs.map((v, i) => [String(i + 1), fechaCorta(v.fecha), v.desc, v.talla || "", fmt(num(v.compra) * qty(v))]),
+      total: { izq: pares + " par" + (pares === 1 ? "" : "es") + " vendido" + (pares === 1 ? "" : "s"), der: fmt(total) },
+      firmas: ["Entrega — Local Búnker", "Recibe — " + nombreProv(pid)],
+      pie: "Valores al precio de compra acordado con la bodega.",
+    });
+    showToast("PDF de " + nombreProv(pid) + " descargado ✓");
+  };
+
+  // Hoja para IMPRIMIR (tamaño CARTA) y entregarle a la bodega. Solo sus
+  // ventas del rango y el total: sin pagos y sin saldo acumulado.
+  const imprimirProveedor = (pid) => {
+    const vs = ventasDe(pid);
+    const total = vs.reduce((a, v) => a + num(v.compra) * qty(v), 0);
+    const pares = vs.reduce((a, v) => a + qty(v), 0);
+    const esc = (t) => String(t == null ? "" : t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const filas = vs.map((v, i) =>
+      "<tr><td class='c'>" + (i + 1) + "</td><td class='c'>" + esc(fechaCorta(v.fecha)) + "</td><td>" + esc(v.desc) +
+      "</td><td class='c'>" + esc(v.talla) + "</td><td class='n'>" + fmt(num(v.compra) * qty(v)) + "</td></tr>"
+    ).join("");
+    const html =
+      "<!DOCTYPE html><html lang='es'><head><meta charset='utf-8'>" +
+      "<title>" + esc(nombreProv(pid)) + " " + esc(fechaCorta(hoyLocal())) + "</title><style>" +
+      // CARTA con márgenes de impresora doméstica. En pantalla se ve del mismo
+      // ancho que la hoja, para que no haya sorpresas al imprimir.
+      "@page{size:letter portrait;margin:14mm 13mm}" +
+      "*{box-sizing:border-box}" +
+      "body{font-family:'Helvetica Neue',Arial,sans-serif;color:#111;margin:0;padding:14mm 13mm;" +
+      "font-size:10.5pt;line-height:1.35;max-width:216mm}" +
+      ".cab{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2.5px solid #111;padding-bottom:8px;margin-bottom:4px}" +
+      "h1{font-size:17pt;margin:0;letter-spacing:-.01em}" +
+      ".sub{font-size:9.5pt;color:#444;margin-top:3px}" +
+      ".der{text-align:right;font-size:9pt;color:#555;white-space:nowrap}" +
+      "table{width:100%;border-collapse:collapse;margin-top:12px}" +
+      "thead{display:table-header-group}" +          // la cabecera se repite en cada hoja
+      "tr{break-inside:avoid;page-break-inside:avoid}" +
+      "th{font-size:8pt;text-transform:uppercase;letter-spacing:.06em;color:#333;text-align:left;" +
+      "border-bottom:1.5px solid #111;padding:4px 6px}" +
+      // Filas apretadas a propósito: así una entrega normal (35-40 pares) cabe
+      // en UNA hoja carta en vez de partirse en dos.
+      "td{padding:2.6px 6px;border-bottom:.75px solid #e0e0e0;font-size:9.5pt;line-height:1.25}" +
+      "td.desc{width:100%}" +
+      ".n{text-align:right;white-space:nowrap}.c{text-align:center;white-space:nowrap}" +
+      ".num{color:#888;font-size:8.5pt}" +
+      ".tot{margin-top:14px;border-top:2.5px solid #111;padding-top:9px;display:flex;" +
+      "justify-content:space-between;align-items:baseline;break-inside:avoid}" +
+      ".tot .etq{font-size:10pt;color:#444}.tot .val{font-size:16pt;font-weight:800}" +
+      ".firmas{margin-top:22mm;display:flex;gap:18mm;break-inside:avoid}" +
+      ".firma{flex:1;border-top:1px solid #111;padding-top:5px;font-size:8.5pt;color:#555}" +
+      ".pie{margin-top:10px;color:#777;font-size:8pt}" +
+      "@media print{body{padding:0}}" +
+      "</style></head><body>" +
+      "<div class='cab'><div><h1>" + esc(nombreProv(pid)) + "</h1>" +
+      "<div class='sub'>Relación de mercancía vendida · Local Búnker</div></div>" +
+      "<div class='der'>" + esc(rangoTexto) + "<br>Generado el " + esc(fechaCorta(hoyLocal())) + "</div></div>" +
+      "<table><thead><tr><th class='c'>#</th><th class='c'>Fecha</th><th class='desc'>Descripción</th>" +
+      "<th class='c'>Talla</th><th class='n'>Valor</th></tr></thead><tbody>" +
+      (filas || "<tr><td colspan='5' style='padding:14px 6px'>No hay ventas de esta bodega en las fechas seleccionadas.</td></tr>") +
+      "</tbody></table>" +
+      "<div class='tot'><span class='etq'>" + pares + " par" + (pares === 1 ? "" : "es") + " vendido" + (pares === 1 ? "" : "s") + "</span>" +
+      "<span><span class='etq'>Total&nbsp;&nbsp;</span><span class='val'>" + fmt(total) + "</span></span></div>" +
+      "<div class='firmas'><div class='firma'>Entrega — Local Búnker</div><div class='firma'>Recibe — " + esc(nombreProv(pid)) + "</div></div>" +
+      "<div class='pie'>Valores al precio de compra acordado con la bodega.</div>" +
+      "</body></html>";
+    const w = window.open("", "_blank");
+    if (!w) { showToast("El navegador bloqueó la ventana. Usa “Descargar Excel”.", true); return; }
+    w.document.write(html);
+    w.document.close();
+    w.focus();
+    setTimeout(() => { try { w.print(); } catch (e) {} }, 400);
+  };
+
+  // Para mandarle por WhatsApp a la bodega: lo mismo que dice la hoja impresa
+  // (sus ventas del rango), sin pagos ni saldo acumulado.
+  const copiarResumen = (pid) => {
+    const vs = ventasDe(pid);
+    const total = vs.reduce((a, v) => a + num(v.compra) * qty(v), 0);
+    const pares = vs.reduce((a, v) => a + qty(v), 0);
+    const txt =
+      "*" + nombreProv(pid) + "* — Local Búnker\n" + rangoTexto + "\n" +
+      pares + " par" + (pares === 1 ? "" : "es") + " vendido" + (pares === 1 ? "" : "s") + "\n" +
+      "Total: " + fmt(total);
+    try {
+      navigator.clipboard.writeText(txt);
+      showToast("Resumen copiado — pégalo en WhatsApp ✓");
+    } catch (e) {
+      showToast("No se pudo copiar en este navegador.", true);
+    }
+  };
+
+  // ---------- Importar el histórico ----------
+  const leerArchivo = (file) => {
+    if (!file) return;
+    const fr = new FileReader();
+    fr.onload = () => {
+      const res = bkLeerCSV(String(fr.result || ""));
+      if (res.error) { showToast(res.error, true); return; }
+      setImportar({ previo: res, nombre: file.name });
+    };
+    fr.onerror = () => showToast("No se pudo leer el archivo.", true);
+    fr.readAsText(file, "utf-8");
+  };
+
+  const confirmarImportar = async () => {
+    const p = importar.previo;
+    // Las bodegas que ya existen NO se pisan (conservan nombre editado y estado)
+    const bodegasNuevas = p.bodegas.filter((b) => !provPorId[b.id]);
+    const ok = await importarBunker(p.ventas, bodegasNuevas);
+    if (ok) {
+      showToast(p.ventas.length + " ventas importadas ✓ (repetir el archivo no las duplica)");
+      setImportar(null);
+    }
+  };
+
+  // ---------- Listas para pintar ----------
+  const q = normTxt(buscar);
+  const ventasVista = ventasR
+    .filter((v) => !q || normTxt(v.desc).indexOf(q) !== -1 || normTxt(nombreProv(v.proveedor)).indexOf(q) !== -1 || String(v.talla) === q)
+    .sort((a, b) => (a.fecha !== b.fecha ? (a.fecha < b.fecha ? 1 : -1) : (a.creado || "") < (b.creado || "") ? 1 : -1));
+  const dias = [];
+  ventasVista.slice(0, mostrarVentas).forEach((v) => {
+    const d = dias.length && dias[dias.length - 1].fecha === v.fecha ? dias[dias.length - 1] : (dias.push({ fecha: v.fecha, items: [] }), dias[dias.length - 1]);
+    d.items.push(v);
+  });
+
+  // Pestaña activa en NEGRO sólido, no en blanco sobre casi blanco: en la
+  // pantalla del local (con sol) el estado activo tiene que verse de lejos.
+  const subTab = (id, label) => (
+    <button
+      key={id}
+      onClick={() => setVista(id)}
+      style={{
+        flex: 1, border: "none", background: vista === id ? C.ink : "transparent",
+        color: vista === id ? "#fff" : C.ink2, borderRadius: 11, padding: "10px 4px",
+        fontWeight: 800, fontSize: 12.5, cursor: "pointer",
+      }}
+    >
+      {label}
+    </button>
+  );
+
+  // Ficha de dato para FONDO CLARO (la versión clara de MiniStat, que solo
+  // sirve sobre el panel negro).
+  const bkStat = (label, valor) => (
+    <div key={label} style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 14, padding: "11px 12px" }}>
+      <div style={{ ...eyebrow(), fontSize: 9.5 }}>{label}</div>
+      <div style={{ ...display(19), marginTop: 4 }}>{valor}</div>
+    </div>
+  );
+
+  // Tarjeta del módulo: con BORDE, no solo sombra. Blanco sobre #F4F4F2 con una
+  // sombra suave se lee como una mancha; el borde le devuelve el filo.
+  const bkCard = (extra = {}) => ({
+    background: C.card,
+    border: `1px solid ${C.line}`,
+    borderRadius: 16,
+    boxShadow: "0 1px 2px rgba(16,16,18,.04)",
+    ...extra,
+  });
+
+  // El ancla oscura de cada vista: un solo bloque, siempre en el mismo sitio,
+  // que cambia de contenido según la pestaña. Sin esto, Ventas/Bodegas/Gastos
+  // quedaban en blanco sobre casi blanco y la pantalla se veía "muy clara".
+  const anclaVista =
+    vista === "ventas" ? { ojo: "Vendido en el periodo", valor: totalVenta, pie: paresR + " par" + (paresR === 1 ? "" : "es") + " · utilidad " + fmtS(utilidadBruta) }
+      : vista === "bodegas" ? { ojo: "Lo que le debo a las bodegas", valor: deudaTotal, pie: filasSaldo.length + " bodega" + (filasSaldo.length === 1 ? "" : "s") + " · pagado en el periodo " + fmt(totalPagosR), rojo: true }
+        : vista === "gastos" ? { ojo: "Gastos del periodo", valor: totalGastos, pie: gastosR.length + " registro" + (gastosR.length === 1 ? "" : "s") }
+          : { ojo: "Utilidad del local", valor: utilidadNeta, pie: "Bruta " + fmtS(utilidadBruta) + " − gastos " + fmt(totalGastos) };
+
+  return (
+    <div style={{ padding: "16px 16px 0" }} className="vm-fade">
+      {/* Cabecera. La acción "Importar" es de una sola vez en la vida del
+          módulo: vive en el menú, no compitiendo con el título todos los días. */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, padding: "0 2px", gap: 8 }}>
+        <div>
+          <div style={display(22)}>Local Búnker</div>
+          <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>
+            Cuentas del local · aparte de VarMan Crew
+          </div>
+        </div>
+        <button onClick={() => setMenu(true)} aria-label="Más opciones" style={btnIcon()}>
+          <svg {...svgP()} viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.4" fill="currentColor" /><circle cx="12" cy="12" r="1.4" fill="currentColor" /><circle cx="19" cy="12" r="1.4" fill="currentColor" /></svg>
+        </button>
+      </div>
+
+      {/* Sub-pestañas: la navegación del módulo */}
+      <div style={{ display: "flex", gap: 4, background: C.bg, border: `1.5px solid ${C.line}`, borderRadius: 14, padding: 4, marginBottom: 10 }}>
+        {subTab("resumen", "Resumen")}
+        {subTab("graficas", "Gráficas")}
+        {subTab("ventas", "Ventas")}
+        {subTab("bodegas", "Bodegas")}
+        {subTab("gastos", "Gastos")}
+      </div>
+
+      {/* Periodo: UNA fila que no se desborda y que dice el rango de verdad
+          (antes eran 6 chips que se salían de la pantalla en el celular). */}
+      <button
+        onClick={() => setSheetPeriodo(true)}
+        className="vm-press"
+        style={{
+          width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
+          gap: 8, background: C.card, border: `1.5px solid ${C.line}`, borderRadius: 13,
+          padding: "10px 13px", cursor: "pointer", marginBottom: 16,
+          fontFamily: "Inter, sans-serif", color: C.ink,
+        }}
+      >
+        <span style={{ display: "flex", alignItems: "center", gap: 9, minWidth: 0 }}>
+          <svg {...svgP()} viewBox="0 0 24 24" style={{ width: 16, height: 16, color: C.muted, flexShrink: 0 }}>
+            <rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18M8 3v4M16 3v4" />
+          </svg>
+          <b style={{ fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{periodoLabel}</b>
+        </span>
+        <span style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0, color: C.muted, fontSize: 13, fontWeight: 600 }}>
+          {rangoCorto}
+          <svg {...svgP()} viewBox="0 0 24 24" style={{ width: 15, height: 15 }}><path d="M6 9l6 6 6-6" /></svg>
+        </span>
+      </button>
+
+      {/* Si Firestore rechaza la lectura, la pantalla se ve IGUAL que si no
+          hubiera datos. Decirlo, y decir qué hacer. */}
+      {error && (
+        <div style={{ background: C.redSoft, color: C.red, borderRadius: 14, padding: "12px 14px", marginBottom: 14, fontSize: 13, lineHeight: 1.5 }}>
+          <b>No se pudo leer la información del local.</b>{" "}
+          {error === "permission-denied"
+            ? "Firestore rechazó la lectura: faltan por publicar las reglas nuevas (bloque bunker) o entraste con un correo que no es el tuyo ni el de Andrés."
+            : "Error de conexión (" + error + "). Revisa el internet."}
+        </div>
+      )}
+
+      {/* El ancla oscura del módulo: el número que manda en la vista abierta.
+          Siempre en el mismo sitio, para no tener cuatro pantallas distintas.
+          En Gráficas no va: ahí el panel oscuro ES el contenido. */}
+      {!primerArranque && vista !== "graficas" && (
+        <div
+          style={{
+            background: C.ink, borderRadius: 18, padding: "16px 18px", marginBottom: 14,
+            color: "#fff", position: "relative", overflow: "hidden",
+            boxShadow: "0 10px 26px rgba(16,16,18,.20)",
+          }}
+        >
+          <div style={eyebrow("rgba(255,255,255,.55)")}>{anclaVista.ojo}</div>
+          <div style={{ ...display(34, anclaVista.rojo && anclaVista.valor > 0 ? "#FF8A65" : "#fff"), margin: "6px 0 3px" }}>
+            {fmtS(anclaVista.valor)}
+          </div>
+          <div style={{ fontSize: 12.5, color: "rgba(255,255,255,.62)" }}>{anclaVista.pie}</div>
+        </div>
+      )}
+
+      {/* PRIMER ARRANQUE: sin una sola venta ni bodega, los ceros no significan
+          "no vendiste nada", significan "esto todavía está vacío". El histórico
+          del Excel NO sube solo: hay que importarlo una vez. Decirlo aquí, con
+          el botón al lado, en vez de mostrar $0 en cuatro tarjetas. */}
+      {primerArranque && (
+        <div style={bkCard({ padding: "22px 18px", marginBottom: 16 })}>
+          <div style={{ ...display(19), marginBottom: 6 }}>Aquí todavía no hay nada</div>
+          <div style={{ fontSize: 13.5, color: C.ink2, lineHeight: 1.6, marginBottom: 16 }}>
+            El histórico del Excel <b>no viaja solo</b>: hay que subir el archivo <b>una vez</b>
+            {" "}desde este dispositivo. Después de eso queda sincronizado en todos los celulares
+            del local.
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button onClick={() => setImportar({ previo: null })} style={btnPrimary({ flex: "1 1 180px" })}>
+              Importar el Excel
+            </button>
+            <button onClick={() => { setVista("bodegas"); setFormBodega({ draft: { nombre: "", tel: "", nota: "", activo: true, saldoInicial: "", saldoFecha: "" }, editId: null }); }} style={btnGhost({ flex: "1 1 140px" })}>
+              Empezar de cero
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ---------------- RESUMEN ---------------- */}
+      {/* En el primer arranque no se pintan cuatro tarjetas en $0 debajo del
+          aviso: cero tarjetas vacías, solo el aviso que dice qué hacer. */}
+      {vista === "resumen" && !primerArranque && (
+        <div>
+          {/* OJO: aquí NO va <MiniStat>. Ese componente está hecho para el panel
+              NEGRO (texto blanco sobre fondo casi transparente); puesto sobre
+              fondo claro queda blanco sobre blanco y no se lee nada. */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
+            {bkStat("Vendido", fmt(totalVenta))}
+            {bkStat("Costo (bodegas)", fmt(totalCompra))}
+            {bkStat("Pares vendidos", String(paresR))}
+            {bkStat("Pagado a bodegas", fmt(totalPagosR))}
+          </div>
+
+          <div style={bkCard({ padding: 14, marginBottom: 12 })}>
+            <div style={{ ...eyebrow(), marginBottom: 8 }}>Cómo entró la plata</div>
+            {BK_MEDIOS.map((m) => (
+              <div key={m.id} style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", fontSize: 13.5 }}>
+                <span style={{ color: C.ink2 }}>{m.label}</span>
+                <b>{fmt(porMedio[m.id])}</b>
+              </div>
+            ))}
+            {porMedio.otro > 0 && (
+              <div style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", fontSize: 13.5 }}>
+                <span style={{ color: C.muted }}>Sin medio registrado</span>
+                <b>{fmt(porMedio.otro)}</b>
+              </div>
+            )}
+          </div>
+
+          <div style={bkCard({ padding: 14, marginBottom: 14 })}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4 }}>
+              <div style={eyebrow()}>Lo que le debo a cada bodega</div>
+              <div style={{ fontSize: 11.5, color: C.muted }}>saldo total</div>
+            </div>
+            <div style={{ ...display(24), margin: "2px 0 10px", color: deudaTotal > 0 ? C.red : C.green }}>{fmtS(deudaTotal)}</div>
+            {!filasSaldo.length && <div style={{ fontSize: 13, color: C.muted }}>Todavía no hay bodegas registradas.</div>}
+            {filasSaldo.map((s) => (
+              <button
+                key={s.id}
+                onClick={() => setDetalleProv(s.id)}
+                className="vm-press"
+                style={{
+                  width: "100%", textAlign: "left", border: "none", background: "transparent",
+                  borderTop: `1px solid ${C.line}`, padding: "10px 2px", cursor: "pointer", display: "flex",
+                  justifyContent: "space-between", alignItems: "center", gap: 8,
+                }}
+              >
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontWeight: 800, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.nombre}</div>
+                  <div style={{ fontSize: 11.5, color: C.ink2, marginTop: 2 }}>
+                    vendí {fmt(s.mercR)} · pagué {fmt(s.pagR)}
+                  </div>
+                </div>
+                <div style={{ textAlign: "right", flexShrink: 0 }}>
+                  <div style={{ fontWeight: 900, fontSize: 15, color: s.saldo > 0 ? C.red : C.green }}>{fmtS(s.saldo)}</div>
+                  <div style={{ fontSize: 10.5, color: C.muted }}>ver cuenta ›</div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ---------------- GRÁFICAS ---------------- */}
+      {vista === "graficas" && !primerArranque && (
+        <BunkerGraficas
+          ventasR={ventasR}
+          filasSaldo={filasSaldo}
+          porMedio={porMedio}
+          totalVenta={totalVenta}
+          utilidadBruta={utilidadBruta}
+          rangoCorto={periodo === "todo" ? "todo el histórico" : rangoCorto}
+        />
+      )}
+
+      {/* ---------------- VENTAS ---------------- */}
+      {vista === "ventas" && (
+        <div>
+          <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+            <button onClick={() => setFormVenta({ draft: { ...emptyBkVenta(), proveedor: bodegasActivas.length === 1 ? bodegasActivas[0].id : "" }, editId: null })} style={btnPrimary({ flex: 1 })}>
+              + Registrar venta
+            </button>
+          </div>
+          <input
+            value={buscar}
+            onChange={(e) => setBuscar(e.target.value)}
+            placeholder="Buscar por modelo, bodega o talla…"
+            style={inputStyle({ marginBottom: 12, padding: "11px 13px" })}
+          />
+          {!ventasVista.length && (
+            <EmptyState icon={<IconChart big />} title="Sin ventas en este periodo" text="Registra la primera venta del local o importa el histórico del Excel." />
+          )}
+          {dias.map((d) => {
+            const tVenta = d.items.reduce((a, v) => a + num(v.venta) * qty(v), 0);
+            const tUtil = d.items.reduce((a, v) => a + (num(v.venta) - num(v.compra)) * qty(v), 0);
+            return (
+              <div key={d.fecha} style={{ marginBottom: 14 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", padding: "0 4px 6px" }}>
+                  <div style={{ fontWeight: 800, fontSize: 13.5 }}>{fechaCorta(d.fecha)}</div>
+                  <div style={{ fontSize: 12, color: C.ink2 }}>
+                    {d.items.length} par{d.items.length === 1 ? "" : "es"} · {fmt(tVenta)} · util. <b style={{ color: C.green }}>{fmt(tUtil)}</b>
+                  </div>
+                </div>
+                <div style={bkCard({ overflow: "hidden" })}>
+                  {d.items.map((v, i) => (
+                    <button
+                      key={v.id}
+                      onClick={() => setFormVenta({
+                        draft: { fecha: v.fecha, desc: v.desc, talla: v.talla || "", proveedor: v.proveedor, compra: v.compra, venta: v.venta, medio: v.medio || "efectivo" },
+                        editId: v.id,
+                      })}
+                      className="vm-press"
+                      style={{
+                        width: "100%", textAlign: "left", border: "none", background: "transparent", cursor: "pointer",
+                        borderTop: i ? `1px solid ${C.line}` : "none", padding: "11px 13px",
+                        display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center",
+                      }}
+                    >
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontWeight: 700, fontSize: 13.5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                          {v.desc}{v.talla ? " · " + v.talla : ""}
+                        </div>
+                        <div style={{ fontSize: 11.5, color: C.ink2, marginTop: 2 }}>
+                          {nombreProv(v.proveedor)} · {bkMedio(v.medio)} · compra {fmt(num(v.compra))}
+                        </div>
+                      </div>
+                      <div style={{ textAlign: "right", flexShrink: 0 }}>
+                        <div style={{ fontWeight: 800, fontSize: 14 }}>{fmt(num(v.venta) * qty(v))}</div>
+                        <div style={{ fontSize: 11.5, fontWeight: 700, color: num(v.venta) - num(v.compra) >= 0 ? C.green : C.red }}>
+                          {fmtS((num(v.venta) - num(v.compra)) * qty(v))}
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+          {ventasVista.length > mostrarVentas && (
+            <button onClick={() => setMostrarVentas(mostrarVentas + 60)} style={btnGhost({ width: "100%", marginBottom: 16 })}>
+              Ver más ({ventasVista.length - mostrarVentas} restantes)
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* ---------------- BODEGAS ---------------- */}
+      {vista === "bodegas" && (
+        <div>
+          <button onClick={() => setFormBodega({ draft: { nombre: "", tel: "", nota: "", activo: true, saldoInicial: "", saldoFecha: "" }, editId: null })} style={btnPrimary({ width: "100%", marginBottom: 12 })}>
+            + Nueva bodega
+          </button>
+          {!filasSaldo.length && <EmptyState icon={<IconCash big />} title="Sin bodegas" text="Crea las bodegas que te dejan mercancía para poder asignarles cada venta." />}
+          {filasSaldo.map((s) => {
+            const p = provPorId[s.id];
+            return (
+              <div key={s.id} style={bkCard({ padding: 14, marginBottom: 10 })}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontWeight: 800, fontSize: 15 }}>
+                      {s.nombre}
+                      {p && p.activo === false && <span style={{ fontSize: 11, color: C.muted, fontWeight: 700 }}> · inactiva</span>}
+                    </div>
+                    <div style={{ fontSize: 12, color: C.ink2, marginTop: 3 }}>
+                      {s.paresR} par{s.paresR === 1 ? "" : "es"} · vendí {fmt(s.mercR)} · pagué {fmt(s.pagR)}
+                    </div>
+                  </div>
+                  <div style={{ textAlign: "right", flexShrink: 0 }}>
+                    <div style={{ ...eyebrow(), fontSize: 9.5 }}>saldo total</div>
+                    <div style={{ fontWeight: 900, fontSize: 17, color: s.saldo > 0 ? C.red : C.green }}>{fmtS(s.saldo)}</div>
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 6, marginTop: 11, flexWrap: "wrap" }}>
+                  <button onClick={() => setDetalleProv(s.id)} style={btnGhost({ padding: "8px 12px", fontSize: 12.5 })}>Ver cuenta</button>
+                  <button onClick={() => setFormPago({ draft: emptyBkPago(), proveedor: s.id, editId: null })} style={btnGhost({ padding: "8px 12px", fontSize: 12.5 })}>Registrar pago</button>
+                  {/* El documento que se le entrega. PDF y no Excel: el CSV no
+                      tiene formato y no cabe en una hoja carta. */}
+                  <button onClick={() => pdfProveedor(s.id)} style={btnGhost({ padding: "8px 12px", fontSize: 12.5 })}>PDF</button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* ---------------- GASTOS ---------------- */}
+      {vista === "gastos" && (
+        <div>
+          <button onClick={() => setFormGasto({ draft: emptyBkGastoBk(), editId: null })} style={btnPrimary({ width: "100%", marginBottom: 12 })}>
+            + Registrar gasto
+          </button>
+          {/* El total ya está en el ancla de arriba: aquí solo el desglose */}
+          <div style={bkCard({ padding: 14, marginBottom: 12 })}>
+            <div style={{ ...eyebrow(), marginBottom: 8 }}>En qué se fue</div>
+            {CATS_GASTO_BK.map((c) => {
+              const t = gastosR.filter((g) => (g.categoria || "otro") === c.id).reduce((a, g) => a + num(g.monto), 0);
+              if (!t) return null;
+              return (
+                <div key={c.id} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", fontSize: 13 }}>
+                  <span style={{ color: C.ink2 }}>{c.label}</span>
+                  <b>{fmt(t)}</b>
+                </div>
+              );
+            })}
+          </div>
+          {!gastosR.length && <EmptyState icon={<IconCash big />} title="Sin gastos en este periodo" text="Arriendo, nómina, servicios o caja menor del local." />}
+          {gastosR.slice().sort((a, b) => (a.fecha < b.fecha ? 1 : -1)).map((g, i) => (
+            <div key={g.id} style={bkCard({ padding: "11px 13px", marginBottom: 8, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 })}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontWeight: 700, fontSize: 13.5 }}>{g.desc}</div>
+                <div style={{ fontSize: 11.5, color: C.ink2, marginTop: 2 }}>
+                  {fechaCorta(g.fecha)} · {(CATS_GASTO_BK.filter((c) => c.id === (g.categoria || "otro"))[0] || { label: "Otro" }).label}
+                </div>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                <b style={{ fontSize: 14 }}>{fmt(num(g.monto))}</b>
+                <button onClick={() => setFormGasto({ draft: { fecha: g.fecha, desc: g.desc, monto: g.monto, categoria: g.categoria || "otro" }, editId: g.id })} style={btnIcon()}>✎</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div style={{ height: 90 }} />
+
+      {/* ---------------- Hoja: periodo ---------------- */}
+      {sheetPeriodo && (
+        <Sheet title="Periodo" onClose={() => setSheetPeriodo(false)}>
+          {BK_PERIODOS.map((p) => (
+            <button
+              key={p.id}
+              onClick={() => { setPeriodo(p.id); if (p.id !== "custom") setSheetPeriodo(false); }}
+              style={{
+                width: "100%", textAlign: "left", cursor: "pointer",
+                background: periodo === p.id ? C.ink : C.card, color: periodo === p.id ? "#fff" : C.ink,
+                border: `1.5px solid ${periodo === p.id ? C.ink : C.line}`, borderRadius: 13,
+                padding: "13px 15px", marginBottom: 8, fontFamily: "Inter, sans-serif",
+                fontWeight: 700, fontSize: 14.5,
+              }}
+            >
+              {p.label}
+            </button>
+          ))}
+          {periodo === "custom" && (
+            <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+              <div style={{ flex: 1 }}>
+                <Field label="Desde">
+                  <input type="date" value={cDesde} max={cHasta} onChange={(e) => setCDesde(e.target.value)} style={inputStyle()} />
+                </Field>
+              </div>
+              <div style={{ flex: 1 }}>
+                <Field label="Hasta">
+                  <input type="date" value={cHasta} min={cDesde} onChange={(e) => setCHasta(e.target.value)} style={inputStyle()} />
+                </Field>
+              </div>
+            </div>
+          )}
+          {periodo === "custom" && (
+            <button onClick={() => setSheetPeriodo(false)} style={btnPrimary({ width: "100%", marginTop: 4 })}>Ver estas fechas</button>
+          )}
+        </Sheet>
+      )}
+
+      {/* ---------------- Hoja: menú ---------------- */}
+      {menu && (
+        <Sheet title="Opciones del local" onClose={() => setMenu(false)}>
+          <button onClick={() => { setMenu(false); setImportar({ previo: null }); }} style={btnGhost({ width: "100%", textAlign: "left", padding: "14px 16px", marginBottom: 8, fontSize: 14.5 })}>
+            Importar histórico del Excel
+          </button>
+          <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.55, padding: "2px 4px" }}>
+            {ventas.length
+              ? ventas.length + " ventas y " + proveedores.length + " bodegas guardadas. Volver a importar el mismo archivo no duplica nada."
+              : "Todavía no hay ventas cargadas."}
+          </div>
+        </Sheet>
+      )}
+
+      {/* ---------------- Hoja: venta ---------------- */}
+      {formVenta && (
+        <Sheet title={formVenta.editId ? "Editar venta" : "Nueva venta"} onClose={() => setFormVenta(null)}>
+          <Field label="Fecha">
+            <input type="date" value={formVenta.draft.fecha} onChange={(e) => setFormVenta({ ...formVenta, draft: { ...formVenta.draft, fecha: e.target.value } })} style={inputStyle()} />
+          </Field>
+          <Field label="Qué se vendió (referencia)">
+            <input
+              value={formVenta.draft.desc}
+              onChange={(e) => setFormVenta({ ...formVenta, draft: { ...formVenta.draft, desc: e.target.value } })}
+              placeholder="NIKE AIR MAX NEGRO"
+              style={inputStyle()}
+            />
+          </Field>
+          <div style={{ display: "flex", gap: 8 }}>
+            <div style={{ width: 110 }}>
+              <Field label="Talla">
+                <input value={formVenta.draft.talla} inputMode="numeric" onChange={(e) => setFormVenta({ ...formVenta, draft: { ...formVenta.draft, talla: e.target.value } })} style={inputStyle()} />
+              </Field>
+            </div>
+            <div style={{ flex: 1 }}>
+              <Field label="Bodega (proveedor)">
+                <select value={formVenta.draft.proveedor} onChange={(e) => setFormVenta({ ...formVenta, draft: { ...formVenta.draft, proveedor: e.target.value } })} style={inputStyle()}>
+                  <option value="">Elegir…</option>
+                  {bodegasActivas.map((p) => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+                  {formVenta.draft.proveedor && provPorId[formVenta.draft.proveedor] && provPorId[formVenta.draft.proveedor].activo === false && (
+                    <option value={formVenta.draft.proveedor}>{provPorId[formVenta.draft.proveedor].nombre} (inactiva)</option>
+                  )}
+                </select>
+              </Field>
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <div style={{ flex: 1 }}>
+              <Field label="Precio de compra">
+                <input value={formVenta.draft.compra} inputMode="numeric" onChange={(e) => setFormVenta({ ...formVenta, draft: { ...formVenta.draft, compra: e.target.value } })} placeholder="105000" style={inputStyle()} />
+              </Field>
+            </div>
+            <div style={{ flex: 1 }}>
+              <Field label="Precio de venta">
+                <input value={formVenta.draft.venta} inputMode="numeric" onChange={(e) => setFormVenta({ ...formVenta, draft: { ...formVenta.draft, venta: e.target.value } })} placeholder="130000" style={inputStyle()} />
+              </Field>
+            </div>
+          </div>
+          <Field label="Cómo pagó">
+            <div style={{ display: "flex", gap: 6 }}>
+              {BK_MEDIOS.concat(formVenta.draft.medio === "mixto" ? [{ id: "mixto", label: "Mixto" }] : []).map((m) => (
+                <button
+                  key={m.id}
+                  onClick={() => setFormVenta({ ...formVenta, draft: { ...formVenta.draft, medio: m.id } })}
+                  style={{
+                    flex: 1, border: `1.5px solid ${formVenta.draft.medio === m.id ? C.ink : C.line}`,
+                    background: formVenta.draft.medio === m.id ? C.ink : C.card,
+                    color: formVenta.draft.medio === m.id ? "#fff" : C.ink2,
+                    borderRadius: 12, padding: "11px 4px", fontWeight: 800, fontSize: 13, cursor: "pointer",
+                  }}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+          </Field>
+          {num(formVenta.draft.compra) > 0 && num(formVenta.draft.venta) > 0 && (
+            <div style={{ background: C.greenSoft, color: C.green, borderRadius: 12, padding: "10px 13px", fontWeight: 800, fontSize: 13.5, marginBottom: 10 }}>
+              Utilidad: {fmtS(Math.round(num(formVenta.draft.venta) - num(formVenta.draft.compra)))}
+              <span style={{ fontWeight: 600, color: C.ink2 }}> · le debes {fmt(Math.round(num(formVenta.draft.compra)))} a {formVenta.draft.proveedor ? nombreProv(formVenta.draft.proveedor) : "la bodega"}</span>
+            </div>
+          )}
+          <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
+            <button onClick={guardarVenta} style={btnPrimary({ flex: 1 })}>Guardar</button>
+            {formVenta.editId && (
+              <button onClick={() => { setConfirmBorrar({ que: "ventas", item: { id: formVenta.editId } }); setFormVenta(null); }} style={btnGhost({ color: C.red, borderColor: C.redSoft })}>
+                Eliminar
+              </button>
+            )}
+          </div>
+        </Sheet>
+      )}
+
+      {/* ---------------- Hoja: pago a bodega ---------------- */}
+      {formPago && (
+        <Sheet title={"Pago a " + nombreProv(formPago.proveedor)} onClose={() => setFormPago(null)}>
+          <div style={{ fontSize: 13, color: C.muted, marginBottom: 12 }}>
+            Saldo actual:{" "}
+            <b style={{ color: C.ink }}>{fmtS(saldoDe(formPago.proveedor))}</b>
+          </div>
+          <Field label="Fecha del pago">
+            <input type="date" value={formPago.draft.fecha} onChange={(e) => setFormPago({ ...formPago, draft: { ...formPago.draft, fecha: e.target.value } })} style={inputStyle()} />
+          </Field>
+          <Field label="Monto">
+            <input value={formPago.draft.monto} inputMode="numeric" onChange={(e) => setFormPago({ ...formPago, draft: { ...formPago.draft, monto: e.target.value } })} placeholder="500000" style={inputStyle()} />
+          </Field>
+          <Field label="Cómo se pagó">
+            <select value={formPago.draft.medio} onChange={(e) => setFormPago({ ...formPago, draft: { ...formPago.draft, medio: e.target.value } })} style={inputStyle()}>
+              {BK_MEDIOS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+            </select>
+          </Field>
+          <Field label="Nota (opcional)">
+            <input value={formPago.draft.nota} onChange={(e) => setFormPago({ ...formPago, draft: { ...formPago.draft, nota: e.target.value } })} placeholder="Abono de la semana" style={inputStyle()} />
+          </Field>
+          <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
+            <button onClick={guardarPago} style={btnPrimary({ flex: 1 })}>Guardar pago</button>
+            {formPago.editId && (
+              <button onClick={() => { setConfirmBorrar({ que: "pagos", item: { id: formPago.editId } }); setFormPago(null); }} style={btnGhost({ color: C.red, borderColor: C.redSoft })}>
+                Eliminar
+              </button>
+            )}
+          </div>
+        </Sheet>
+      )}
+
+      {/* ---------------- Hoja: gasto ---------------- */}
+      {formGasto && (
+        <Sheet title={formGasto.editId ? "Editar gasto" : "Nuevo gasto del local"} onClose={() => setFormGasto(null)}>
+          <Field label="Fecha">
+            <input type="date" value={formGasto.draft.fecha} onChange={(e) => setFormGasto({ ...formGasto, draft: { ...formGasto.draft, fecha: e.target.value } })} style={inputStyle()} />
+          </Field>
+          <Field label="Descripción">
+            <input value={formGasto.draft.desc} onChange={(e) => setFormGasto({ ...formGasto, draft: { ...formGasto.draft, desc: e.target.value } })} placeholder="ARRIENDO AGOSTO" style={inputStyle()} />
+          </Field>
+          <Field label="Monto">
+            <input value={formGasto.draft.monto} inputMode="numeric" onChange={(e) => setFormGasto({ ...formGasto, draft: { ...formGasto.draft, monto: e.target.value } })} style={inputStyle()} />
+          </Field>
+          <Field label="Categoría">
+            <select value={formGasto.draft.categoria} onChange={(e) => setFormGasto({ ...formGasto, draft: { ...formGasto.draft, categoria: e.target.value } })} style={inputStyle()}>
+              {CATS_GASTO_BK.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+            </select>
+          </Field>
+          <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
+            <button onClick={guardarGastoBk} style={btnPrimary({ flex: 1 })}>Guardar</button>
+            {formGasto.editId && (
+              <button onClick={() => { setConfirmBorrar({ que: "gastos", item: { id: formGasto.editId } }); setFormGasto(null); }} style={btnGhost({ color: C.red, borderColor: C.redSoft })}>
+                Eliminar
+              </button>
+            )}
+          </div>
+        </Sheet>
+      )}
+
+      {/* ---------------- Hoja: bodega ---------------- */}
+      {formBodega && (
+        <Sheet title={formBodega.editId ? "Editar bodega" : "Nueva bodega"} onClose={() => setFormBodega(null)}>
+          <Field label="Nombre">
+            <input value={formBodega.draft.nombre} onChange={(e) => setFormBodega({ ...formBodega, draft: { ...formBodega.draft, nombre: e.target.value } })} placeholder="MOISÉS" style={inputStyle()} />
+          </Field>
+          <Field label="Teléfono (opcional)">
+            <input value={formBodega.draft.tel} inputMode="tel" onChange={(e) => setFormBodega({ ...formBodega, draft: { ...formBodega.draft, tel: e.target.value } })} style={inputStyle()} />
+          </Field>
+          <Field label="Nota (opcional)">
+            <input value={formBodega.draft.nota} onChange={(e) => setFormBodega({ ...formBodega, draft: { ...formBodega.draft, nota: e.target.value } })} style={inputStyle()} />
+          </Field>
+          {formBodega.editId && (
+            <label style={{ display: "flex", alignItems: "center", gap: 9, fontSize: 13.5, fontWeight: 700, margin: "4px 0 12px", cursor: "pointer" }}>
+              <input type="checkbox" checked={formBodega.draft.activo !== false} onChange={(e) => setFormBodega({ ...formBodega, draft: { ...formBodega.draft, activo: e.target.checked } })} style={{ width: 20, height: 20 }} />
+              Sigue despachando mercancía
+            </label>
+          )}
+          {formBodega.editId && (
+            <div style={{ fontSize: 12, color: C.ink2, marginBottom: 14, lineHeight: 1.5 }}>
+              Si esta bodega ya no trabaja contigo, desmarca la casilla: deja de aparecer al registrar ventas, pero su historial y su saldo se conservan.
+            </div>
+          )}
+
+          {/* Saldo real acordado. Sin esto la app muestra como deuda TODO lo
+              vendido desde julio, porque el Excel no trae los pagos hechos. */}
+          <div style={{ borderTop: `1.5px solid ${C.line}`, paddingTop: 14, marginTop: 4 }}>
+            <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 4 }}>Saldo real acordado</div>
+            <div style={{ fontSize: 12.5, color: C.ink2, lineHeight: 1.55, marginBottom: 12 }}>
+              Escribe cuánto le debes <b>de verdad</b> a esta bodega y a qué día quedaron cuadrados.
+              Todo lo vendido hasta esa fecha queda dentro de ese número; de ahí en adelante el saldo
+              se mueve solo con las ventas y los pagos nuevos. Déjalo vacío para que cuente todo el
+              histórico.
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <div style={{ flex: 1 }}>
+                <Field label="Le debo">
+                  <input
+                    value={formBodega.draft.saldoInicial == null ? "" : formBodega.draft.saldoInicial}
+                    inputMode="numeric"
+                    placeholder="0"
+                    onChange={(e) => setFormBodega({ ...formBodega, draft: { ...formBodega.draft, saldoInicial: e.target.value } })}
+                    style={inputStyle()}
+                  />
+                </Field>
+              </div>
+              <div style={{ flex: 1 }}>
+                <Field label="Cuadrado al día">
+                  <input
+                    type="date"
+                    value={formBodega.draft.saldoFecha || ""}
+                    onChange={(e) => setFormBodega({ ...formBodega, draft: { ...formBodega.draft, saldoFecha: e.target.value } })}
+                    style={inputStyle()}
+                  />
+                </Field>
+              </div>
+            </div>
+            {formBodega.editId && String(formBodega.draft.saldoInicial) !== "" && formBodega.draft.saldoFecha && (
+              <div style={{ background: C.greenSoft, color: C.green, borderRadius: 12, padding: "10px 13px", fontSize: 12.5, fontWeight: 700, marginBottom: 12, lineHeight: 1.5 }}>
+                Quedará debiendo {fmt(Math.round(num(formBodega.draft.saldoInicial))
+                  + ventas.filter((v) => v.proveedor === formBodega.editId && (v.fecha || "") > formBodega.draft.saldoFecha).reduce((a, v) => a + num(v.compra) * qty(v), 0)
+                  - pagos.filter((p) => p.proveedor === formBodega.editId && (p.fecha || "") > formBodega.draft.saldoFecha).reduce((a, p) => a + num(p.monto), 0))}
+                {" "}en total (ese saldo + lo vendido después de esa fecha).
+              </div>
+            )}
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={guardarBodega} style={btnPrimary({ flex: 1 })}>Guardar</button>
+            {formBodega.editId && (
+              <button onClick={() => setConfirmBorrar({ que: "proveedores", item: { id: formBodega.editId } })} style={btnGhost({ color: C.red, borderColor: C.redSoft })}>
+                Eliminar
+              </button>
+            )}
+          </div>
+        </Sheet>
+      )}
+
+      {/* ---------------- Hoja: estado de cuenta de una bodega ---------------- */}
+      {detalleProv && (
+        <Sheet title={nombreProv(detalleProv)} onClose={() => setDetalleProv(null)}>
+          {(() => {
+            const s = saldos[detalleProv] || { mercAcum: 0, pagAcum: 0, mercR: 0, pagR: 0, utilR: 0 };
+            const movs = movimientosDe(detalleProv).reverse();
+            return (
+              <div>
+                <div style={bkCard({ padding: 14, marginBottom: 12, background: C.ink, color: "#fff", border: "none" })}>
+                  <div style={eyebrow("rgba(255,255,255,.55)")}>Saldo total (le debo)</div>
+                  <div style={{ ...display(30, "#fff"), margin: "5px 0 2px" }}>{fmtS(saldoDe(detalleProv))}</div>
+                  <div style={{ fontSize: 12, color: "rgba(255,255,255,.62)", lineHeight: 1.5 }}>
+                    {anclaDe(detalleProv)
+                      ? "Saldo acordado " + fmt(anclaDe(detalleProv).monto) + " al " + fechaCorta(anclaDe(detalleProv).fecha) + " + mercancía " + fmt(s.mercAcum) + " − pagos " + fmt(s.pagAcum)
+                      : "Todo lo vendido: mercancía " + fmt(s.mercAcum) + " − pagos " + fmt(s.pagAcum)}
+                  </div>
+                  {!anclaDe(detalleProv) && (
+                    <button
+                      onClick={() => { const p = provPorId[detalleProv]; if (!p) return; setFormBodega({ draft: { nombre: p.nombre, tel: p.tel || "", nota: p.nota || "", activo: p.activo !== false, saldoInicial: "", saldoFecha: hoyLocal() }, editId: p.id }); setDetalleProv(null); }}
+                      style={{ marginTop: 10, background: "rgba(255,255,255,.14)", color: "#fff", border: "none", borderRadius: 11, padding: "9px 12px", fontFamily: "Inter, sans-serif", fontWeight: 700, fontSize: 12.5, cursor: "pointer" }}
+                    >
+                      ¿Ya le habías pagado parte? Poner el saldo real
+                    </button>
+                  )}
+                </div>
+                <div style={bkCard({ padding: 14, marginBottom: 12 })}>
+                  <div style={{ ...eyebrow(), marginBottom: 6 }}>{rangoTexto}</div>
+                  <div style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", fontSize: 13.5 }}><span style={{ color: C.ink2 }}>Mercancía vendida</span><b>{fmt(s.mercR)}</b></div>
+                  <div style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", fontSize: 13.5 }}><span style={{ color: C.ink2 }}>Pagos hechos</span><b>{fmt(s.pagR)}</b></div>
+                  <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0 0", fontSize: 14, borderTop: `1px solid ${C.line}`, marginTop: 4 }}>
+                    <b>Saldo del periodo</b><b>{fmtS(s.mercR - s.pagR)}</b>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", padding: "4px 0 0", fontSize: 12.5, color: C.ink2 }}>
+                    <span>Mi utilidad con esta bodega</span><span>{fmtS(s.utilR)}</span>
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 14 }}>
+                  <button onClick={() => setFormPago({ draft: emptyBkPago(), proveedor: detalleProv, editId: null })} style={btnPrimary({ flex: "1 1 46%", boxShadow: "none" })}>Registrar pago</button>
+                  <button onClick={() => pdfProveedor(detalleProv)} style={btnGhost({ flex: "1 1 46%" })}>Descargar PDF</button>
+                  <button onClick={() => imprimirProveedor(detalleProv)} style={btnGhost({ flex: "1 1 46%" })}>Imprimir</button>
+                  <button onClick={() => exportarProveedor(detalleProv)} style={btnGhost({ flex: "1 1 46%" })}>Excel</button>
+                  <button onClick={() => copiarResumen(detalleProv)} style={btnGhost({ flex: "1 1 46%" })}>Copiar resumen</button>
+                  {provPorId[detalleProv] && (
+                    <button
+                      onClick={() => { const p = provPorId[detalleProv]; setFormBodega({ draft: { nombre: p.nombre, tel: p.tel || "", nota: p.nota || "", activo: p.activo !== false, saldoInicial: p.saldoInicial == null ? "" : p.saldoInicial, saldoFecha: p.saldoFecha || "" }, editId: p.id }); setDetalleProv(null); }}
+                      style={btnGhost({ flex: "1 1 100%" })}
+                    >
+                      Editar bodega
+                    </button>
+                  )}
+                </div>
+
+                <div style={{ ...eyebrow(), marginBottom: 8 }}>Movimientos · {rangoTexto}</div>
+                {!movs.length && <div style={{ fontSize: 13, color: C.muted }}>Sin movimientos en este periodo.</div>}
+                {movs.map((m, i) => (
+                  <div key={i} style={{ display: "flex", justifyContent: "space-between", gap: 8, padding: "9px 2px", borderTop: i ? `1px solid ${C.line}` : "none" }}>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        {m.desc}{m.talla ? " · " + m.talla : ""}
+                      </div>
+                      <div style={{ fontSize: 11.5, color: C.ink2, marginTop: 2 }}>{fechaCorta(m.fecha)}</div>
+                    </div>
+                    {m.tipo === "pago" ? (
+                      <button onClick={() => { const p = m.item; setFormPago({ draft: { fecha: p.fecha, monto: p.monto, medio: p.medio || "efectivo", nota: p.nota || "" }, proveedor: detalleProv, editId: p.id }); }} style={{ border: "none", background: "transparent", cursor: "pointer", color: C.green, fontWeight: 800, fontSize: 13.5, flexShrink: 0 }}>
+                        − {fmt(m.pago)} ✎
+                      </button>
+                    ) : (
+                      <div style={{ fontWeight: 800, fontSize: 13.5, flexShrink: 0 }}>{fmt(m.debe)}</div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+        </Sheet>
+      )}
+
+      {/* ---------------- Hoja: importar el histórico ---------------- */}
+      {importar && (
+        <Sheet title="Importar histórico" onClose={() => setImportar(null)}>
+          {!importar.previo && (
+            <div>
+              <div style={{ fontSize: 13.5, color: C.ink2, lineHeight: 1.55, marginBottom: 14 }}>
+                Sube el archivo <b>CSV</b> del Excel del local. En Excel: <i>Archivo → Guardar como → CSV</i>.
+                Debe tener las columnas <b>FECHA, DESCRIPCIÓN, TALLA, BODEGA, VALOR COMPRA</b> y los medios de pago
+                (<b>EFECTIVO, BC, DV</b>).
+              </div>
+              <label style={btnPrimary({ display: "block", textAlign: "center", cursor: "pointer" })}>
+                Elegir archivo CSV
+                <input type="file" accept=".csv,.txt,text/csv" onChange={(e) => leerArchivo(e.target.files && e.target.files[0])} style={{ display: "none" }} />
+              </label>
+              <div style={{ fontSize: 12, color: C.muted, marginTop: 14, lineHeight: 1.5 }}>
+                Se puede importar las veces que haga falta: cada venta se identifica por su fecha y su número de
+                línea de ese día, así que volver a subir el mismo archivo <b>no duplica</b> nada. Las bodegas que ya
+                existen se respetan (no se pisan sus nombres).
+              </div>
+            </div>
+          )}
+          {importar.previo && (
+            <div>
+              <div style={bkCard({ padding: 14, marginBottom: 12 })}>
+                <div style={{ ...eyebrow(), marginBottom: 6 }}>Listo para importar</div>
+                <div style={{ fontSize: 14, lineHeight: 1.7 }}>
+                  <b>{importar.previo.ventas.length}</b> ventas<br />
+                  <b>{importar.previo.bodegas.length}</b> bodegas: {importar.previo.bodegas.map((b) => b.nombre).join(", ")}<br />
+                  Del <b>{fechaCorta(importar.previo.ventas.map((v) => v.fecha).sort()[0])}</b> al{" "}
+                  <b>{fechaCorta(importar.previo.ventas.map((v) => v.fecha).sort()[importar.previo.ventas.length - 1])}</b>
+                </div>
+                {!!importar.previo.omitidas && (
+                  <div style={{ fontSize: 12.5, color: C.red, marginTop: 8 }}>
+                    {importar.previo.omitidas} fila(s) sin fecha o sin bodega se van a omitir.
+                  </div>
+                )}
+                {!!(importar.previo.avisos && importar.previo.avisos.length) && (
+                  <div style={{ fontSize: 12, color: C.muted, marginTop: 8 }}>
+                    {importar.previo.avisos.length} fila(s) con la venta por debajo de la compra (se importan igual).
+                  </div>
+                )}
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={confirmarImportar} style={btnPrimary({ flex: 1 })}>Importar ahora</button>
+                <button onClick={() => setImportar({ previo: null })} style={btnGhost()}>Cambiar archivo</button>
+              </div>
+            </div>
+          )}
+        </Sheet>
+      )}
+
+      {/* ---------------- Confirmar borrado ---------------- */}
+      {confirmBorrar && (
+        <Sheet title="¿Eliminar?" onClose={() => setConfirmBorrar(null)}>
+          <div style={{ fontSize: 14, color: C.ink2, marginBottom: 16, lineHeight: 1.55 }}>
+            Esto borra el registro para siempre y cambia los saldos. ¿Seguro?
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={borrar} style={btnPrimary({ flex: 1, background: C.red, boxShadow: "none" })}>Sí, eliminar</button>
+            <button onClick={() => setConfirmBorrar(null)} style={btnGhost({ flex: 1 })}>Cancelar</button>
+          </div>
+        </Sheet>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+// LOCAL BÚNKER — tablero de gráficas
+// ============================================================
+// Cuatro preguntas, cuatro formas. Nada decorativo:
+//   1. ¿Cómo va el día a día?      → barras apiladas (costo + utilidad = venta)
+//   2. ¿A quién le debo más?       → barras horizontales ordenadas
+//   3. ¿Qué es lo que más se vende?→ barras horizontales ordenadas
+//   4. ¿Cómo entró la plata?       → una barra apilada de 3 partes
+// Sin torta (con 3 partes una barra se compara mejor) y sin dos ejes en una
+// misma gráfica: venta y utilidad tienen escalas distintas, por eso van
+// APILADAS (costo + utilidad suman exactamente la venta) y no superpuestas.
+function BunkerGraficas({ ventasR, filasSaldo, porMedio, totalVenta, utilidadBruta, rangoCorto }) {
+  const num = (x) => Number(x) || 0;
+  const qty = (v) => num(v.cantidad) || 1;
+  const [diaSel, setDiaSel] = useState(null); // día tocado (en celular no hay hover)
+
+  // ---- 1. Día a día ----
+  const porDia = {};
+  ventasR.forEach((v) => {
+    if (!v.fecha) return;
+    if (!porDia[v.fecha]) porDia[v.fecha] = { fecha: v.fecha, venta: 0, costo: 0, pares: 0 };
+    const d = porDia[v.fecha];
+    d.venta += num(v.venta) * qty(v);
+    d.costo += num(v.compra) * qty(v);
+    d.pares += qty(v);
+  });
+  let dias = Object.keys(porDia).sort().map((f) => ({ ...porDia[f], util: porDia[f].venta - porDia[f].costo }));
+
+  // Con más de 45 días las barras quedan de 3px: se agrupa por semana.
+  const porSemana = dias.length > 45;
+  if (porSemana) {
+    const sem = {};
+    dias.forEach((d) => {
+      const dt = new Date(d.fecha + "T00:00:00");
+      dt.setDate(dt.getDate() - ((dt.getDay() + 6) % 7)); // lunes de esa semana
+      const k = dt.toISOString().slice(0, 10);
+      if (!sem[k]) sem[k] = { fecha: k, venta: 0, costo: 0, pares: 0 };
+      sem[k].venta += d.venta; sem[k].costo += d.costo; sem[k].pares += d.pares;
+    });
+    dias = Object.keys(sem).sort().map((k) => ({ ...sem[k], util: sem[k].venta - sem[k].costo }));
+  }
+
+  const maxDia = Math.max(1, ...dias.map((d) => d.venta));
+  const VBW = 340, VBH = 150, padT = 14, padB = 22, padX = 2;
+  const innerW = VBW - padX * 2, innerH = VBH - padT - padB, baseY = padT + innerH;
+  const paso = dias.length ? innerW / dias.length : innerW;
+  const ancho = Math.max(3, Math.min(26, paso - (paso > 8 ? 2 : 1))); // 2px de aire entre barras
+  const sel = diaSel != null ? dias[diaSel] : null;
+
+  // ---- 2 y 3 ----
+  const deuda = filasSaldo.filter((s) => s.saldo > 0).slice(0, 8);
+  const maxDeuda = Math.max(1, ...deuda.map((s) => s.saldo));
+
+  const porModelo = {};
+  ventasR.forEach((v) => {
+    const k = (v.desc || "SIN NOMBRE").trim();
+    if (!porModelo[k]) porModelo[k] = { nombre: k, pares: 0, util: 0 };
+    porModelo[k].pares += qty(v);
+    porModelo[k].util += (num(v.venta) - num(v.compra)) * qty(v);
+  });
+  const top = Object.keys(porModelo).map((k) => porModelo[k]).sort((a, b) => b.pares - a.pares).slice(0, 6);
+  const maxTop = Math.max(1, ...top.map((m) => m.pares));
+
+  // ---- 4 ----
+  const medios = [
+    { id: "efectivo", label: "Efectivo", valor: porMedio.efectivo },
+    { id: "bc", label: "BC", valor: porMedio.bc },
+    { id: "dv", label: "DV", valor: porMedio.dv },
+  ].filter((m) => m.valor > 0);
+  const totalMedios = medios.reduce((a, m) => a + m.valor, 0) || 1;
+
+  const titulo = (t, der) => (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 12 }}>
+      <div style={{ fontSize: 15, fontWeight: 800, color: DK.ink, fontFamily: "Inter, sans-serif" }}>{t}</div>
+      {der != null && <div style={{ fontSize: 11.5, color: DK.muted, fontWeight: 600 }}>{der}</div>}
+    </div>
+  );
+
+  const bloque = (extra = {}) => ({ borderTop: `1px solid ${DK.line}`, paddingTop: 18, marginTop: 20, ...extra });
+
+  if (!ventasR.length) {
+    return (
+      <div style={{ background: DK.fondo, borderRadius: 20, padding: "26px 18px", textAlign: "center", color: DK.ink2, fontSize: 13.5, lineHeight: 1.55 }}>
+        No hay ventas en este periodo, así que no hay nada que graficar.<br />
+        Cambia el periodo arriba (prueba <b style={{ color: DK.ink }}>Todo el histórico</b>).
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ background: DK.fondo, border: `1px solid ${DK.line}`, borderRadius: 20, padding: "18px 16px 20px", boxShadow: "0 20px 50px rgba(0,0,0,.35)" }}>
+      {/* ---- 1. Día a día ---- */}
+      {titulo(porSemana ? "Semana a semana" : "Día a día", rangoCorto)}
+
+      {/* Lectura del día tocado. En celular no hay hover: se toca la barra. */}
+      <div style={{ minHeight: 34, marginBottom: 2 }}>
+        {sel ? (
+          <div style={{ fontSize: 12.5, color: DK.ink2 }}>
+            <b style={{ color: DK.ink }}>{fechaCorta(sel.fecha)}</b> · vendido{" "}
+            <b style={{ color: DK.ink }}>{fmt(sel.venta)}</b> · utilidad{" "}
+            <b style={{ color: SERIE.util }}>{fmt(sel.util)}</b> · {sel.pares} par{sel.pares === 1 ? "" : "es"}
+          </div>
+        ) : (
+          <div style={{ fontSize: 12.5, color: DK.muted }}>
+            Vendido <b style={{ color: DK.ink }}>{fmt(totalVenta)}</b> · de eso es tuyo{" "}
+            <b style={{ color: SERIE.util }}>{fmt(utilidadBruta)}</b>
+            <span style={{ display: "block", fontSize: 11, marginTop: 2 }}>Toca una barra para ver ese día</span>
+          </div>
+        )}
+      </div>
+
+      <svg viewBox={`0 0 ${VBW} ${VBH}`} width="100%" style={{ display: "block", overflow: "visible" }} role="img" aria-label="Ventas por día: la parte naranja es la utilidad del local">
+        {[0, 0.5, 1].map((g, i) => (
+          <line key={i} x1={0} y1={padT + g * innerH} x2={VBW} y2={padT + g * innerH} stroke={DK.line} strokeWidth="1" />
+        ))}
+        {dias.map((d, i) => {
+          const x = padX + i * paso + (paso - ancho) / 2;
+          const hTot = (d.venta / maxDia) * innerH;
+          const hUtil = d.venta > 0 ? Math.max(0, (d.util / maxDia) * innerH) : 0;
+          const hCosto = Math.max(0, hTot - hUtil);
+          const r = Math.min(4, ancho / 2);
+          const activo = diaSel === i;
+          return (
+            <g key={d.fecha} onClick={() => setDiaSel(activo ? null : i)} style={{ cursor: "pointer" }}>
+              {/* zona de toque más grande que la barra */}
+              <rect x={padX + i * paso} y={padT} width={paso} height={innerH} fill="transparent" />
+              <rect x={x} y={baseY - hCosto} width={ancho} height={hCosto} fill={SERIE.costo} opacity={activo || diaSel == null ? 1 : 0.45} />
+              {hUtil > 0 && (
+                <rect
+                  x={x} y={baseY - hTot} width={ancho} height={Math.max(1, hUtil - (hCosto > 2 ? 2 : 0))}
+                  rx={r} fill={SERIE.util} opacity={activo || diaSel == null ? 1 : 0.45}
+                />
+              )}
+            </g>
+          );
+        })}
+        {dias.map((d, i) => {
+          const cada = Math.max(1, Math.ceil(dias.length / 6));
+          if (!(i % cada === 0 || i === dias.length - 1)) return null;
+          return (
+            <text key={"t" + i} x={padX + i * paso + paso / 2} y={VBH - 6} textAnchor="middle"
+              fontSize="10.5" fontWeight="700" fill={diaSel === i ? DK.ink : DK.muted} fontFamily="Inter, sans-serif">
+              {diaMes(d.fecha)}
+            </text>
+          );
+        })}
+        <text x={0} y={padT - 4} fontSize="10.5" fontWeight="700" fill={DK.muted} fontFamily="Inter, sans-serif">{compactoCOP(maxDia)}</text>
+      </svg>
+
+      {/* Leyenda: dos partes, nunca solo por color */}
+      <div style={{ display: "flex", gap: 14, marginTop: 10, fontSize: 11.5, color: DK.ink2, fontWeight: 600 }}>
+        <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{ width: 10, height: 10, borderRadius: 3, background: SERIE.util, display: "inline-block" }} /> Tu utilidad
+        </span>
+        <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{ width: 10, height: 10, borderRadius: 3, background: SERIE.costo, display: "inline-block" }} /> De las bodegas
+        </span>
+      </div>
+
+      {/* ---- 2. Deuda por bodega ---- */}
+      {!!deuda.length && (
+        <div style={bloque()}>
+          {titulo("A quién le debo más", "saldo a hoy")}
+          {deuda.map((s, i) => (
+            <div key={s.id} style={{ marginBottom: 11 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, marginBottom: 5 }}>
+                <span style={{ color: DK.ink2, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "60%" }}>{s.nombre}</span>
+                <b style={{ color: DK.ink }}>{fmt(s.saldo)}</b>
+              </div>
+              <div style={{ background: DK.track, borderRadius: 99, height: 10 }}>
+                <div style={{
+                  width: Math.max(4, (s.saldo / maxDeuda) * 100) + "%", height: "100%", borderRadius: 99,
+                  background: SERIE.efectivo, transformOrigin: "left",
+                  animation: "vmGrowX .6s cubic-bezier(.2,.8,.2,1) both", animationDelay: (i * 0.04) + "s",
+                }} />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ---- 3. Top modelos ---- */}
+      {!!top.length && (
+        <div style={bloque()}>
+          {titulo("Lo que más se vende", "pares en el periodo")}
+          {top.map((m, i) => (
+            <div key={m.nombre} style={{ marginBottom: 11 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, marginBottom: 5, gap: 8 }}>
+                <span style={{ color: DK.ink2, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.nombre}</span>
+                <b style={{ color: DK.ink, flexShrink: 0 }}>{m.pares} · {compactoCOP(m.util)}</b>
+              </div>
+              <div style={{ background: DK.track, borderRadius: 99, height: 10 }}>
+                <div style={{
+                  width: Math.max(4, (m.pares / maxTop) * 100) + "%", height: "100%", borderRadius: 99,
+                  background: SERIE.bc, transformOrigin: "left",
+                  animation: "vmGrowX .6s cubic-bezier(.2,.8,.2,1) both", animationDelay: (i * 0.04) + "s",
+                }} />
+              </div>
+            </div>
+          ))}
+          <div style={{ fontSize: 11, color: DK.muted, marginTop: -2 }}>pares · utilidad que dejó</div>
+        </div>
+      )}
+
+      {/* ---- 4. Medios de pago ---- */}
+      {!!medios.length && (
+        <div style={bloque()}>
+          {titulo("Cómo entró la plata", compactoCOP(totalMedios))}
+          <div style={{ display: "flex", gap: 2, height: 26, borderRadius: 8, overflow: "hidden", marginBottom: 12 }}>
+            {medios.map((m) => (
+              <div key={m.id} style={{ width: (m.valor / totalMedios) * 100 + "%", background: SERIE[m.id] }} />
+            ))}
+          </div>
+          {medios.map((m) => (
+            <div key={m.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "5px 0", fontSize: 12.5 }}>
+              <span style={{ display: "flex", alignItems: "center", gap: 8, color: DK.ink2, fontWeight: 600 }}>
+                <span style={{ width: 10, height: 10, borderRadius: 3, background: SERIE[m.id] }} />
+                {m.label}
+              </span>
+              <span style={{ color: DK.ink, fontWeight: 700 }}>
+                {fmt(m.valor)} <span style={{ color: DK.muted, fontWeight: 600 }}>· {Math.round((m.valor / totalMedios) * 100)}%</span>
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function BadgeEstadoPedido({ estado }) {
   const E = ESTADOS_PEDIDO[normEstadoPedido(estado)];
   return (
@@ -4793,6 +7431,30 @@ function Pedidos({ pedidos, products, actualizarPedido, showToast, esSocio = fal
                 <br />
                 Total: <b>{fmt(abierto.total)}</b>{abierto.metodo_pago ? <> por <b>{abierto.metodo_pago}</b></> : null}
               </div>
+              {/* CARRITO web (2026-07-18): compra de VARIOS productos en un solo
+                  pago. El detalle exacto viene en items_json (lo escribe
+                  _worker.js); los campos ref/talla de arriba son el resumen.
+                  Si el pedido no lo trae (todos los de hoy), no se ve nada. */}
+              {(() => {
+                let its = null;
+                try { its = JSON.parse(String(abierto.items_json || "")); } catch (e) { its = null; }
+                if (!Array.isArray(its) || its.length < 2) return null;
+                return (
+                  <div style={{ marginTop: 10, borderTop: `1px dashed ${C.line}`, paddingTop: 10 }}>
+                    <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: ".1em", textTransform: "uppercase", color: C.muted, marginBottom: 6 }}>
+                      🛍 {its.length} referencias en este pedido — alistar todas
+                    </div>
+                    {its.map((x, i) => (
+                      <div key={i} style={{ fontSize: 13, color: C.ink, lineHeight: 1.8 }}>
+                        • <b>Ref {String(x.ref || "?")}</b> · Talla {String(x.talla || "?")}
+                        {x.genero ? " · " + String(x.genero) : ""} · {Number(x.cantidad) || 1} par
+                        {(Number(x.cantidad) || 1) === 1 ? "" : "es"}
+                        {x.subtotal ? " · " + fmt(x.subtotal) : ""}
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
               {/* Canal (solo lectura): los pedidos del bot no traen el campo;
                   'web' = compra pagada por Wompi directo en varmancrew.com */}
               {String(abierto.canal || "") === "web" ? (
@@ -4804,8 +7466,25 @@ function Pedidos({ pedidos, products, actualizarPedido, showToast, esSocio = fal
                   "ctwa:<id>" = llegó de un anuncio click-to-WhatsApp */}
               {(() => {
                 const f = String(abierto.fuente || "");
-                if (!f) return null; // pedidos anteriores al campo: no se muestra nada
                 const esAnuncio = f.indexOf("ctwa:") === 0;
+                // Detalle de pauta (campos OPCIONALES, solo existen si el bot los
+                // guarda): título del anuncio/publicación, red y tipo. Si el pedido
+                // no los trae, este bloque no aplica y el render de abajo queda
+                // idéntico al de siempre (cero cambio para pedidos actuales).
+                const fTitulo = String(abierto.fuente_titulo || "");
+                const fPlataforma = String(abierto.fuente_plataforma || "");
+                const fTipo = String(abierto.fuente_tipo || "");
+                if ((esAnuncio || fTitulo) && (fTitulo || fPlataforma || fTipo)) {
+                  // Sin título no se inventa uno: genérico según el tipo real
+                  // ('post' = publicación normal, lo demás se asume anuncio).
+                  const nombre = fTitulo || (fTipo === "post" ? "Publicación" : "Anuncio");
+                  return (
+                    <div style={{ fontSize: 11.5, marginTop: 6, fontWeight: 700, color: "#6E8BFF" }}>
+                      📣 {nombre}{fPlataforma ? <span style={{ color: C.muted, fontWeight: 600 }}> · {fPlataforma}</span> : null}
+                    </div>
+                  );
+                }
+                if (!f) return null; // pedidos anteriores al campo: no se muestra nada
                 return (
                   <div style={{ fontSize: 11.5, marginTop: 6, fontWeight: 700, color: esAnuncio ? "#6E8BFF" : C.muted }}>
                     {esAnuncio ? <>📣 Vino de un anuncio · id {f.slice(5)}</> : <>🌱 Cliente orgánico (llegó solo)</>}
@@ -5198,6 +7877,17 @@ function IconCash({ big }) {
       <rect x="2.5" y="6" width="19" height="12" rx="2.5" />
       <circle cx="12" cy="12" r="2.7" />
       <path d="M6.2 9.2h.01M17.8 14.8h.01" />
+    </svg>
+  );
+}
+
+// Local Búnker: una caja fuerte (el libro del local, aparte de la tienda)
+function IconBunker({ big }) {
+  return (
+    <svg {...svgP(big)} viewBox="0 0 24 24">
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <circle cx="12" cy="12" r="3.5" />
+      <path d="M12 8.5V7M12 17v-1.5M15.5 12H17M7 12h1.5" />
     </svg>
   );
 }

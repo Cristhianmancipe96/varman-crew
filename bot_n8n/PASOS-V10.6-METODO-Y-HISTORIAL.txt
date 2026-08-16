@@ -1,0 +1,125 @@
+============================================================
+ BOT VarMan Crew — v10.6 "MÉTODO OBLIGATORIO + HISTORIAL FIEL" (3-ago-2026)
+ (reemplaza a la v10.5, que no se llegó a subir)
+============================================================
+
+QUÉ PASÓ (visto en vivo, 3-ago 1:11 pm):
+  Cliente: "En Bogotá" ... "Cristhian mancipe"
+  Bot:     "✅ Tu pedido ya está confirmado ... Contra entrega"
+El bot CONFIRMÓ el pedido con solo el nombre: sin dirección y sin
+preguntar jamás cómo quería pagar — asumió contra entrega.
+
+POR QUÉ (causa raíz, dos piezas que se reforzaban):
+1. El CUADERNO (el manual que guía a Gemini) ordena para Bogotá:
+   nombre → dirección → registrar. NUNCA le dice que pregunte el
+   método — lo da por sentado.
+2. La herramienta `registrar_pedido` se lo permitía: si el modelo no
+   manda método, en Bogotá LO ASUME ("Contra entrega" por defecto), y
+   no exige dirección. Gemini se adelantó y nada lo frenó.
+
+EL ARREGLO (en la raíz, NO un parche sobre los mensajes):
+No se agregó ninguna guarda nueva de las que reescriben mensajes (el
+problema de la v10.4 fue justamente dos de esas peleando). Se arregló
+la fuente de verdad:
+
+a) La HERRAMIENTA ahora es estricta: en Bogotá `registrar_pedido`
+   RECHAZA el registro si el cliente no ha elegido método de pago con
+   sus propias palabras, o si falta la dirección. El rechazo le dice a
+   Gemini qué preguntar (el mismo mecanismo que ya usaban los otros
+   rechazos de la herramienta). Aunque Gemini se adelante, YA NO PUEDE
+   confirmar un pedido incompleto.
+
+b) El CUADERNO recibe una regla al final (solo con el flag ON, el
+   cuaderno base no se toca): en Bogotá el cierre es
+   nombre → "¿prefieres pagar contra entrega o anticipado por Wompi?"
+   → dirección → registrar.
+
+c) El método que el cliente dice ("contra entrega", "por Nequi",
+   "con tarjeta") se captura de su texto y queda en la sesión — igual
+   que ya se capturan la ciudad y la talla. Las frases negadas no
+   cuentan ("no tengo tarjeta" NO es elegir Wompi).
+
+d) La reescritura anti-pedido-fantasma ([FIX-PROMesa-PEDIDO]) pide
+   ahora los datos en el MISMO orden que exige la herramienta
+   (nombre → método → dirección), para que nunca den instrucciones
+   contradictorias.
+
+e) El registro automático de Bogotá ([FIX-REGISTRO-FORZADO]) ya no
+   fuerza 'contraentrega' a ciegas: manda el método que el cliente
+   eligió, y si no hay, la herramienta lo frena.
+
+f) [FIX-HIST-CIERRE] SEGUNDO HALLAZGO del dueño (revisando Firestore):
+   la burbuja "✅ Tu pedido ya está confirmado" se le ENVIABA al
+   cliente pero NO quedaba en el historial de la sesión — en la BD la
+   conversación salta del nombre del cliente directo a "¿me confirmas
+   tu dirección?". O sea: el turno siguiente Gemini leía una
+   conversación donde esa confirmación nunca existió, y auditando la
+   base de datos tampoco se veía. Causa: el cierre se encola como
+   mensaje APARTE (a propósito, para que ninguna reescritura se lo
+   coma) y el guardado del historial solo anotaba la respuesta
+   redactada por el modelo. Ahora el cierre queda en el historial
+   junto con la respuesta del turno: LO QUE EL CLIENTE RECIBE ES LO
+   QUE LA BASE DE DATOS REGISTRA.
+
+------------------------------------------------------------
+FLAG (.env de la VM) — NO HAY FLAG NUEVO
+------------------------------------------------------------
+Todo va detrás de BOT_ELIGE_PAGO, que YA está en on en la VM desde la
+v10.3 — es la misma idea ("el método se pregunta, no se asume"),
+ahora aplicada también al camino del cerebro-IA.
+
+  BOT_ELIGE_PAGO=off  ->  todo vuelve a como estaba (asume método).
+
+------------------------------------------------------------
+CÓMO DESPLEGAR
+------------------------------------------------------------
+1. Subir del Escritorio a la VM:
+     bot-varman-PARA-SUBIR-v10.6-2026-08-03.json
+   (Verificado 3-ago: es el ÚNICO PARA-SUBIR que queda en el
+   Escritorio — los viejos ya no están, no hay con qué confundirse.)
+
+2. En la VM, dentro de ~/varman-bot:
+     mv ~/bot-varman-PARA-SUBIR-v10.6-2026-08-03.json workflows/bot-varman.json
+     ls -l workflows/bot-varman.json     # 1122151 bytes EXACTOS
+
+3. Comprobar que sí es el nuevo:
+     grep -c bTurno workflows/bot-varman.json
+   Tiene que dar 1 o más. Si da 0: PARA, el mv no se hizo.
+
+4. Sin cambios en el .env (BOT_ELIGE_PAGO ya está en on).
+
+5. Importar:
+     bash importar-workflows.sh
+   Si queda inactivo, "Publish" en bot.varmancrew.com.
+
+6. Esperar 3-5 min:
+     bash verificar-salud.sh
+
+------------------------------------------------------------
+CÓMO PROBARLO (desde el 320, como cliente)
+------------------------------------------------------------
+Repite EXACTAMENTE la conversación que falló:
+  "Hola quiero información de las reebok" -> "En Bogotá"
+  -> da tu nombre
+AHORA debe preguntar: "¿prefieres pagar contra entrega o anticipado
+por Wompi?" — y NO confirmar el pedido todavía.
+  -> "contra entrega"
+Debe pedir la dirección.
+  -> da una dirección
+AHÍ SÍ: "✅ Tu pedido ya está confirmado" con método y dirección.
+
+------------------------------------------------------------
+LO QUE NO ESTÁ PROBADO (igual que la v10.4)
+------------------------------------------------------------
+El camino cerebro-IA sigue sin pruebas offline (deuda técnica ya
+anotada). La diferencia: el candado de la herramienta es código
+determinista — aunque Gemini ignore la regla nueva, el registro
+incompleto es IMPOSIBLE. Lo peor que puede pasar si Gemini se
+confunde es que pregunte el método dos veces, no que confirme sin él.
+
+------------------------------------------------------------
+ROLLBACK (1 paso)
+------------------------------------------------------------
+  BOT_ELIGE_PAGO=off  en el .env  +  docker compose up -d --force-recreate n8n
+(Ojo: eso también apaga el menú de métodos de la v10.3, son la misma
+función. Volver a la v10.4: importar workflows/respaldo/bot-varman-v10.4.json.)

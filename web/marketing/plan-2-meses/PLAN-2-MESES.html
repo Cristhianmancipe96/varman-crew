@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plan 2 meses — Marketing VarMan Crew</title>
+<style>
+  :root{
+    --naranja:#F26A1B;--naranja-oscuro:#c9530d;--tinta:#1c1a17;--gris:#6b6660;
+    --fondo:#faf7f3;--tarjeta:#fff;--linea:#e7e1d8;--verde:#1f8a5b;
+    --radio:14px;--sombra:0 1px 2px rgba(0,0,0,.05),0 8px 24px rgba(0,0,0,.05);
+  }
+  *{box-sizing:border-box}html{scroll-behavior:smooth}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    color:var(--tinta);background:var(--fondo);line-height:1.55;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1120px;margin:0 auto;padding:0 20px}
+  header.hero{background:linear-gradient(135deg,var(--naranja) 0%,var(--naranja-oscuro) 100%);
+    color:#fff;padding:34px 0 30px;position:relative;overflow:hidden}
+  header.hero::after{content:"📈";position:absolute;right:-6px;top:-16px;font-size:170px;opacity:.10;transform:rotate(-12deg)}
+  .kicker{font-size:13px;letter-spacing:.14em;text-transform:uppercase;font-weight:700;opacity:.9}
+  header.hero h1{margin:6px 0 8px;font-size:clamp(26px,4vw,40px);line-height:1.1}
+  header.hero p.sub{margin:0;font-size:16px;max-width:660px;opacity:.95}
+  .meta-pills{margin-top:18px;display:flex;flex-wrap:wrap;gap:8px}
+  .pill{background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.28);
+    padding:5px 12px;border-radius:999px;font-size:13px;font-weight:600}
+  nav.toc{position:sticky;top:0;z-index:20;background:rgba(250,247,243,.92);
+    backdrop-filter:blur(8px);border-bottom:1px solid var(--linea)}
+  nav.toc .wrap{display:flex;gap:6px;overflow-x:auto;padding:10px 20px}
+  nav.toc a{white-space:nowrap;font-size:13.5px;font-weight:600;color:var(--gris);
+    text-decoration:none;padding:6px 11px;border-radius:8px}
+  nav.toc a:hover{background:#fff;color:var(--naranja-oscuro)}
+  main{padding:30px 0 60px}
+  section{margin:0 0 34px;scroll-margin-top:64px}
+  h2{font-size:23px;margin:0 0 4px;display:flex;align-items:center;gap:10px}
+  h2 .num{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;
+    border-radius:9px;background:var(--naranja);color:#fff;font-size:15px;font-weight:800;flex:none}
+  .lead{color:var(--gris);margin:2px 0 16px;max-width:780px}
+  h3{font-size:16px;margin:18px 0 8px}
+  .card{background:var(--tarjeta);border:1px solid var(--linea);border-radius:var(--radio);
+    padding:18px 20px;box-shadow:var(--sombra)}
+  .grid{display:grid;gap:14px}.g2{grid-template-columns:repeat(2,1fr)}.g3{grid-template-columns:repeat(3,1fr)}
+  @media(max-width:820px){.g2,.g3{grid-template-columns:1fr}}
+  .nota{border-left:4px solid var(--naranja);background:#fff6ee;border-radius:10px;padding:14px 16px;margin:0 0 22px}
+  .nota b{color:var(--naranja-oscuro)}
+  table{width:100%;border-collapse:collapse;font-size:14.5px;background:#fff;border:1px solid var(--linea);
+    border-radius:12px;overflow:hidden}
+  th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--linea);vertical-align:top}
+  th{background:#f6f0e9;font-size:12.5px;text-transform:uppercase;letter-spacing:.04em;color:#8a7f72}
+  tr:last-child td{border-bottom:none}
+  .tabla-scroll{overflow-x:auto}
+  ul.check{list-style:none;padding:0;margin:0}
+  ul.check li{position:relative;padding:6px 0 6px 28px;border-bottom:1px dashed var(--linea)}
+  ul.check li:last-child{border-bottom:none}
+  ul.check li::before{content:"☐";position:absolute;left:0;top:5px;font-size:16px;color:var(--naranja)}
+  .tag{display:inline-block;font-size:11.5px;font-weight:700;padding:2px 9px;border-radius:999px;
+    text-transform:uppercase;letter-spacing:.03em}
+  .tag.mes1{background:#fdecdf;color:var(--naranja-oscuro)}
+  .tag.mes2{background:#e6f0ff;color:#2a5ca8}
+  .tag.ok{background:#e4f6ec;color:var(--verde)}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px;
+    background:#f3ede5;padding:1px 6px;border-radius:5px}
+  .semaforo{display:flex;flex-direction:column;gap:6px}
+  .semaforo div{padding:8px 12px;border-radius:9px;font-size:14px}
+  .s-ok{background:#e4f6ec;color:#146c43}.s-med{background:#fff4e0;color:#8a5a12}.s-mal{background:#fdeaea;color:#9c2c22}
+  .kpi{font-size:24px;font-weight:800;color:var(--naranja-oscuro)}
+  .kpi small{font-size:13px;color:var(--gris);font-weight:600}
+  footer{border-top:1px solid var(--linea);padding:22px 0;color:var(--gris);font-size:13px}
+  .fuentes{font-size:12.5px;color:#9a9086;margin-top:6px}
+  .cambio-antes{color:#9c2c22;text-decoration:line-through;opacity:.75}
+  .ritual{background:#111;color:#fff;border-radius:12px;padding:16px 18px}
+  .ritual b{color:#ffcf9f}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="kicker">VarMan Crew · Plan reformado · v1 — 12 jul 2026</div>
+    <h1>Plan de marketing — 2 meses</h1>
+    <p class="sub">16 jul → 15 sep 2026. Probar semana a semana e ir escalando: una campaña, un ritual de decisión los jueves, y la plata solo sigue a lo que demuestra vender.</p>
+    <div class="meta-pills">
+      <span class="pill">💰 15–20k COP/día</span>
+      <span class="pill">🗓️ Arranque: jue 16 jul</span>
+      <span class="pill">🔁 Decisión cada jueves</span>
+      <span class="pill">🎬 2 videos/semana</span>
+    </div>
+  </div>
+</header>
+
+<nav class="toc">
+  <div class="wrap">
+    <a href="#resumen">Resumen</a>
+    <a href="#cambios">Qué cambió</a>
+    <a href="#semana0">Semana 0</a>
+    <a href="#mes1">Mes 1</a>
+    <a href="#ritual">El ritual</a>
+    <a href="#mes2">Mes 2</a>
+    <a href="#contenido">Contenido</a>
+    <a href="#presupuesto">Presupuesto</a>
+    <a href="#riesgos">Riesgos</a>
+  </div>
+</nav>
+
+<main class="wrap">
+
+  <div class="nota">
+    <b>Tus decisiones (12 jul), que definen este plan:</b> presupuesto <b>15–20k COP/día</b> ·
+    arranque <b>16 jul como estaba</b> · meta <b>"probar semana a semana e ir escalando"</b> ·
+    <b>2 videos/semana</b>. Ojo: el 16 jul queda a 4 días — la <a href="#semana0">Semana 0</a>
+    es apretada y si no cierra el 15, la pauta se corre (no se paga tráfico hacia un bot sin probar).
+  </div>
+
+  <section id="resumen">
+    <h2><span class="num">1</span> Resumen en 60 segundos</h2>
+    <div class="grid g3">
+      <div class="card"><h3 style="margin-top:0">🎯 Una sola campaña</h3>
+        <p style="font-size:14.5px;margin:0">Mensajes (click-to-WhatsApp al bot) con 3 creativos: D1, C1, U1. Toda la plata a un solo lugar hasta que los datos digan otra cosa.</p></div>
+      <div class="card"><h3 style="margin-top:0">🔁 Un ritual semanal</h3>
+        <p style="font-size:14.5px;margin:0">Cada jueves, 30 minutos y UNA decisión: mantener, rotar creativo o subir +20%. Ese ritual ES la estrategia de probar y escalar.</p></div>
+      <div class="card"><h3 style="margin-top:0">🌐 La web cierra ventas</h3>
+        <p style="font-size:14.5px;margin:0">El bot manda al catálogo web y el cliente puede pagar ahí mismo con Wompi. Llevarlo a producción en el mes 1 multiplica lo que vale cada clic.</p></div>
+    </div>
+    <div class="nota" style="margin-top:14px"><b>Resultado esperado al 15 sep:</b> saber cuánto cuesta un pedido, cuál anuncio lo trae, y un presupuesto para el mes 3 basado en margen real — no en intuición.</div>
+  </section>
+
+  <section id="cambios">
+    <h2><span class="num">2</span> Qué cambió desde el plan original</h2>
+    <div class="tabla-scroll"><table>
+      <tr><th>Antes (plan 7-8 jul)</th><th>Ahora</th></tr>
+      <tr><td class="cambio-antes">Crear cuenta TikTok @varmancrew</td><td>✅ Ya existe <b>@varmansnk</b> (verificado en los links de la web) — usar esa</td></tr>
+      <tr><td class="cambio-antes">Anuncios sin precio</td><td>✅ Precios ya en la app → se puede probar “Desde $XXX.XXX”</td></tr>
+      <tr><td class="cambio-antes">Un solo camino: anuncio → bot → pedido</td><td><b>Dos caminos:</b> bot por WhatsApp + compra directa en la web (Wompi)</td></tr>
+      <tr><td class="cambio-antes">Bot mandaba fotos del catálogo</td><td>Bot manda el <b>link del catálogo web</b> (BOT_CATALOGO_WEB ON)</td></tr>
+      <tr><td class="cambio-antes">3-4 videos/semana</td><td><b>2 videos/semana</b> — sostenible para una persona</td></tr>
+      <tr><td class="cambio-antes">Plan de 3 semanas de julio</td><td><b>8 semanas</b> con revisión y decisión cada jueves</td></tr>
+    </table></div>
+    <p class="fuentes">La atribución <span class="mono">fuente</span> (qué anuncio trajo el pedido) está construida en el bot pero <b>falta probarla</b> — va en Semana 0.</p>
+  </section>
+
+  <section id="semana0">
+    <h2><span class="num">3</span> Semana 0 (13–15 jul) — sin esto NO se enciende nada</h2>
+    <p class="lead">Cada clic pagado que cae en un bot a medias es plata perdida. Antes del jueves 16:</p>
+    <div class="card">
+      <ul class="check">
+        <li><b>Subir CW2 + flags a la VM:</b> archivo fechado del Escritorio + <span class="mono">BOT_FOTO_ASESOR=on</span> y <span class="mono">BOT_NOMBRE_MODELO=on</span> + recrear + reimportar (guía: <span class="mono">PASOS-SUBIR-CATALOGO-WEB.txt</span>).</li>
+        <li><b>Probar el bot E2E:</b> hola → catálogo → precio → marca → una compra completa.</li>
+        <li><b>Probar la atribución <span class="mono">fuente</span>:</b> verificar que un chat que entra por anuncio deje la fuente en el pedido. Es el único termómetro de qué anuncio VENDE.</li>
+        <li><b>CORTE verificado:</b> botón WhatsApp de FB, bio de TikTok @varmansnk, bio de IG y links de la web → todos al número del bot (304), no al 320.</li>
+        <li><b>Cuenta publicitaria lista:</b> método de pago cargado + WABA vinculada al negocio.</li>
+        <li><b>Fotos de los 3 anuncios elegidas:</b> on-feet con medias blancas; sin logos de terceros protagonistas; nunca tipo LV.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="mes1">
+    <h2><span class="num">4</span> Mes 1 (16 jul – 12 ago) — descubrir qué vende</h2>
+    <p class="lead"><b>Estructura fija:</b> 1 campaña Mensajes → 1 conjunto (15k/día) → 3 anuncios (D1, C1, U1). Reservas: D2/C2/U2.</p>
+    <div class="tabla-scroll"><table>
+      <tr><th>Semana</th><th>Fechas</th><th>Qué pasa</th><th>Decisión del jueves</th></tr>
+      <tr><td><b>S1</b></td><td>16–22 jul</td><td>Pauta ON. Aprendizaje de Meta: <b>no tocar nada</b>. Mirar 1 vez/día sin editar.</td><td><b>Jue 23:</b> 1ª revisión — costo/conversación por anuncio, CTR, frecuencia, pedidos por fuente. Rotar a reserva solo lo que pasó umbrales.</td></tr>
+      <tr><td><b>S2</b></td><td>23–29 jul</td><td>Correr con los ajustes. Variables Wompi en Cloudflare + probar compra web en sandbox.</td><td><b>Jue 30:</b> ¿video orgánico que despegó? → Promote chico. ¿Costo/pedido &lt; margen? → subir a 18k/día.</td></tr>
+      <tr><td><b>S3</b></td><td>30 jul–5 ago</td><td>Escalado prudente. Si sandbox OK → <b>Wompi a producción</b> (llaves prod + webhook + compra real chica).</td><td><b>Jue 6:</b> ¿el ganador aguanta la subida? Frecuencia &gt;3 → refrescar foto.</td></tr>
+      <tr><td><b>S4</b></td><td>6–12 ago</td><td>Consolidar y preparar el corte de cuentas.</td><td><b>Jue 13: BALANCE MES 1</b> — costo por conversación, costo por pedido, anuncio ganador, margen. Con eso se decide el mes 2.</td></tr>
+    </table></div>
+  </section>
+
+  <section id="ritual">
+    <h2><span class="num">5</span> El ritual del jueves (30 min) y los umbrales</h2>
+    <div class="grid g2">
+      <div class="ritual">
+        <h3 style="margin-top:0;color:#fff">Cada jueves, en orden:</h3>
+        <ol style="margin:0;padding-left:20px;font-size:14.5px">
+          <li>Abrir Ads Manager: <b>costo por conversación</b> por anuncio, CTR, frecuencia.</li>
+          <li>Abrir la app: <b>pedidos verificados</b> de la semana y su <b>fuente</b>.</li>
+          <li>Hacer la cuenta real: <b>plata gastada ÷ pedidos = costo por pedido</b>, vs margen.</li>
+          <li>Tomar <b>UNA sola decisión</b>: mantener · rotar creativo · subir +20% · (o pausar).</li>
+          <li>Anotarla en la bitácora del plan — la semana siguiente se compara contra ella.</li>
+        </ol>
+      </div>
+      <div class="card">
+        <h3 style="margin-top:0">Umbrales (guía técnica vigente)</h3>
+        <div class="semaforo">
+          <div class="s-ok">Costo/conversación &lt; 3.000 COP → excelente, dejar correr</div>
+          <div class="s-med">3.000–6.000 → normal; fin de semana: apagar el más caro, probar reserva</div>
+          <div class="s-mal">&gt; 8.000 sostenido → cambiar la FOTO (antes que el texto)</div>
+        </div>
+        <p style="font-size:13.5px;margin:10px 0 0">CTR &gt;1% bien · &lt;0,6% la foto no llama · Frecuencia &gt;3 = rotar creativo · Subidas: <b>+20% máx, 1 vez/semana</b>, solo si costo/pedido &lt; margen.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="mes2">
+    <h2><span class="num">6</span> Mes 2 (13 ago – 15 sep) — escalar lo que demostró vender</h2>
+    <p class="lead">El contenido exacto lo dicta el balance del mes 1. Este es el menú de decisiones:</p>
+    <div class="tabla-scroll"><table>
+      <tr><th>Si pasó esto en mes 1…</th><th>…entonces en mes 2</th></tr>
+      <tr><td><span class="tag ok">Rentable</span> costo/pedido &lt; margen</td><td>Subir el ganador hasta 20k/día (+20% semanal). Creativo nuevo del mismo estilo probando <b>CON precio vs SIN precio</b> (“Desde $XXX.XXX”).</td></tr>
+      <tr><td><span class="tag ok">Rentable y estable 2+ semanas</span></td><td>Considerar 2ª campaña de <b>Tráfico</b> a varmancrew.com (8–10k/día) con plata NUEVA — nunca quitándole a Mensajes. Con Wompi en producción la web cierra ventas sola: el tráfico vale más que antes.</td></tr>
+      <tr><td><span class="tag mes2">En tablas</span> costo/pedido ≈ margen</td><td>No escalar. Rotar creativos (fotos nuevas, texto ganador) y probar <b>1 variable por semana</b>: foto → precio en texto → audiencia.</td></tr>
+      <tr><td><span class="tag mes1">Chats sí, pedidos no</span></td><td>El problema es el cierre, no el anuncio: revisar conversaciones del bot, precios vs competencia, fricción de talla/envío. Pausar pauta si hace falta — no pagar por chats que no cierran.</td></tr>
+      <tr><td><span class="tag ok">Un video orgánico explotó</span></td><td>Promote + remake del formato cada semana; el orgánico puede bajar el costo total.</td></tr>
+    </table></div>
+    <p class="fuentes">Mismo ritual los jueves 20 y 27 ago, 3 y 10 sep. Cierre ~15 sep: balance de los 2 meses → plan del mes 3 con datos reales.</p>
+  </section>
+
+  <section id="contenido">
+    <h2><span class="num">7</span> Contenido orgánico — 2 videos/semana × 8 semanas</h2>
+    <div class="grid g2">
+      <div class="card">
+        <h3 style="margin-top:0">La máquina simple</h3>
+        <ul style="margin:0;padding-left:18px;font-size:14.5px">
+          <li><b>Martes y domingo:</b> video (1 grabación → TikTok @varmansnk + Reel IG + FB).</li>
+          <li>Los demás días: historias (llegadas, empaques, tenis del día) + responder todo.</li>
+          <li>Audio de tendencia elegido <b>el mismo día</b> de grabar, nunca antes.</li>
+          <li>CTA siempre: “escríbenos por WhatsApp” + link en bio (al bot). Marca de agua siempre.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3 style="margin-top:0">Qué grabar (16 videos)</h3>
+        <ul style="margin:0;padding-left:18px;font-size:14.5px">
+          <li><b>S1–S3:</b> los 6 guiones existentes (D-V1, C-V1, U-V1, D-V2, C-V2, U-V2 de <span class="mono">TEXTOS-TIKTOK-REELS.md</span>).</li>
+          <li><b>S4–S8:</b> remakes del formato ganador (otro par, mismo guion) + POV empacando pedidos REALES + 1 trend nuevo/semana.</li>
+          <li><b>Cierre:</b> “lo que más nos pidieron” con los pares top de los 2 meses.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section id="presupuesto">
+    <h2><span class="num">8</span> Presupuesto de los 2 meses</h2>
+    <div class="grid g3">
+      <div class="card"><div style="font-size:13px;color:var(--gris);font-weight:700">MES 1</div>
+        <div class="kpi">~470–570k <small>COP</small></div>
+        <p style="font-size:14px;margin:6px 0 0">Meta Mensajes 15k/día → 18k si rentable. + Promote opcional (0–50k).</p></div>
+      <div class="card"><div style="font-size:13px;color:var(--gris);font-weight:700">MES 2</div>
+        <div class="kpi">~560–950k <small>COP</small></div>
+        <p style="font-size:14px;margin:6px 0 0">Hasta 20k/día en el ganador. Tráfico (0–250k) y Promote (0–100k) SOLO con plata nueva.</p></div>
+      <div class="card"><div style="font-size:13px;color:var(--gris);font-weight:700">TOTAL 2 MESES</div>
+        <div class="kpi">~1,0–1,5M <small>COP</small></div>
+        <p style="font-size:14px;margin:6px 0 0">Cada subida la apruebas tú en el ritual del jueves. Orgánico: $0 + tu tiempo (2 grabaciones/semana).</p></div>
+    </div>
+  </section>
+
+  <section id="riesgos">
+    <h2><span class="num">9</span> Riesgos y decisiones abiertas</h2>
+    <div class="card">
+      <ul style="margin:0;padding-left:18px;font-size:14.5px">
+        <li><b><span class="mono">fuente</span> sin probar</b> — si no queda grabada, volamos a ciegas sobre qué anuncio vende. Probar en Semana 0 (bloqueante).</li>
+        <li><b>Logos de terceros en creativos</b> — riesgo de rechazo/baneo de la cuenta publicitaria. Recomendación PM: primera campaña con modelos sin branding visible. Decisión tuya.</li>
+        <li><b>Wompi producción</b> — sin esto la web no cierra ventas sola. Meta: semana 3.</li>
+        <li><b>VM de 1 GB</b> — si la pauta multiplica los chats, vigilar la carga la primera semana.</li>
+        <li><b>16 jul es apretado</b> — elegiste mantenerlo; si la Semana 0 no cierra el 15, la pauta se corre. Regla no negociable: no se paga tráfico hacia un bot sin probar.</li>
+      </ul>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <div><b>Plan de marketing 2 meses — VarMan Crew · v1 (12 jul 2026).</b> Documento fuente: <span class="mono">web/marketing/plan-2-meses/PLAN-2-MESES.md</span>.</div>
+    <div class="fuentes">Material operativo vigente: TEXTOS-ANUNCIOS · TEXTOS-TIKTOK-REELS · GUIA-PRIMERA-CAMPANA (técnica Meta) · ESTILO-MARCA-REDES. El calendario de julio original queda archivado (fechas vencidas).</div>
+  </div>
+</footer>
+
+</body>
+</html>

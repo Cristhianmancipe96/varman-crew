@@ -1,0 +1,138 @@
+=========================================================================
+ CEREBRO IA v9.8 — FASE A (prueba solo con TU número)
+ Guía de despliegue para Cristhian · 25 jul 2026
+=========================================================================
+
+ESTADO: código construido y VERDE.
+  · Cerebro (Gemini real): 47 PASS · 0 FAIL  (12 guiones de conversación)
+  · Regresión del bot clásico: 352 PASS · 0 FAIL
+  · Verde también en 9.1, 9.2, 9.3, 9.5, 9.6, 9.7 → el flujo que vende NO se movió.
+
+QUÉ SUBES:  Escritorio → bot-varman-PARA-SUBIR-v9.8-2026-07-25.json
+RESPALDO:   bot_n8n\workflows\respaldo\bot-varman-v9.8.json (y todas las anteriores)
+
+
+-------------------------------------------------------------------------
+ 1) ANTES DE SUBIR — verificar UNA variable en la VM
+-------------------------------------------------------------------------
+El bot ya lee el referral de los anuncios (ID, titular, plataforma), pero solo
+si este flag está encendido. Sin él, la cascada de campaña cae siempre al
+nivel 3 y el aviso de "anuncio sin mapear" sale sin titular (inservible).
+
+   cd ~/varman-bot
+   grep BOT_FUENTE_DETALLE .env
+
+Si NO aparece o dice off → agregar la línea:   BOT_FUENTE_DETALLE=on
+
+(Regla de la casa: "ya lo hice" se verifica en la máquina, no en la memoria.)
+
+
+-------------------------------------------------------------------------
+ 2) SUBIR EL WORKFLOW (secuencia exacta — lección del 23 jul)
+-------------------------------------------------------------------------
+El import se ATASCA si n8n está corriendo (pelea por el lock de SQLite), y
+`import:workflow` DESACTIVA el workflow: hay que publicar después o el
+webhook queda en 404 y el bot no responde.
+
+   1. Subir el archivo a la carpeta workflows/ de la VM y renombrarlo a
+      bot-varman.json   (esperar a que la subida TERMINE antes del mv)
+   2. cd ~/varman-bot
+   3. docker compose stop n8n
+   4. docker compose run --rm --no-deps -u node n8n \
+        import:workflow --input=/workflows/bot-varman.json
+   5. docker compose start n8n
+   6. En la UI de n8n: botón PUBLISH  (en n8n 2.x dice Publish, no Active)
+   7. ./verificar-salud.sh     → debe dar 7 bien · 0 fallos
+
+
+-------------------------------------------------------------------------
+ 3) ENCENDER EL CEREBRO **SOLO PARA TU NÚMERO**
+-------------------------------------------------------------------------
+Agregar al .env de la VM:
+
+   BOT_CEREBRO_IA=on
+   BOT_CEREBRO_IA_SOLO=<TU NÚMERO DE PRUEBA, formato 573001234567>
+
+   docker compose up -d --force-recreate n8n
+   docker exec varman-n8n printenv | grep BOT_CEREBRO   ← confirmar DENTRO del contenedor
+
+Con la lista puesta, TODO el tráfico real de clientes sigue por el flujo
+clásico de siempre. Solo tu número entra al cerebro.
+
+*** OJO, ESTO ES IMPORTANTE ***
+El cerebro NO actúa con el número del DUEÑO (el 320). Es a propósito, para
+poder probar el flujo clásico y los comandos de admin. Así que tienes que
+escribirle al bot (304) desde un celular DISTINTO al 320. Si pruebas desde el
+320 vas a ver el bot viejo y vas a pensar que el cerebro no funciona — es
+exactamente el error que ya nos pasó hoy con el modelo 404.
+
+
+-------------------------------------------------------------------------
+ 4) GUION DE PRUEBA (escríbele al 304 en este orden)
+-------------------------------------------------------------------------
+Lo que debe pasar en cada paso:
+
+  1. "Hola"
+     → saludo por la hora + bienvenida + su nombre + UNA pregunta.
+       (Si tienes refPauta puesta en la app, abre con ESE modelo: foto+precio.)
+  2. "muéstrame unas <marca que tengas>"
+     → foto + nombre + precio REAL + pregunta de la ciudad. NO debe pedir talla.
+  3. "estos en 39"
+     → confirma disponibilidad ("todas las tallas disponibles"), NO repregunta.
+  4. "estoy en Bogotá"   (o tu ciudad real)
+     → Bogotá: contra entrega + pide SOLO nombre y dirección.
+       Fuera: pago anticipado + link Wompi + el NOMBRE de tu ciudad.
+  5. "muy caro, hay rebaja?"
+     → 10% con la CIFRA FINAL en pesos (no el porcentaje solo).
+  6. "son originales?"
+     → "importados, de excelente calidad". JAMÁS "1.1" ni "réplica".
+  7. "tienen New Balance 9060 moradas?"  (algo que NO tengas)
+     → "no lo encontré" + te llega a TI el aviso al 320. Nunca "no lo tenemos".
+  8. "cuál era el precio del que me mostraste?"
+     → dice la cifra SIN reenviar la foto.
+  9. "jajaja"
+     → una línea amable que retoma lo que estaban hablando.
+ 10. "quiero hablar con una persona"
+     → traspaso + aviso a tu 320 + el bot se CALLA con ese número 4 horas.
+
+QUÉ MIRAR EN TU 320: los avisos deben llegarte en los momentos de venta
+(intención de compra, anuncio sin mapear, pedido, handoff). Si no llegan,
+revisar la plantilla aviso_bt (tiene que estar Activa en la cuenta del 304).
+
+
+-------------------------------------------------------------------------
+ 5) ROLLBACK — un solo paso
+-------------------------------------------------------------------------
+   BOT_CEREBRO_IA=off      +  docker compose up -d --force-recreate n8n
+
+El bot vuelve EXACTAMENTE al comportamiento de hoy. No hace falta reimportar
+el JSON viejo: con el flag apagado el cerebro es código inerte (y eso está
+probado por los 352 tests en verde).
+
+
+-------------------------------------------------------------------------
+ 6) LO QUE FALTA (decisiones tuyas, después de la fase A)
+-------------------------------------------------------------------------
+ a) COSTO. Medido: ~11.500 tokens de entrada por llamada, 2-3 llamadas por
+    turno. El cuaderno (35.200 caracteres) viaja completo en cada llamada.
+    Palanca a medir: CACHÉ DE CONTEXTO de Gemini — el cuaderno es idéntico
+    siempre, cachearlo bajaría el costo un orden de magnitud sin quitar
+    ninguna regla. Antes de abrirlo a clientes reales.
+
+ b) LA VOZ EN LOS TURNOS COMPLEJOS. Cuando el cerebro usa sus 3 vueltas de
+    herramientas, el turno se cierra con texto de plantilla en vez de con
+    palabras del modelo — y justo esos son los turnos de más intención de
+    compra. Se arregla con UNA llamada extra a Gemini al final del turno,
+    sin herramientas. Recomendado, cuesta una llamada más.
+
+ c) PRERREQUISITOS TUYOS EN LA APP:
+    · Campo de VIDEO por referencia (el video del par en la mano es tu
+      gancho más fuerte y aparece en las 2 ventas que cerraste; sin el campo,
+      la herramienta enviar_video nunca se usa).
+    · Mapa ANUNCIO → MODELO. El bot te avisa al 320 con el ID y el titular
+      la primera vez que llega alguien de un anuncio sin asignar.
+      OJO: el ID llega como "ctwa:120xxxx" y en el mapa va el ID PELADO.
+
+ d) DEUDA ANOTADA (no urgente): el veto de precios permite el precio de
+    lista junto a la cifra con descuento si el modelo escribe mal; cuando se
+    suprime una foto repetida no cuenta como "contenido" del turno.

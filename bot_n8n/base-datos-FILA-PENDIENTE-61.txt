@@ -1,0 +1,4 @@
+FILA PENDIENTE para base-datos-respuestas-bot.csv (el CSV estaba bloqueado por Excel/OneDrive).
+Pegar esta línea al final del CSV cuando esté libre (o pedirle al PM que lo haga):
+
+61;Cierre (320 humano);"cliente dio la talla tras oferta con descuento (caso Andrés 22 jul, Adidas Samba vinotinto)";"¡Talla 41! ✅ Tenme presente que el 15% ($212.400) te lo puedo respetar por el día de hoy. Cuando quieras me pasas nombre, dirección, ciudad y teléfono, y te mando el link de pago. El envío va gratis 🚚 Todos nuestros envíos son seguros: te enviamos foto o video de cuando se alista tu pedido, y te compartimos la guía de envío con la transportadora que te quede más cómoda.";Plantilla humana (320);APROBADA por el dueño (22 jul, usada en vivo);Urgencia suave (descuento válido solo hoy) + confianza (foto/video del alistamiento + guía). Adaptar talla y cifras. Llevar al bot: ver briefs/brief-2026-07-22-cierre-confianza.md

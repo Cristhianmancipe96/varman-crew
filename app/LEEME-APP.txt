@@ -18,16 +18,31 @@ proyecto "varmanapp").
     manifest.json, sw.js, icon.png -> app instalable (PWA)
     servidor.py / iniciar-varman.bat -> abrir la app en este PC
                             (http://localhost:8000, sin caché)
-    seed-catalogo.json, importar-datos.html -> carga inicial de datos
+    seed-catalogo.json   -> catálogo para la carga inicial (sin costos)
     netlify/ , netlify.toml -> restos de Netlify (ya se usa Cloudflare)
+
+  *** SEGURIDAD (2026-07-21): importar-datos.html ***
+  La herramienta REAL (con los COSTOS de compra) se sacó a ..\_ARCHIVO-NO-SUBIR\.
+  El importar-datos.html que quedó AQUÍ es una LÁPIDA vacía (solo redirige, sin
+  datos): sirve para sobreescribir en el CDN la versión vieja que quedó cacheada
+  (borrar el archivo no basta, Cloudflare lo cachea hasta 7 días). SÍ hay que
+  subir esta lápida. NO vuelvas a poner datos del negocio en esta carpeta.
+  Tampoco aportan al deploy (y exponen procedimientos internos): netlify\,
+  netlify.toml, NOTA-*.md, este LEEME. Lo IMPRESCINDIBLE público: index.html,
+  app.jsx, vendor\, manifest.json, sw.js, icon.png, importar-datos.html (lápida).
+  (reglas-firestore.txt se pega en la consola de Firebase; no se despliega.)
 
 CÓMO SE ACTUALIZA LA APP EN INTERNET (2 minutos):
   1. Entrar a https://dash.cloudflare.com -> Workers & Pages
      -> proyecto "varmanapp".
   2. Pestaña "Deployments" -> botón "Create deployment".
-  3. ARRASTRAR LA CARPETA app\ COMPLETA a la zona de subida
-     (con vendor\ incluida; el .py y el .bat no estorban).
+  3. ARRASTRAR LA CARPETA app\ a la zona de subida (con vendor\ incluida).
+     La lápida importar-datos.html SÍ va; la herramienta con costos ya NO está.
   4. "Save and Deploy". En ~1 minuto queda en varmanapp.pages.dev.
+     ESTE deploy sobreescribe importar-datos con la lápida (sin costos).
+     Verifica luego: abrir varmanapp.pages.dev/importar-datos debe redirigir
+     al inicio, NO mostrar costos. Si aún los muestra, es caché: esperar unos
+     minutos y recargar con Ctrl+F5, o purgar caché en Cloudflare.
   En el celular: cerrar y volver a abrir la app (o F5) para ver lo nuevo.
 
 ----------------------------------------------------------

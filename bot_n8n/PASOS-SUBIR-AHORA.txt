@@ -1,0 +1,120 @@
+============================================================
+ SUBIR EL BOT — un solo archivo, las dos actualizaciones
+ (Lead Caliente v10.2 + Elige Pago v10.3)     2-ago-2026
+============================================================
+
+El archivo bot-varman-PARA-SUBIR-v10.3-2026-07-30.json YA TRAE
+las dos cosas adentro. Se sube UNA sola vez. Lo que decide qué
+se prende son los flags del .env, no el archivo.
+
+------------------------------------------------------------
+PASO 1 — Entrar a la VM
+------------------------------------------------------------
+Google Cloud Console -> Compute Engine -> Instancias de VM
+-> botón SSH de la instancia del bot (abre terminal en el navegador).
+
+------------------------------------------------------------
+PASO 2 — Subir el archivo
+------------------------------------------------------------
+En esa ventana SSH: engranaje (arriba a la derecha) -> "Subir archivo"
+-> escoger del Escritorio:
+     bot-varman-PARA-SUBIR-v10.3-2026-07-30.json
+Queda en la carpeta home (~).
+
+------------------------------------------------------------
+PASO 3 — Ponerlo en su lugar y verificar
+------------------------------------------------------------
+  cd ~/varman-bot
+  cp workflows/bot-varman.json workflows/bot-varman-ANTES.json
+  mv ~/bot-varman-PARA-SUBIR-v10.3-2026-07-30.json workflows/bot-varman.json
+  ls -l workflows/bot-varman.json
+
+Debe pesar EXACTAMENTE 1100322 bytes.
+Si no coincide, la subida se cortó -> repetir el PASO 2.
+(La copia -ANTES.json es el respaldo por si toca devolverse.)
+
+------------------------------------------------------------
+PASO 4 — Prender los flags en el .env
+------------------------------------------------------------
+  nano .env
+
+Agregar al final (o revisar que estén):
+
+  BOT_LEAD_CALIENTE=on      <- te avisa quién está listo para comprar
+  BOT_LEAD_UMBRAL=6         <- puntos para considerarlo caliente (6 = recomendado)
+  BOT_ELIGE_PAGO=on         <- pregunta el método de pago + avisa al elegirlo
+
+Guardar: Ctrl+O, Enter, Ctrl+X
+
+NOTA: si solo quieres probar los leads esta semana, pon únicamente
+las dos primeras y deja BOT_ELIGE_PAGO=off. Son independientes.
+
+------------------------------------------------------------
+PASO 5 — Reiniciar n8n
+------------------------------------------------------------
+  docker compose up -d --force-recreate n8n
+
+------------------------------------------------------------
+PASO 6 — Importar con el script (NO por la interfaz de n8n)
+------------------------------------------------------------
+ANTES de importar, comprobar que el archivo en workflows/ SÍ es el
+nuevo (esto ya se perdió una tarde dos veces, 25-jul):
+
+  grep -c convEsperaMetodo workflows/bot-varman.json
+
+Tiene que dar 1 o más. Si da 0, estás por importar el VIEJO: PARA
+y revisa el mv del PASO 3.
+
+Luego, dentro de ~/varman-bot:
+
+  bash importar-workflows.sh
+
+El script solo: detiene n8n -> importa -> deja activo VarmanBotV4Ped01
+-> vuelve a arrancar n8n y espera a que responda. El bot queda fuera
+de línea 1-2 minutos, es normal.
+
+OJO: import:workflow deja el workflow DESACTIVADO. Si al entrar a
+bot.varmancrew.com lo ves inactivo, dale al botón (en n8n 2.x dice
+"Publish", no "Active"). Eso es lo único que se hace por la interfaz.
+
+Después, el chequeo de salud:
+
+  bash verificar-salud.sh
+
+n8n tarda 3-5 min en arrancar en esta VM (el webhook ~1 min más).
+Si corres el chequeo antes, va a dar falsos fallos.
+
+------------------------------------------------------------
+PASO 7 — Probar (desde tu WhatsApp, el 320)
+------------------------------------------------------------
+A) Comandos de dueño (escribe al bot desde el 320):
+     calientes            -> lista de quién está listo para comprar
+     tomar 573001234567   -> el bot calla con ese cliente y te reenvía todo
+     soltar 573001234567  -> el bot vuelve a atenderlo
+     link 07 38 10        -> arma el link de pago (ref 07, talla 38, 10% dto)
+                             y te devuelve el mensaje listo para copiar
+
+B) Como cliente (si prendiste BOT_ELIGE_PAGO):
+   pide un modelo -> ciudad que NO sea Bogotá -> "sí lo quiero"
+   -> debe salir el MENÚ de 4 métodos (Nequi/Daviplata/Bre-B/Wompi)
+   -> elige Nequi: te pide nombre+dirección Y te avisa al 320 de una.
+   -> con Wompi: manda el link igual que siempre.
+
+------------------------------------------------------------
+OJO — la ventana de 24h de Meta
+------------------------------------------------------------
+Meta solo deja que el bot te mande texto libre al 320 si TÚ le
+escribiste al bot en las últimas 24 horas. Así que escríbele
+cualquier cosa una vez al día (con "pedidos" basta) para que los
+avisos de leads sí te lleguen.
+
+------------------------------------------------------------
+ROLLBACK (1 paso, sin tocar el archivo)
+------------------------------------------------------------
+  nano .env      -> poner los flags en off
+  docker compose up -d --force-recreate n8n
+
+Si hasta el archivo hay que devolver:
+  cd ~/varman-bot
+  mv workflows/bot-varman-ANTES.json workflows/bot-varman.json
+  bash importar-workflows.sh

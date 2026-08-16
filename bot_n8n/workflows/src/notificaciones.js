@@ -109,10 +109,77 @@ const salida = [];
 const tok = await tokenAdmin();
 const dueno = String($env.OWNER_WHATSAPP || '').replace(/\D/g, '');
 
+// [RESCATE-CEREBRO] ¿esta sesión la lleva el cerebro? (campos con prefijo `ia`)
+function esDelCerebro(s) {
+  for (const k in s) if (/^ia[A-Z]/.test(k) && s[k]) return true;
+  return false;
+}
+// catálogo bajo demanda: solo se lee si hay algún candidato a rescate (1 lectura
+// por corrida como mucho, y la mayoría de las horas ni eso).
+let _catalogo = null;
+async function nombreDeRef(tok, ref) {
+  const r = String(ref || '').replace(/\D/g, '').padStart(2, '0');
+  if (!r) return '';
+  if (_catalogo === null) {
+    try { _catalogo = await listar(tok, 'catalogo'); } catch (e) { _catalogo = []; }
+  }
+  const p = _catalogo.find((x) => String(x.ref || '').padStart(2, '0') === r);
+  const m = p ? String(p.marca || '').trim() : '';
+  return m ? m.charAt(0).toUpperCase() + m.slice(1) : '';
+}
+
+// ---- 0. [RESCATE-CEREBRO] el link de Wompi que nadie pagó ----
+// El hueco #10 del barrido de julio: el 100% de los links quedó sin pagar y sin
+// rescate. rescate-conversa.js salta a propósito las conversaciones del cerebro
+// ("lleva su propio rescate") y ese rescate NO existía: el CUADERNO documenta el
+// evento `silencio_link` pero nadie lo disparaba. Una sola vez por sesión, entre
+// 2 y 12 h después del link, y nunca si ya pagó, si hay un humano en la
+// conversación o si el cliente escribió hace poco.
+try {
+  const sesiones = await listar(tok, 'botSesiones');
+  for (const s of sesiones) {
+    if (!s._id || s._id === dueno) continue;
+    if (!esDelCerebro(s)) continue;
+    if (s.iaRescateLink === true) continue;          // máx 1 por sesión
+    if (s.enHandoffAt) continue;                     // lo tiene un humano
+    if (String(s.iaEstadoPedido || '') === 'registrado') continue;
+    if (String(s.iaPago || '') === 'confirmado') continue;
+    if (!s.iaLinkAt) continue;                       // no se le mandó ningún link
+    const edad = Date.now() - Date.parse(s.iaLinkAt || '');
+    if (isNaN(edad) || edad < 2 * HORA_MS || edad > 12 * HORA_MS) continue;
+    // ventana de 24h de WhatsApp: sin ella el texto libre no se entrega
+    const rate = await fsGetDoc(tok, 'tiendas/varman/botRate/' + s._id);
+    const ultimo = rate && rate.updatedAt ? Date.now() - Date.parse(rate.updatedAt) : Infinity;
+    if (!(ultimo < 24 * HORA_MS)) continue;
+    if (ultimo < 1 * HORA_MS) continue;              // conversación viva: no interrumpir
+    // doble red: si el PEDIDO ya está pagado/despachado, no se rescata nada
+    // (el webhook de Wompi marca la sesión, pero un pago por Nequi lo confirma
+    // el dueño a mano sobre el pedido y la sesión puede no enterarse).
+    if (s.iaPedidoPath) {
+      const ped = await fsGetDoc(tok, String(s.iaPedidoPath));
+      const est = ped ? String(ped.estado || '') : '';
+      if (['pago_confirmado', 'verificado', 'enviado', 'entregado', 'cancelado'].indexOf(est) >= 0) continue;
+    }
+    const modelo = (await nombreDeRef(tok, s.iaRef)) || 'tus tenis';
+    const total = Number(s.iaCotTotal) > 0 ? fmtPrecio(s.iaCotTotal) : '';
+    if (!total) continue;                            // sin cifra real no se escribe
+    const nombre = String(s.nombrePerfil || '').trim();
+    await fsMerge(tok, 'tiendas/varman/botSesiones/' + s._id, { iaRescateLink: true });
+    salida.push(msjTexto(s._id, T(TEXTOS.iaRescateLink, {
+      nombre: nombre ? ' ' + nombre : '', modelo, total
+    })));
+  }
+} catch (e) {}
+
 // ---- 1. carrito abandonado ----
 try {
   const sesiones = await listar(tok, 'botSesiones');
   for (const s of sesiones) {
+    // [FIX-CARRITO-CEREBRO] (barrido r2) la guarda pedía `estado` y `ref`, que
+    // solo escribía el flujo clásico: con el cerebro esta sección estaba MUERTA
+    // para todos los clientes. El cerebro tiene su propio rescate (bloque 0),
+    // así que aquí se saltan sus sesiones en vez de dejarlas sin nada.
+    if (esDelCerebro(s)) continue;
     if (!s.estado || !s.ref) continue;              // sin pedido en curso (o solo fuente)
     if (s.recordatorio === true) continue;          // máx 1 recordatorio por sesión
     if (!s._id || s._id === dueno) continue;        // al dueño no (sesiones de prueba)
@@ -182,6 +249,13 @@ if (FLAG_CATALOGO_WEB) {
       if (!s.linkCatalogoAt) continue;                // nunca le mandamos el link
       if (s.seguimientoLink === true) continue;       // máx 1 seguimiento por sesión
       if (s.estado && s.ref) continue;                // pedido en curso: lo cubre el carrito abandonado
+      // [FIX-SEGUIMIENTO-CEREBRO] (barrido r2) esa guarda era del flujo clásico
+      // y con el cerebro NUNCA se cumple: al cliente que estaba eligiendo modelo
+      // con el bot le llegaba "¿pudiste hacer tu compra?" en plena venta, o
+      // incluso teniendo un asesor encima. Se salta si el cerebro ya lo está
+      // atendiendo o si hay un humano en la conversación.
+      if (esDelCerebro(s)) continue;
+      if (s.enHandoffAt) continue;
       if (!s._id || s._id === dueno) continue;        // al dueño no (sesiones de prueba)
       const edad = Date.now() - Date.parse(s.linkCatalogoAt || '');
       if (isNaN(edad) || edad < 2 * HORA_MS || edad > 24 * HORA_MS) continue;

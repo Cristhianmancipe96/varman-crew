@@ -28,6 +28,23 @@ Luego `node workflows\build-v4-pedidos.js` y `node tests\test-offline-v4.js` nor
 > (`BRIEF-FLUIDEZ-CONVERSACION.md` + `CONVERSACIONES-INCOMODAS.md`), una mejora F
 > por vuelta. Esta cola queda para cuando se retome el loop general.
 
+0. **[CV1] Modelo específico + anti-repetición (bug visto EN VIVO por el dueño, 12 jul).**
+   ✅ **PARTE B HECHA (12 jul):** anti-repetición → asesor, flag `BOT_MODELO_ASESOR` (288/0).
+   Queda PENDIENTE la parte A (mandar la ref exacta), BLOQUEADA hasta que el dueño registre el
+   nombre del modelo en la app (el catálogo hoy solo guarda marca). Detalle abajo (histórico): Conversación real: "Tienes Jordan retro 4?" → el bot solo matcheó la
+   marca y dio el mensaje genérico de CW2 ("De Jordan tenemos 17 modelos + link"); al insistir
+   "Retro 4 tienes?" repitió EXACTAMENTE el mismo mensaje. Dos arreglos (aditivos + flag):
+   (a) si la pregunta trae un modelo además de la marca (p. ej. "retro 4"), buscar el modelo
+   en el CATÁLOGO REAL (nombre/marca de las refs): si HAY match → responder con la(s)
+   referencia(s) concreta(s) que sí tenemos (pedido explícito del dueño 12 jul: "que cheque
+   en inventario y le envíe la referencia si tenemos ese estilo"), reusando el flujo de ref
+   directa que ya existe; si NO hay match o es ambiguo → honesto + pasar al asesor (reusar
+   `pasarModeloAlAsesor`, jamás inventar); (b) guardia anti-repetición: si la respuesta a
+   generar es idéntica a la última enviada en la sesión, variar el texto y ofrecer el asesor.
+   ⚠️ NO arrancar mientras corra otro agente sobre `cerebro-v4.js` (12 jul: corre el de
+   `BOT_FUENTE_DETALLE`). Adicional a revisar ese día: latencia de 3-4 min en responder
+   (¿VM reiniciando por la subida, o problema real? mirar logs de n8n).
+
 1. **[E2b-resto] Más textos cálidos** bajo `BOT_TEXTOS_V2`: quedan `comprarIntro`,
    `datosFaltan`/`datosIncompletos` (BANCO §9) y `refDirectaIntro` (bienvenida y cierre ya
    salieron en la mejora 12). 1–2 por vuelta, con test del mensaje clave. (Origen: BANCO.)

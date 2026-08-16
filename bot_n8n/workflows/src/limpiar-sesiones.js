@@ -121,6 +121,16 @@ await barrer(tok, 'botProcesados', 24 * 3600 * 1000);
 // "último mensaje del cliente" y el trigger horario lo usa para saber si la
 // ventana de 24h está abierta (reseñas/guías) → se conservan 25h, no 1h
 await barrer(tok, 'botRate', 25 * 3600 * 1000);
+// [FIX-COLECCIONES-SIN-PODA] (barrido r2) `botLocks` es nueva de la v10 y nadie
+// la limpiaba: un candado huérfano (n8n matado, OOM en la VM de 1 GB) se quedaba
+// ahí para siempre y el doc se acumulaba. El candado vivo dura segundos, así que
+// cualquiera de más de una hora es basura y borrarlo es seguro. `botErrores`
+// tampoco se podaba: es la bitácora que el dueño ve en la app y en el resumen,
+// pero un mes de errores en la VM chica no le sirve a nadie — se conservan 30
+// días. (`botAnuncios` NO se toca a propósito: es el mapa de anuncios que el
+// dueño usa para asignar refs, no un dato de paso.)
+await barrer(tok, 'botLocks', 1 * 3600 * 1000);
+await barrer(tok, 'botErrores', 30 * 24 * 3600 * 1000);
 
 // ---- resumen diario al dueño (últimas 24h) ----
 const dueno = String($env.OWNER_WHATSAPP || '').replace(/\D/g, '');
@@ -152,4 +162,8 @@ const cuerpo = T(TEXTOS.resumenDiarioTitulo, {
   fecha: new Date().toLocaleDateString('es-CO', { timeZone: 'America/Bogota', day: '2-digit', month: '2-digit', year: 'numeric' }),
   conversaciones, pedidos: nPedidos, lineasPedidos, errores: nErrores, lineasErrores, sesiones: sesionesBorradas
 });
-return [{ json: { messaging_product: 'whatsapp', to: dueno, type: 'text', text: { body: cuerpo } } }];
+// [AVISO-PLANTILLA] msjAvisoDueno (textos.js): con BOT_AVISO_PLANTILLA=on el
+// resumen va como PLANTILLA aprobada → llega aunque la ventana de 24h esté
+// cerrada (el caso real: a las 3:15am casi siempre lo está y el resumen se
+// perdía en silencio). Flag OFF = texto libre EXACTO como hoy.
+return [{ json: msjAvisoDueno(dueno, cuerpo) }];

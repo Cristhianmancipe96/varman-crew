@@ -306,3 +306,37 @@ Los pedidos `canal:'web'` ahora llevan un campo más:
 - **El webhook del bot ya lo usa**: la confirmación al 320 dice "Talla 40 · Dama"
   y la del cliente "(talla 40, dama)". Sin `genero` (pedidos del bot) el texto
   queda como antes. Probado E2E sandbox 2026-07-12 (batería 273/0).
+
+---
+
+# CAMBIO 2026-07-12: atribución DETALLADA de pauta (flag `BOT_FUENTE_DETALLE`, OFF por defecto)
+
+**ADICIÓN al contrato — nada de lo existente cambia.** Con el flag apagado
+(estado por defecto) el pedido es byte-idéntico al de hoy y estos campos NO
+existen. Rollback: quitar `BOT_FUENTE_DETALLE` del `.env`.
+
+Con `BOT_FUENTE_DETALLE=on`, los pedidos que llegan de un anuncio/publicación
+click-to-WhatsApp pueden llevar hasta 3 campos MÁS (solo se escriben los que
+tengan valor — nunca strings vacíos ni placeholders):
+
+| Campo | Tipo | Valores |
+|---|---|---|
+| `fuente_titulo` | string (opcional) | headline del anuncio tal como lo reporta Meta (`referral.headline`), ej. "Tus próximos tenis están aquí" |
+| `fuente_tipo` | string (opcional) | `ad` (anuncio) o `post` (publicación) — `referral.source_type` crudo de Meta |
+| `fuente_plataforma` | string (opcional) | `facebook` / `instagram`, deducida de `referral.source_url` (contiene "instagram" → instagram; "fb.me"/"facebook" → facebook); si la url no lo dice, el campo NO se escribe |
+
+Detalles:
+
+- **`fuente` (v5) NO cambia nunca**: sigue siendo `organico` o `ctwa:<source_id>`
+  en todos los pedidos, con o sin flag.
+- Pedidos orgánicos, pedidos viejos o flag OFF: ninguno de los 3 campos existe —
+  la app debe tratarlos como opcionales (mostrar solo si vienen, no asumir nada).
+- El detalle viaja igual que `fuente`: nace en el referral (solo el PRIMER
+  mensaje), sobrevive en la sesión (`botSesiones.{wa}.fuenteDetalle`, JSON string
+  interno del bot — NO exponerlo a la app en reglas) y cae al pedido al crearse
+  (los 3 puntos: comprobante, Wompi y contra entrega).
+- El aviso de pedido nuevo al 320 anexa una línea "📣 Vino de: {titulo} ({plataforma})"
+  cuando hay dato; con el flag OFF el aviso queda byte-idéntico al de hoy.
+
+*Escrito por el Agente BOT el 2026-07-12 (batería offline en verde con la
+sección 49 nueva). Responder aquí si la app quiere otros nombres.*

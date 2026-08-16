@@ -172,6 +172,22 @@ async function principal() {
     actualizado: new Date().toISOString()
   });
 
+  // [PAGO-EN-LA-SESION] (barrido r2) el webhook solo tocaba el PEDIDO, así que
+  // la sesión del cerebro seguía diciendo "pago: pendiente" después de un pago
+  // real: el bot le hablaba al cliente como si no hubiera pagado y el rescate
+  // del link estaba a punto de preguntarle "¿te quedó alguna duda con el pago?"
+  // a alguien que ya había pagado. Mejor esfuerzo: si falla, nada se rompe.
+  try {
+    const waSes = String(pedido.data.cliente_wa || '').replace(/\D/g, '');
+    if (waSes) {
+      await fsMerge(tok, 'tiendas/varman/botSesiones/' + waSes, {
+        iaPago: 'confirmado',
+        iaEstadoPedido: 'registrado',
+        updatedAt: new Date().toISOString()
+      });
+    }
+  } catch (e) {}
+
   // Género del pedido (lo trae la compra WEB: dama/caballero). Los pedidos del
   // bot no lo tienen → cadena vacía y el mensaje queda como antes.
   const gen = String(pedido.data.genero || '').toLowerCase();
@@ -193,18 +209,26 @@ async function principal() {
         modelo, ref: pedido.data.ref || '?', talla: pedido.data.talla || '?', genero: generoCli
       })
     } } });
+    // [PAGO-PRIMERO] el pedido nació con el link ANTES de los datos de envío
+    // (marca "(pendientes tras pago)"): ahora que pagó, se le piden nombre y
+    // dirección. El Cerebro los captura (sesión datosPost) y completa el pedido.
+    if (/^\(pendientes tras pago\)/.test(String(pedido.data.datos_envio || ''))) {
+      salida.push({ json: { messaging_product: 'whatsapp', to: clienteWa, type: 'text', text: {
+        body: TEXTOS.conversaDatosPostPago
+      } } });
+    }
   }
-  // 2) aviso al DUEÑO (320)
+  // 2) aviso al DUEÑO (320). [AVISO-PLANTILLA] msjAvisoDueno (textos.js): con
+  //    el flag ON va como plantilla aprobada (llega aunque la ventana de 24h
+  //    esté cerrada); OFF = texto libre EXACTO como hoy.
   const dueno = String($env.OWNER_WHATSAPP || '').replace(/\D/g, '');
   if (dueno) {
-    salida.push({ json: { messaging_product: 'whatsapp', to: dueno, type: 'text', text: {
-      body: T(TEXTOS.wompiConfirmadoDueno, {
-        ref: pedido.data.ref || '?', talla: pedido.data.talla || '?', genero: generoDueno,
-        total: fmtPrecio(pedido.data.total || 0),
-        cliente: pedido.data.cliente_nombre || '(sin nombre)',
-        wa: pedido.data.cliente_wa || '?', ruta: pedido.path
-      })
-    } } });
+    salida.push({ json: msjAvisoDueno(dueno, T(TEXTOS.wompiConfirmadoDueno, {
+      ref: pedido.data.ref || '?', talla: pedido.data.talla || '?', genero: generoDueno,
+      total: fmtPrecio(pedido.data.total || 0),
+      cliente: pedido.data.cliente_nombre || '(sin nombre)',
+      wa: pedido.data.cliente_wa || '?', ruta: pedido.path
+    })) });
   }
   return salida;
 }

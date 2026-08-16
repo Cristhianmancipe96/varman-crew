@@ -62,6 +62,29 @@ próximo negocio **sin repetir los tropiezos**. Parte del playbook: ver `PLAYBOO
 18. **Cumplimiento:** usar el **tier de PAGO del LLM** (no comparte datos para entrenamiento) —
     requisito de los términos de WhatsApp Business Solution para usar IA de terceros como auxiliar.
 
+## Mensajes del NEGOCIO al dueño (avisos, resúmenes) — lección 2026-07-18
+20. **El "verde" del orquestador NO es entrega.** WhatsApp Cloud API **acepta** un texto libre fuera
+    de la ventana de 24h (devuelve `wamid`, n8n lo pinta verde) y **NO lo entrega** (error 131047).
+    El dueño no recibe el resumen diario ni los avisos de venta y **nadie se entera**. Para VarMan
+    pasó semanas: el reporte llegaba solo los días siguientes a que el dueño le escribiera al bot.
+    - **Regla:** todo mensaje que INICIA el negocio (resumen diario, aviso de pedido, handoff,
+      reenvío de fotos) va por **plantilla aprobada**, nunca texto libre. Dejarlo detrás de un flag
+      con helper único (`msjAvisoDueno()`) para poder volver atrás.
+    - **Gotchas de plantillas de Meta:** no pueden empezar ni terminar en la variable (poner una
+      línea fija al final); la variable **no admite saltos de línea** (aplanar a " | "); el **nombre
+      y el código de idioma** del `.env` deben ser EXACTOS a los de Meta (`es_CO` ≠ `es`); no
+      encender el flag hasta que la plantilla esté **"Activa"** (en revisión → los envíos se rechazan).
+    - **Siempre registrar los `statuses: failed`** del webhook en la colección de errores: sin eso,
+      un fallo de entrega es 100% invisible y se diagnostica a ciegas.
+21. **Antes de teorizar, mirar Executions.** El mismo síntoma ("no me llega el reporte") tenía DOS
+    causas: la ventana de 24h **y** ejecuciones atascadas en "Starting soon/Queued" (el trigger de la
+    madrugada nunca corrió, cola zombie tras reinicios en una VM de 1 GB). Chequear tras cada
+    reinicio que no queden ejecuciones colgadas ("Stop all").
+22. **`import:workflow` deja el workflow DESACTIVADO** ("Deactivating workflow…" en su salida) → el
+    webhook responde 404 y el bot queda mudo sin que nadie lo note. Hay que **publicarlo** después
+    (en n8n 2.x el botón dice **Publish**, no "Active"; por CLI `publish:workflow`). **Correr el
+    chequeo de salud SIEMPRE después de importar** — es lo que delata el 404.
+
 ## Proceso replicable: el BANCO DE RESPUESTAS
 19. **Antes de "pulir" el bot, construir un BANCO DE RESPUESTAS con datos REALES** (conversaciones de
     la campaña + una compra de prueba). Define: reglas de negocio (tallas/conversión, calidad,

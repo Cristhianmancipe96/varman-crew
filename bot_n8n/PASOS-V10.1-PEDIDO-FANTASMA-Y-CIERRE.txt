@@ -1,0 +1,221 @@
+========================================================================
+  BOT VARMAN v10.1  —  EL PEDIDO FANTASMA, EL CIERRE Y EL BOT MUDO
+  Guía para subir a la VM. (26-jul, mañana)
+========================================================================
+
+⚠️ IMPORTANTE: la v10.1 REEMPLAZA a la v10.0. Si ya subiste la v10.0
+   esta mañana, sube esta encima con los mismos pasos — no hay que
+   deshacer nada y NO se toca el .env.
+   Si todavía NO habías subido la v10.0: sube directo la v10.1, que
+   trae todo lo de la v10.0 más estos 8 puntos.
+
+------------------------------------------------------------------------
+QUÉ ARREGLA (tus reportes de la mañana y de la tarde)
+------------------------------------------------------------------------
+
+ 1. EL PEDIDO FANTASMA — el más grave.
+    Le dijiste que cambiabas de modelo, el bot te contestó "sí, ya está
+    ordenado, te llega en la tarde"… y en la app NO se creó nada.
+    Eran DOS fallas encadenadas:
+      a) Con un pedido ya registrado, TODOS los caminos de registro
+         quedaban bloqueados: el modelo nuevo no llegaba nunca a la app.
+         Ahora el cambio de modelo ACTUALIZA el pedido que ya existe
+         (un pedido, un modelo: el último que eligió el cliente). No se
+         crea un segundo pedido — eso sería cobrar dos veces.
+      b) Nada impedía que el bot AFIRMARA un pedido que el código no
+         registró. Ahora, si el texto dice "quedó registrado / ya está
+         ordenado / sale hoy" y el pedido NO existe, el código tumba esa
+         frase y en su lugar pide el dato que falta ("me confirmas la
+         dirección de entrega"). Prometer y no cumplir es lo que mata la
+         venta: preferimos pedir el dato.
+    Excepción a propósito: si ya te habías cambiado DESPUÉS de recibir
+    el link de pago del modelo anterior, el bot no lo toca solo — te
+    avisa al 320 y lo corrige un asesor. Es plata ya cobrada.
+
+ 2. MENSAJE DE CIERRE (lo que pediste).
+    Cuando el pedido queda registrado, al cliente le llega ahora un
+    mensaje aparte:
+
+        ✅ Tu pedido ya está confirmado
+        👟 <modelo>
+        📏 Talla: la confirmamos contigo al alistar
+        💵 Total: $269.900 · Contra entrega
+        📍 <nombre · dirección · ciudad · teléfono>
+
+        Pasa a alistamiento y nos comunicamos contigo para continuar
+        con la entrega.
+
+    Lo garantiza el CÓDIGO, no el modelo: sale siempre, con la cifra
+    real del catálogo, y ningún filtro se lo puede comer. Sale UNA vez
+    por modelo (si el cliente se cambia, sale el resumen nuevo).
+
+ 3. EL BOT MUDO — lo de tu esposa.
+    Preguntó por unos tenis, el bot dijo "Dame un segundo y ya te
+    confirmo" y NUNCA volvió a escribir. Y no podía: el bot solo habla
+    cuando el cliente escribe, así que esa frase deja al cliente
+    esperando para siempre.
+    Ahora esa línea de respaldo NO promete volver: devuelve la pelota
+    ("Perdón, no te entendí bien. ¿Me confirmas el modelo que te
+    interesa?"), y con la respuesta del cliente el turno se reintenta.
+    Además al modelo se le prohibió expresamente en el cuaderno
+    prometer que va a escribir después.
+    (En ese caso ella había COMPARTIDO una publicación de Instagram, no
+     escrito texto: es la entrada que el bot no logró resolver.)
+
+ 4. NO MANDAR MODELOS QUE NADIE PIDIÓ.
+    Preguntaste por "el café" —que el bot YA te había mostrado— y te
+    mandó unas Nike. No podía resolverlo: la lista de fotos que ya te
+    había enviado existía por dentro pero NO le llegaba al modelo.
+    Ahora sí le llega, con el nombre al lado, y la regla nueva (D4) es
+    explícita: si el cliente lo nombra con una palabra corta ("el
+    café", "las blancas", "esas"), es algo que YA le mostraste; si
+    de verdad duda entre dos, pregunta por NOMBRE sin reenviar fotos.
+
+ 5. AHORA SÍ SALUDA PRIMERO (y no suelta el rango de precios).
+    A un "Precio ?" de entrada contestaba "Nuestros tenis importados de
+    excelente calidad van desde $235.000 hasta $480.000 con envío
+    gratis…" — sin saludar y sin presentarse. Ya lo habías pedido el
+    25-jul; el cuaderno lo ordenaba pero el modelo lo omitía.
+    Ahora lo GARANTIZA el código: en el primer mensaje siempre entra
+    "Buenas tardes, bienvenido a VarMan Crew. Mi nombre es Cristian" +
+    la pregunta de qué modelo busca. Y la frase del rango de precios
+    queda PROHIBIDA de entrada: el precio sale después, en la ficha,
+    pegado a la foto del modelo concreto.
+
+ 6. EL CLICK PAGADO QUE RECIBÍA "NO LO ENCONTRÉ".
+    Un cliente llegó del anuncio de Instagram, escribió "Precio.?" y lo
+    primero que leyó fue "No lo encontré entre los modelos que tengo
+    registrados". Nunca nombró un modelo: el que no encontró nada fue el
+    BOT buscando la referencia de su propio anuncio (sin mapear y sin
+    referencia de publicación puesta en la app), y el código convertía
+    ese tropiezo interno en un "no tenemos lo que buscas" dirigido al
+    cliente. Esa regla es para cuando el CLIENTE pide algo que no
+    tenemos — no para la apertura. Ya no dispara ahí.
+    Tampoco se permite rematar la apertura con "déjame ver qué modelo
+    es": es otra promesa de volver que nunca vuelve. El primer mensaje
+    ahora siempre termina en una pregunta.
+
+ 7. VARIOS MODELOS EN LA PUBLICACIÓN (lo que pediste).
+    Antes la app dejaba elegir UNA sola referencia de publicación (un
+    menú desplegable). Ahora es un marcar/desmarcar igual al de las
+    fotos: puedes dejar hasta 5 modelos marcados, y el cliente que
+    llega del anuncio puede preguntar por cualquiera de ellos.
+    Con VARIOS marcados y un mensaje general ("las de la publicación"),
+    el bot NO adivina: se los nombra y le pregunta cuál quiere. Con la
+    que elija, ahí sí manda la ficha. Con UNO solo marcado, se comporta
+    exactamente igual que hoy.
+    ⚠️ Esto son DOS despliegues: el bot (pasos de abajo) Y la app.
+       La app se sube aparte, a Cloudflare Pages:
+         1. https://dash.cloudflare.com -> Workers & Pages -> "varmanapp"
+         2. Deployments -> "Create deployment"
+         3. Arrastrar la carpeta app\ completa (con vendor\ adentro)
+         4. "Save and Deploy" (~1 minuto)
+       Si subes solo el bot, la app te seguirá dejando marcar uno solo
+       (y todo sigue funcionando: el bot entiende las dos formas).
+
+ 8. EL COLOR SE RESUELVE DENTRO DEL MISMO MODELO.
+    Que el bot ofrezca DOS opciones cuando el cliente pide un color
+    está bien y se queda así — puede salvar la venta. Lo que no puede
+    es mezclar: si pide "las blancas", las dos opciones tienen que ser
+    del MISMO modelo en blanco, no una blanca de una referencia y otra
+    blanca de otra distinta.
+    Antes eso solo funcionaba si el modelo estaba "activo" en la
+    conversación. Si el cliente ya había visto la ficha pero todavía no
+    la había elegido, el color se buscaba en TODO el catálogo y salían
+    referencias que no tenían que ver (es lo que te pasó con "el café"
+    y las Nike). Ahora el color se ancla también a la última ficha que
+    le mandaste, y sin ningún modelo en contexto el bot pregunta por el
+    modelo en vez de mezclar referencias.
+
+ 9. LA REFERENCIA DE LA PUBLICACIÓN — ESTE LO ARREGLAS TÚ EN LA APP.
+    El bot abrió con "¿Te interesan las Puma de la publicación?" y la
+    publicación es la Samba Jane (Adidas). Eso NO es código: es el
+    campo refPauta, que quedó apuntando a la Puma de la campaña
+    anterior. En la app → pestaña Tienda → cambia la referencia de la
+    publicación a la Samba Jane blanco. Se refleja en el turno
+    siguiente, sin subir nada.
+    Ojo: mientras esté mal, cada clic pagado del anuncio recibe el
+    modelo equivocado.
+
+------------------------------------------------------------------------
+CÓMO SUBIRLO (igual que siempre + EL CHEQUEO DEL PASO 4)
+------------------------------------------------------------------------
+Archivo en tu Escritorio:  bot-varman-PARA-SUBIR-v10.1-2026-07-26.json
+
+1) Súbelo con el botón de la consola SSH. Espera la notificación verde.
+
+2) Mira dónde cayó:
+       ls -la ~/bot-varman-PARA-SUBIR-*.json ~/varman-bot/workflows/
+
+3) Muévelo con el nombre final:
+       mv ~/bot-varman-PARA-SUBIR-v10.1-2026-07-26.json ~/varman-bot/workflows/bot-varman.json
+
+   Si la consola le puso "_(1)" al nombre (pasa cuando ya existe), usa
+   EXACTAMENTE el nombre que te mostró el paso 2.
+
+4) *** EL CHEQUEO — no te lo saltes (ya nos pasó 2 veces) ***
+       ls -l ~/varman-bot/workflows/bot-varman.json
+   Tiene que pesar EXACTAMENTE   1051611   bytes.
+   Y de confirmación:
+       grep -c FIX-CIERRE-PEDIDO ~/varman-bot/workflows/bot-varman.json
+   Tiene que dar 1 o más. Si da 0, el mv no se hizo y vas a importar el
+   viejo: el import saldrá en verde y el bot NO va a cambiar. Vuelve al 1.
+
+5) cd ~/varman-bot && docker compose stop n8n
+
+6) cd ~/varman-bot && docker compose run --rm --no-deps -u node n8n import:workflow --input=/workflows/bot-varman.json
+
+7) cd ~/varman-bot && docker compose start n8n
+
+8) En n8n: botón **Publish** (el import lo desactiva SIEMPRE).
+
+9) cd ~/varman-bot && ./verificar-salud.sh   → 7 bien · 0 fallos.
+
+NO se toca el .env. Todo corre con los flags que ya están encendidos.
+
+------------------------------------------------------------------------
+PRUEBA DE 3 MINUTOS (desde un número que NO sea el 320)
+------------------------------------------------------------------------
+  1. mancipiola              → "Listo, sesión reiniciada."
+  2. "Precio ?"              → *** LO NUEVO *** "Buenas tardes,
+                               bienvenido a VarMan Crew. Mi nombre es
+                               Cristian" + pregunta de qué modelo
+                               buscas. SIN el rango de precios y SIN
+                               foto. Si suelta el "van desde $235.000
+                               hasta $480.000", avísame.
+  3. "quiero unas reebok"    → solo Reebok, con foto y precio.
+  4. "estoy en Bogotá"       → contra entrega + te pide SOLO el nombre.
+  5. da un nombre            → te pide SOLO la dirección.
+  6. da una dirección        → *** AQUÍ ESTÁ LO NUEVO ***
+                               te llega el ✅ resumen con alistamiento
+                               y "nos comunicamos contigo".
+  7. ABRE LA APP → Pedidos → Por verificar
+                               el pedido TIENE que estar ahí. Si no
+                               está, avísame con la captura.
+  8. "mejor cámbiame a las <otro modelo>"
+                               → sigue la venta con el modelo nuevo,
+                               te llega el resumen nuevo, y en la app
+                               SIGUE HABIENDO UN SOLO PEDIDO, con el
+                               modelo nuevo. Dos pedidos = falla.
+
+------------------------------------------------------------------------
+ROLLBACK (1 paso)
+------------------------------------------------------------------------
+Igual que siempre: en el .env  BOT_CEREBRO_IA=off  +
+    cd ~/varman-bot && docker compose up -d --force-recreate n8n
+El respaldo de la versión anterior está en:
+    bot_n8n\workflows\respaldo\bot-varman-v10.0.json
+
+------------------------------------------------------------------------
+PRUEBAS QUE PASÓ ANTES DE ENTREGARSE
+------------------------------------------------------------------------
+  · Arnés offline del cerebro:  93 PASS · 0 FAIL   (costo $0)
+    Incluye 10 guiones nuevos (P40–P49) que reproducen exactamente lo
+    que reportaste: el pedido fantasma, el cambio de modelo, el
+    resumen de cierre, el bot mudo, las fotos ya enviadas, el saludo
+    que se saltaba, el rango de precios de entrada y el "no lo
+    encontré" del click pagado.
+  · Regresión clásica:          352 PASS · 0 FAIL
+  · Peso del artefacto:         1.051.611 bytes · 17 nodos
+  · NO se corrió el arnés vivo (gasta tu saldo de Gemini). Los guiones
+    nuevos corren gratis y son deterministas.

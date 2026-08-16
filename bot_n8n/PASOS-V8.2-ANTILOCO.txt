@@ -1,0 +1,99 @@
+========================================================
+BOT v8.2 — "ANTI-LOCO" (arreglos de la prueba del 23-jul tarde)
+========================================================
+
+QUÉ ARREGLA (lo que viste en tu prueba de 5:30-5:41pm):
+
+1. BIENVENIDA FANTASMA ("¡Hola! Bienvenido..." en mitad de la charla,
+   típico al mandar una oración + "?").
+   Causa real: cuando Firestore se demoraba en responder, el bot no
+   distinguía "no hay sesión" de "la lectura falló" y te trataba como
+   cliente nuevo. Ahora reintenta la lectura y, si de verdad falla,
+   CALLA ese mensaje (mejor un silencio puntual que resetear la charla).
+   El error queda registrado en botErrores (origen: sesion-lectura).
+   -> Flag: BOT_LECTURA_ROBUSTA
+
+2. PREGUNTABA LA CIUDAD UNA Y OTRA VEZ (cada ficha la repetía).
+   Ahora: la ciudad se pregunta UNA vez (en la primera ficha, dentro
+   del caption de la foto = una sola burbuja, ya no llegan volteadas).
+   Si ya la dio o ya se le preguntó, las fichas siguientes cierran con
+   "¿Qué te parece? 😊". La ciudad solo vuelve a salir al CONFIRMAR
+   el pedido (si nunca la dio).
+   -> Flag: BOT_CIUDAD_UNA_VEZ
+
+3. "SI MIL GRACIAS" Y EL BOT SE DESPEDÍA en vez de mostrar.
+   Un "sí" ya NUNCA cae a Gemini: si no hay nada que mostrar, pregunta
+   en concreto qué referencia busca.
+   -> Flag: BOT_SI_MUESTRA
+
+4. "CLARO QUE SÍ" ELIMINADO de los textos de las fichas/preguntas del
+   modo conversa Y prohibido en el prompt de Gemini (esto va en los
+   textos, sin flag — entra con solo subir el JSON).
+
+5. COLORES + FAMILIAS (opción B del dueño, 23-jul noche): al preguntar
+   por colores, además de los colores del modelo activo (refs hermanas,
+   ej. las Puma speedcat ballet), el bot ofrece POR NOMBRE los otros
+   modelos del mismo tipo — misma categoría y género en la app (ej.
+   "también tenemos: Samba Jane blanco gris…"). Solo nombres, sin más
+   fotos (la VM no aguanta tandas); el cliente escribe el que le gusta
+   y ahí recibe SU ficha.
+   OJO: esto agrupa por Categoría + Género de la app. Para que las
+   Samba Jane salgan junto a las Puma ballet, TODAS deben estar en
+   Casuales + Dama (revisar en la app).
+   -> Flag: BOT_COLORES_FAMILIAS
+
+--------------------------------------------------------
+PASO 1 — Encender los 4 flags en el .env de la VM
+--------------------------------------------------------
+SSH a la VM (consola de GCP), pegar estos dos comandos:
+
+  cd ~/varman-bot && cp .env .env.bak-2026-07-23b
+
+  printf '\nBOT_LECTURA_ROBUSTA=on\nBOT_CIUDAD_UNA_VEZ=on\nBOT_SI_MUESTRA=on\nBOT_COLORES_FAMILIAS=on\n' >> .env
+
+--------------------------------------------------------
+PASO 2 — Subir el JSON e importarlo (secuencia buena del 23-jul)
+--------------------------------------------------------
+1. Subir a la VM el archivo del Escritorio:
+   bot-varman-PARA-SUBIR-v8.2-2026-07-24.json
+   (botón SUBIR ARCHIVO del SSH del navegador; ESPERAR la notificación
+   verde de que terminó la subida ANTES de seguir).
+
+2. En la VM:
+
+  cd ~/varman-bot
+  mv ~/bot-varman-PARA-SUBIR-v8.2-2026-07-24.json workflows/bot-varman.json
+  docker compose stop n8n
+  docker compose run --rm --no-deps -u node n8n import:workflow --input=/workflows/bot-varman.json
+  docker compose up -d --force-recreate n8n
+
+  (el force-recreate aplica TAMBIÉN los flags nuevos del .env)
+
+3. Entrar a la UI de n8n y darle PUBLISH al workflow
+   (el import lo deja desactivado — lección conocida).
+
+4. Verificar:
+
+  ./verificar-salud.sh
+
+  Debe dar 7 bien / 0 fallos. Y confirmar dentro del contenedor:
+
+  docker exec varman-n8n printenv | grep -E "LECTURA_ROBUSTA|CIUDAD_UNA_VEZ|SI_MUESTRA|COLORES_FAMILIAS"
+
+--------------------------------------------------------
+PASO 3 — Guion de prueba rápido (desde un cel que NO sea el 320)
+--------------------------------------------------------
+1. "hola"                  -> saludo + oferta del modelo de la pauta (SIN "claro que sí")
+2. "si"                    -> ficha con foto; la pregunta de la CIUDAD va EN la foto (una burbuja)
+3. "otro color?"           -> colores de la Puma ballet + "en un estilo parecido
+                              también tenemos" con las Samba Jane por nombre;
+                              NO repite la ciudad, NO bienvenida
+3b. "samba jane blanco"    -> la ficha de ESA (foto + precio)
+4. una oración + "?"       -> responde UNA vez; el "?" no genera nada (ni bienvenida)
+5. "quiero ver la plateada"-> ficha con "¿Qué te parece? 😊" (sin ciudad otra vez)
+6. "si"                    -> arranca el cierre: pide la ciudad (confirmación de pedido)
+7. "Bogotá"                -> info de pago contra entrega / datos
+
+ROLLBACK: poner los 4 flags en off en el .env + force-recreate (los
+textos sin "claro que sí" se quedan; si quieres el JSON anterior:
+workflows/respaldo/bot-varman-v8.1.json).

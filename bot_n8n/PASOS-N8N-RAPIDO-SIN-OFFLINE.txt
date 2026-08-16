@@ -1,0 +1,81 @@
+========================================================================
+  n8n MÁS RÁPIDO Y SIN "OFFLINE"  —  VarMan (VM e2-micro, 1 GB)
+  25-jul-2026. Todo esto es GRATIS: no sube la factura ni un peso.
+========================================================================
+
+POR QUÉ SE PONE OFFLINE Y SE LLENA DE EJECUCIONES
+
+  1. n8n guarda TODOS los datos de CADA ejecución en su base (SQLite) en
+     el disco de la VM. Con el bot en ~970 KB por workflow, cada mensaje
+     deja cientos de KB. En horas la base se infla, SQLite se pone lento,
+     y n8n deja de responder = "Offline" en la pestaña.
+  2. Cada mensaje tuyo era UNA ejecución, y si escribías 3 seguidos eran
+     3 ejecuciones peleando por 1 GB de RAM. (Eso ya lo arregla el
+     CANDADO de la v10: los turnos del mismo cliente van en fila.)
+  3. Al importar un workflow nuevo, n8n queda desactivado hasta que le
+     das Publish; Meta reintenta lo que no pudo entregar y al publicar
+     entra todo de golpe.
+
+------------------------------------------------------------------------
+ARREGLO 1 — QUE NO GUARDE LAS EJECUCIONES BUENAS  (el que más pesa)
+------------------------------------------------------------------------
+    cd ~/varman-bot && cp .env .env.bak-antes-de-podar
+
+Pega esto tal cual (una sola vez):
+
+    cd ~/varman-bot && printf 'EXECUTIONS_DATA_SAVE_ON_SUCCESS=none\nEXECUTIONS_DATA_SAVE_ON_ERROR=all\nEXECUTIONS_DATA_SAVE_ON_PROGRESS=false\nEXECUTIONS_DATA_SAVE_MANUAL_EXECUTIONS=false\nEXECUTIONS_DATA_PRUNE=true\nEXECUTIONS_DATA_MAX_AGE=72\nEXECUTIONS_DATA_PRUNE_MAX_COUNT=2000\n' >> .env
+
+Aplicar:
+
+    cd ~/varman-bot && docker compose up -d --force-recreate n8n
+
+QUÉ HACE: guarda solo las ejecuciones con ERROR (que son las que sirven
+para diagnosticar), borra lo viejo de más de 72 h y nunca pasa de 2.000
+ejecuciones guardadas.
+
+⚠️ QUÉ PIERDES: en la pestaña Executions ya no vas a poder abrir el
+detalle de una conversación que salió BIEN. Las conversaciones NO se
+pierden: viven en Firestore (el historial del cerebro) y en la app.
+Si prefieres conservar el visor completo, no apliques este arreglo — pero
+es el que más ayuda contra el "Offline".
+
+------------------------------------------------------------------------
+ARREGLO 2 — LIMPIAR LO QUE YA ESTÁ ACUMULADO
+------------------------------------------------------------------------
+Ver cuánto pesa la base hoy:
+
+    du -h ~/varman-bot/n8n-data/database.sqlite
+
+Si pesa cientos de MB, después del Arreglo 1 la poda la va bajando sola.
+Para forzar la compactación (con n8n APAGADO, tarda 1-2 min):
+
+    cd ~/varman-bot && docker compose stop n8n && docker run --rm -v ~/varman-bot/n8n-data:/d alpine sh -c "apk add -q sqlite && sqlite3 /d/database.sqlite 'VACUUM;'" && docker compose start n8n
+
+------------------------------------------------------------------------
+ARREGLO 3 — CANCELAR LAS EJECUCIONES ZOMBIS
+------------------------------------------------------------------------
+En la pestaña Executions, cualquier cosa en "Running" o "Starting soon"
+de hace más de 10 minutos está colgada (queda del reinicio). Cancélalas
+con la X. No se pierde nada: son inertes, pero ocupan memoria.
+
+------------------------------------------------------------------------
+LO QUE NO HAY QUE HACER (aprendido a los golpes)
+------------------------------------------------------------------------
+✗ N8N_CONCURRENCY_PRODUCTION_LIMIT — lo probamos el 21-jul y fue PEOR:
+  encola los webhooks, se les vence el body ("stream is not readable"),
+  Meta reintenta y se arma una tormenta. Está comentado en el .env: NO
+  lo descomentes.
+✗ Encender el task runner (N8N_RUNNERS_ENABLED=true) — la VM de 1 GB no
+  lo aguanta: el bot se queda mudo 5 minutos seguidos. Va en false.
+✗ Subir la VM a e2-small — rompe la capa gratuita (~US$13/mes). Decisión
+  del dueño: cero costos nuevos hasta que haya ventas.
+
+------------------------------------------------------------------------
+CÓMO SABER SI QUEDÓ BIEN
+------------------------------------------------------------------------
+    docker exec varman-n8n printenv | grep EXECUTIONS_DATA
+    cd ~/varman-bot && ./verificar-salud.sh
+    du -h ~/varman-bot/n8n-data/database.sqlite    (a las 24 h, más chica)
+
+Y en el celular: mándale 3 mensajes seguidos al bot. Debe contestar una
+sola conversación coherente, sin respuestas dobles y sin quedarse mudo.

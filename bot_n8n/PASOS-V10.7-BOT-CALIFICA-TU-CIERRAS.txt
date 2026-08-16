@@ -1,0 +1,120 @@
+============================================================
+ BOT VarMan Crew — v10.7 "EL BOT CALIFICA, TÚ CIERRAS" (3-ago-2026)
+ (reemplaza a la v10.6, que no se llegó a subir)
+============================================================
+
+QUÉ PIDIÓ EL DUEÑO (3-ago, tras ver al cerebro-IA delirar en vivo):
+"Quiero que vuelva a ser como antes: preguntan por una referencia →
+responde con el precio y pregunta dónde está ubicado → espera el
+'Bogotá' → le indica que el pago es contra entrega → pregunta si
+procedemos a alistar su pedido. Si preguntan talla o colores,
+responde y sigue. Y si el cliente quiere seguir con su pedido, SE ME
+TRANSFIERE A MÍ. Solo eso. Las preguntas las sigue procesando la IA
+de Gemini con la información de nuestros zapatos."
+
+LO QUE SE ENCONTRÓ REVISANDO (3 hallazgos):
+1. El "deliro" era el CEREBRO-IA (BOT_CEREBRO_IA=on en la VM): Gemini
+   manejando toda la conversación, con las fallas ya vistas.
+2. El remate de la locura: cuando el cliente escribió "Contra
+   entrega" (eligiendo el método), la FAQ vieja lo interpretó como
+   PREGUNTA sobre contra entrega y soltó el discurso completo con
+   "¿Quieres que un asesor te ayude?" — descarriló la venta.
+3. Los RECORDATORIOS no llegaban porque el rescate de seguimiento
+   salta a propósito las sesiones del cerebro-IA ("el cerebro lleva
+   su propio rescate" — que en la práctica no corre). Al apagar el
+   cerebro, los recordatorios VUELVEN SOLOS.
+
+------------------------------------------------------------
+1) EL FLUJO NUEVO (flag BOT_CIERRE_ASESOR)
+------------------------------------------------------------
+Corre sobre el MODO CONVERSA de siempre (el de plantillas, cubierto
+por la batería de pruebas). Gemini solo contesta preguntas libres
+(talla, colores, envíos) con la info del catálogo — no dirige nada.
+
+  Cliente: "quiero las reebok azules"
+  Bot:     ficha + precio + "¿En qué ciudad estás?"
+  Cliente: "Bogotá"
+  Bot:     "¡Buenas noticias! En Bogotá manejamos pago contra
+            entrega: pagas cuando recibes tu pedido..." +
+           "¿Procedemos a alistar tu pedido?"
+  Cliente: "sí"
+  Bot:     -> TE AVISA AL 320: "CLIENTE LISTO PARA CERRAR" con
+              modelo, ciudad y número
+           -> al cliente: "Ya mismo un asesor te escribe por este
+              mismo chat"
+           -> y LA CONVERSACIÓN PASA A TI: el bot queda en silencio
+              (igual que con "tomar") y te reenvía todo lo que el
+              cliente escriba. Cuando termines: soltar <numero>
+
+Fuera de Bogotá: mismo flujo (con su texto de pago anticipado) y el
+mismo traspaso a ti con el "sí".
+
+------------------------------------------------------------
+2) CAMBIOS EN EL .env DE LA VM (los importantes)
+------------------------------------------------------------
+  BOT_CEREBRO_IA=off        <- EL CAMBIO CLAVE: apaga el que deliraba.
+                               (También deja de gastar tu saldo de
+                               Gemini en cada conversación y hace
+                               volver los recordatorios.)
+  BOT_CIERRE_ASESOR=on      <- flag NUEVO: el flujo de arriba.
+  BOT_SILENCIO_HANDOFF=on   <- necesario para el traspaso (si ya lo
+                               tenías en on, déjalo igual).
+  BOT_MODO_CONVERSA=on      <- ya debe estar en on; verifica.
+
+Los demás flags se quedan COMO ESTÁN (no toques nada más).
+
+------------------------------------------------------------
+3) CÓMO DESPLEGAR
+------------------------------------------------------------
+1. Subir del Escritorio a la VM:
+     bot-varman-PARA-SUBIR-v10.7-2026-08-03.json
+   (borra los PARA-SUBIR viejos del Escritorio si queda alguno)
+
+2. En la VM, dentro de ~/varman-bot:
+     mv ~/bot-varman-PARA-SUBIR-v10.7-2026-08-03.json workflows/bot-varman.json
+     ls -l workflows/bot-varman.json     # 1128453 bytes EXACTOS
+
+3. Comprobar que sí es el nuevo:
+     grep -c cierreAsesorCliente workflows/bot-varman.json
+   Tiene que dar 1 o más. Si da 0: PARA, el mv no se hizo.
+
+4. Editar el .env (nano .env) con los 4 flags de arriba.
+
+5. Reiniciar para que tome el .env E importar:
+     docker compose up -d --force-recreate n8n
+     bash importar-workflows.sh
+   Si queda inactivo, "Publish" en bot.varmancrew.com.
+
+6. Esperar 3-5 min:
+     bash verificar-salud.sh
+
+------------------------------------------------------------
+4) CÓMO PROBARLO (desde el 320, como cliente)
+------------------------------------------------------------
+a) "Hola estoy interesado en las reebok azules"
+   -> ficha + precio + pregunta la ciudad
+b) "Bogotá"
+   -> debe INFORMAR el contra entrega y preguntar
+      "¿Procedemos a alistar tu pedido?"
+c) pregunta algo libre: "¿qué colores tienen?" o "¿tienen talla 39?"
+   -> debe responderla (Gemini con el catálogo) y seguir
+d) "sí, procedan"
+   -> te llega el aviso CLIENTE LISTO PARA CERRAR al 320
+   -> al cliente: "un asesor te escribe"
+   -> escribe algo más como cliente: te lo debe REENVIAR al 320
+      y no responderle nada al cliente
+e) cuando cierres la venta: escribe al bot desde el 320:
+      soltar <numero del cliente>
+
+Y a las ~3h de una conversación que quedó a medias, el cliente debe
+recibir el recordatorio de seguimiento (eso vuelve al apagar el
+cerebro — pruébalo dejando una conversación sin terminar).
+
+------------------------------------------------------------
+5) ROLLBACK (1 paso)
+------------------------------------------------------------
+  BOT_CIERRE_ASESOR=off  en el .env  +  force-recreate
+  -> vuelve el modo conversa completo de antes (datos/pago por bot).
+Si extrañas el cerebro-IA (no recomendado por ahora):
+  BOT_CEREBRO_IA=on — pero vuelve el gasto de Gemini, los deliros
+  vistos y los recordatorios muertos.

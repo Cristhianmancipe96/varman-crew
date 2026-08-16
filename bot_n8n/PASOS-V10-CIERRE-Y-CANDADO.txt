@@ -1,0 +1,124 @@
+========================================================================
+  BOT VARMAN v10.0  —  CIERRE DE VENTA + CANDADO + AVISOS RECORTADOS
+  Guía para subir a la VM. (25-jul, tarde-noche)
+========================================================================
+
+QUÉ ARREGLA (tus 8 puntos de la prueba de la tarde + lo que confirmaste)
+
+ 1. CANDADO POR CLIENTE — la falla madre del trancón.
+    Dos mensajes tuyos seguidos ya no se procesan en paralelo pisándose:
+    van EN FILA por número. Se acaban las respuestas dobles, el "Si" que
+    recibía un saludo de cero, y las respuestas desordenadas.
+
+ 2. LA MÁQUINA VIEJA ESTÁ MUERTA (con el cerebro encendido).
+    Si Gemini falla, sale UNA línea neutra ("Dame un segundo y ya te
+    confirmo.") y nada más. Nunca más las plantillas viejas: ni
+    "¿Te interesa el modelo de nuestra publicación? 😊" ni el
+    "soy el asistente virtual y no alcanzo a ver las imágenes".
+
+ 3. CIERRE DEL PEDIDO SIN VUELTAS.
+    - Fuera de Bogotá: en cuanto dices que sí (aunque sea "Si porfabor" o
+      "si milgracias"), el link de Wompi SALE EN ESE TURNO. Lo garantiza
+      el código, no la buena voluntad del modelo.
+    - Bogotá: los datos se piden DE A UNO — primero el nombre, luego la
+      dirección — y con los dos, se registra y se confirma UNA vez.
+      Sin "¿te parece bien?" ni "¿te queda bien en la tarde?".
+
+ 4. AVISOS AL 320 RECORTADOS: solo PEDIDO y PLATA.
+    Te llegan: pedido agendado, comprobante recibido, pago confirmado,
+    "dice que ya pagó", link enviado, y anuncio sin mapear (una vez).
+    Ya NO te llegan: "cliente mandó foto", "intención de compra" y demás
+    ruido. La foto del cliente solo te sube si acaba en comprobante o en
+    traspaso a asesor. El traspaso a asesor te sigue llegando siempre.
+
+ 5. ASESOR SOLO CUANDO LA CONVERSACIÓN SE PIERDE.
+    1ª vez que algo no aparece → "No lo encontré… ¿me confirmas el nombre
+    o la marca?" y el bot SIGUE. El asesor entra a la 2ª falla por lo
+    mismo, a la 3ª repetición, o si el cliente lo pide.
+
+ 6. COLOR DENTRO DEL MODELO. "Las quiero café" viendo una Reebok busca
+    ESE modelo en café (refs hermanas). Si no hay, te dice qué colores sí
+    hay o que solo va en el de la foto. Nunca más una Nike por ser café.
+
+ 7. ENTIENDE EL "SÍ" MAL ESCRITO. "si milgracias", "si porfavo",
+    "porfabor", "profavor", "sii", "dale" → es un SÍ y avanza.
+
+ 8. NO RE-SALUDA. Un "Hola" a mitad de conversación re-ancla
+    ("¿seguimos con tus Reebok?"), no vuelve a darte la bienvenida.
+
+------------------------------------------------------------------------
+CÓMO SUBIRLO (igual que siempre + EL CHEQUEO DEL PASO 4)
+------------------------------------------------------------------------
+Archivo en tu Escritorio:  bot-varman-PARA-SUBIR-v10.0-2026-07-25.json
+
+1) Súbelo con el botón de la consola SSH. Espera la notificación verde.
+
+2) Mira dónde cayó:
+       ls -la ~/bot-varman-PARA-SUBIR-*.json ~/varman-bot/workflows/
+
+3) Muévelo con el nombre final:
+       mv ~/bot-varman-PARA-SUBIR-v10.0-2026-07-25.json ~/varman-bot/workflows/bot-varman.json
+
+4) *** EL CHEQUEO — no te lo saltes (ya nos pasó 2 veces) ***
+       ls -l ~/varman-bot/workflows/bot-varman.json
+   El build te dice el peso exacto al construir (está también abajo en
+   "peso del archivo"). Si pesa otra cosa, el mv no se hizo: vuelve al 1.
+
+5) cd ~/varman-bot && docker compose stop n8n
+
+6) cd ~/varman-bot && docker compose run --rm --no-deps -u node n8n import:workflow --input=/workflows/bot-varman.json
+
+7) cd ~/varman-bot && docker compose start n8n
+
+8) En n8n: botón **Publish** (el import lo desactiva SIEMPRE).
+
+9) cd ~/varman-bot && ./verificar-salud.sh   → 7 bien · 0 fallos.
+
+------------------------------------------------------------------------
+OPCIONAL PERO MUY RECOMENDADO: que n8n deje de ahogarse (2 líneas)
+------------------------------------------------------------------------
+n8n está guardando ~950 KB de datos POR CADA ejecución en la base de la
+VM de 1 GB — parte del trancón que viste. Con estas líneas guarda solo
+las ejecuciones con ERROR (las verdes ya no pesan):
+
+    cd ~/varman-bot && cp .env .env.bak-2026-07-25d
+    printf 'EXECUTIONS_DATA_SAVE_ON_SUCCESS=none\nEXECUTIONS_DATA_PRUNE=true\nEXECUTIONS_DATA_MAX_AGE=168\n' >> .env
+    docker compose up -d --force-recreate n8n
+
+⚠️ QUÉ PIERDES A CAMBIO: el visor de Executions ya no mostrará el detalle
+de las ejecuciones exitosas (solo errores). La memoria de las
+conversaciones NO se pierde — vive en Firestore (historial del cerebro).
+Si prefieres conservar el visor completo, no pongas estas líneas.
+Rollback: borrar las 3 líneas del .env + force-recreate.
+
+Y de paso: en Executions, cancela las ejecuciones colgadas en
+"Running/Starting soon" de más de 10 minutos — son zombis del deploy.
+
+------------------------------------------------------------------------
+PRUEBA DE 3 MINUTOS (desde un número que NO sea el 320)
+------------------------------------------------------------------------
+  1. mancipiola            → "Listo, sesión reiniciada."
+  2. "Hola"                → saludo + pregunta, sin ficha.
+  3. "quiero unas reebok"  → solo Reebok.
+  4. "estoy en Bogotá"     → contra entrega + te pide SOLO el nombre.
+  5. da un nombre          → te pide SOLO la dirección.
+  6. mancipiola → "Hola" → elige un modelo → di una ciudad NO Bogotá →
+     cuando pregunte, responde "si porfabor" → EL LINK DE WOMPI LLEGA.
+     (⚠️ link REAL de pago: no pagues, o paga $1.000 si quieres probar todo)
+  7. manda 2 mensajes seguidos rapidísimo → una sola conversación
+     coherente, sin respuestas dobles.
+
+------------------------------------------------------------------------
+ROLLBACK
+------------------------------------------------------------------------
+  BOT_CEREBRO_IA=off en el .env + force-recreate (vuelve el flujo v8), o
+  importar workflows/respaldo/bot-varman-v9.9.json con el mismo método.
+
+------------------------------------------------------------------------
+PRUEBAS CORRIDAS (25-jul)
+------------------------------------------------------------------------
+  · 352 PASS · 0 FAIL  — batería clásica (rollback intacto)
+  · 106 PASS · 0 FAIL  — arnés del cerebro (Gemini real), 33 guiones,
+    incluye los 9 nuevos de tu prueba de la tarde (G24–G32)
+  · peso del archivo: lo imprime el build en el recuadro — compáralo en
+    el paso 4

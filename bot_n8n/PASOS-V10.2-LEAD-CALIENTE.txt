@@ -1,0 +1,113 @@
+============================================================
+ BOT VarMan Crew — v10.2 "LEAD CALIENTE"  (30-jul-2026)
+============================================================
+
+QUÉ CAMBIA PARA EL CLIENTE: NADA. Ni una palabra del diálogo se tocó.
+Esto es una capa que SOLO ESCUCHA por encima del bot que ya tienes y te
+avisa a TI (el 320) cuando alguien da señales reales de querer comprar.
+
+Por qué: dos barridos (20-21 jul y 26-30 jul), ~200 conversaciones, cero
+ventas — y esta semana trabajaste 12 leads a mano sin saber cuáles valían
+la pena. Esto reemplaza el "estar pendiente" por un aviso automático.
+
+------------------------------------------------------------
+1) QUÉ HACE
+------------------------------------------------------------
+- Puntúa señales por cliente (sin Gemini, sin gastar tu saldo de API):
+    acepta pagar anticipado (nequi/psé/tarjeta/transferencia) ... 4 pts
+    volvió a escribir otro día por su cuenta ..................... 4 pts
+    siguió conversando DESPUÉS de ver el precio ................... 3 pts
+    dio la talla ................................................... 3 pts
+    preguntó cómo pagar ............................................ 3 pts
+    soltó dirección o barrio sin que se lo pidieran ................ 3 pts
+    preguntó si es seguro / objeción de confianza ................... 2 pts
+    conversación de 6+ turnos ........................................ 2 pts
+- Al llegar a 6 puntos (umbral, configurable) te manda UNA ficha al 320:
+  nombre, modelo, talla, ciudad si la hay, señales, último mensaje y el
+  link wa.me para que entres tú a cerrar.
+- Un cliente que insiste 2+ veces en contra entrega y NUNCA aceptó pago
+  anticipado queda "bloqueado": no te llega como potencial (para no hacerte
+  perder el tiempo), pero se cuenta aparte para que sepas cuántas ventas
+  te está costando esa política.
+- La ciudad y el color NO puntúan (decisión tuya, 30-jul: los pregunta
+  casi todo el mundo y no separan al comprador del curioso).
+
+------------------------------------------------------------
+2) COMANDOS NUEVOS DESDE TU WHATSAPP (el 320)
+------------------------------------------------------------
+  calientes              -> lista los clientes potenciales ahora mismo
+  tomar 573001234567     -> el bot CALLA con ese cliente y te reenvía
+                            aquí todo lo que escriba (cierras tú)
+  soltar 573001234567    -> el bot vuelve a atenderlo normal
+  link 07 38             -> arma el link de pago de la Ref 07 talla 38
+  link 07 38 10          -> igual, con 10% de descuento (el código calcula
+                            la cifra, tú no calculas nada)
+  admin                  -> la ayuda ahora incluye estos 4 comandos
+
+El comando `link` te devuelve DOS mensajes: uno con el resumen (para ti) y
+otro YA REDACTADO listo para copiar y pegarle al cliente. El pedido queda
+registrado en Firestore ANTES de mandarte el link, así que cuando el
+cliente pague, el webhook de Wompi lo confirma solo, igual que siempre.
+
+------------------------------------------------------------
+3) FLAGS NUEVOS (.env de la VM)
+------------------------------------------------------------
+  BOT_LEAD_CALIENTE=on       <- el maestro. OFF (o ausente) = nada de esto
+                                existe, byte-idéntico a hoy.
+  BOT_LEAD_UMBRAL=6          <- opcional. Puntos para avisar. Default 6.
+
+IMPORTANTE — trampa ya conocida de este proyecto (julio, error 131047):
+Meta solo entrega mensajes de texto libre al 320 si TÚ le escribiste al
+bot en las últimas 24h. Si no le escribes nada en un día, los avisos de
+`leadAviso` (y también `wa.me`) pueden no llegarte. Dos salidas:
+  (a) escríbele cualquier cosa al bot una vez al día (con `pedidos` sirve), o
+  (b) esperar a que Meta apruebe la plantilla `aviso_bt` que quedó en
+      revisión, y encender BOT_AVISO_PLANTILLA (ya existe, es de otra
+      mejora, pero cubre este mismo problema para TODOS los avisos).
+Sin esto, la función funciona igual pero el aviso puede no llegarte.
+
+------------------------------------------------------------
+4) CÓMO DESPLEGAR (igual que siempre)
+------------------------------------------------------------
+1. Súbete el archivo que ya quedó en el Escritorio:
+     bot-varman-PARA-SUBIR-v10.2-2026-07-30.json
+   a la VM (o por SFTP/consola SSH como siempre).
+
+2. En la VM, dentro de ~/varman-bot (ajusta si tu ruta es otra):
+     mv bot-varman-PARA-SUBIR-v10.2-2026-07-30.json workflows/bot-varman.json
+     ls -l workflows/bot-varman.json      # debe pesar 1086268 bytes exactos
+                                           # (si no, el mv no se hizo: vas a
+                                           # importar el viejo sin darte cuenta)
+
+3. Importa ese JSON en n8n (como cualquier otra versión).
+
+4. Agrega al .env de la VM:
+     BOT_LEAD_CALIENTE=on
+     BOT_LEAD_UMBRAL=6
+
+5. Reinicia n8n:
+     docker compose up -d --force-recreate n8n
+
+6. Prueba desde tu propio WhatsApp (el 320), escribiéndole al bot como
+   si fueras cliente unas cuantas veces (talla, "cómo pago", etc.) hasta
+   que te llegue la ficha de "CLIENTE POTENCIAL". Luego probá:
+     calientes
+     tomar <tu mismo número de prueba>
+     soltar <tu mismo número de prueba>
+     link 07 38 10
+
+------------------------------------------------------------
+5) ROLLBACK (1 paso)
+------------------------------------------------------------
+  BOT_LEAD_CALIENTE=off   en el .env  +  force-recreate.
+Todo lo demás del bot queda intacto: esta capa no toca el flujo clásico
+ni ningún flag existente.
+
+------------------------------------------------------------
+6) LO QUE ESTA SEMANA VA A CONTAR (aunque no vendas nada)
+------------------------------------------------------------
+Al cabo de unos días, `tiendas/varman/botLeads/*` va a tener, por cliente:
+puntaje, qué señales dio, cuántos días volvió, y si quedó bloqueado por
+contra entrega. Con eso vas a poder decidir con datos —no con corazonada—
+si vale la pena habilitar contra entrega fuera de Bogotá o si el problema
+real está en otro lado. Eso queda pendiente para una próxima revisión.

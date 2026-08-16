@@ -1,0 +1,105 @@
+============================================================
+ BOT VarMan Crew — v10.8 "CEREBRO GUIADO"        (3-ago-2026)
+ (reemplaza a la v10.7; decisión del dueño tras probarla en vivo)
+============================================================
+
+DECISIÓN DEL DUEÑO (3-ago): "El cerebro de IA está bien — lo que
+falla son los mensajes por defecto que ya estaban programados.
+Quiero solo el cerebro, con todos los parches, guiado por el paso a
+paso; que PREGUNTE si procedemos al alistamiento (no que lo dé por
+sentado) y cuando el cliente esté listo me lo pase al 320."
+
+QUÉ HACE LA v10.8:
+1. El CEREBRO vuelve a ser el ÚNICO que habla (BOT_CEREBRO_IA=on) y
+   SIN los parches de mensajes (van apagados por flag — ver .env).
+   Lo único que se conserva del trabajo previo es invisible: el
+   historial fiel (lo que se envía queda registrado en la BD).
+2. SE LE QUITAN las herramientas de cerrar: registrar_pedido y
+   crear_link_wompi ya NO están en su caja. Lo que no tiene no lo
+   puede usar, aunque se confunda — candado de código, no de prompt.
+   (Decidido mirando los barridos: ningún cliente pide "el link ya";
+   preguntan "¿cómo se paga?" — el bot INFORMA y sigue calificando.)
+3. Misión nueva en el cuaderno: ficha+precio → ciudad → info de pago
+   de esa ciudad → "¿Procedemos con el alistamiento de tu pedido?"
+   — SIEMPRE pregunta, nunca lo da por hecho. Prohibido pedir
+   nombre/dirección/método o afirmar pedidos confirmados.
+4. El SÍ al alistamiento lo detecta EL CÓDIGO (no Gemini): aviso
+   🔔 CLIENTE LISTO PARA CERRAR al 320 con modelo+ciudad+número,
+   al cliente "un asesor te escribe", y el bot queda EN SILENCIO
+   reenviándote todo (igual que "tomar"; lo sueltas con: soltar <num>).
+5. RECORDATORIO a las ~3 HORAS de silencio (una sola vez, y solo si
+   había un modelo en juego): "¿Seguimos con tu pedido? 😊 Quedé
+   pendiente para ayudarte a dejarlo listo." Antes las sesiones del
+   cerebro no recibían NINGÚN seguimiento.
+6. SIN DESCUENTOS (pedido del dueño 3-ago): el descuento va forzado
+   a 0 EN CÓDIGO (la herramienta cotizar siempre cobra precio de
+   lista) y el cuaderno le prohíbe ofrecer rebajas — si el cliente
+   pide rebaja, responde que el asesor lo revisa con él al alistar.
+   Los descuentos quedan 100% en manos del dueño al cerrar.
+
+------------------------------------------------------------
+.env DE LA VM — "SOLO EL CEREBRO, SIN PARCHES" (pedido del dueño)
+------------------------------------------------------------
+PRENDER (el cerebro y su guía):
+  BOT_CEREBRO_IA=on         <- el cerebro vuelve a hablar
+  BOT_CIERRE_ASESOR=on      <- la misión "califica, tú cierras" +
+                               el traspaso al 320 + el rescate de 3h
+  BOT_SILENCIO_HANDOFF=on   <- el silencio del traspaso
+  CEREBRO_IA_SOLO=          <- VACÍA o borrada (para TODOS)
+
+APAGAR (los parches que reescribían mensajes — "lo volvían loco"):
+  BOT_BOGOTA_CE=off         <- fuera la línea pegada de Bogotá y la
+                               respuesta enlatada a la desconfianza
+  BOT_ELIGE_PAGO=off        <- fuera la regla del método de pago
+                               (ya no aplica: el bot no cobra)
+
+Con eso el cerebro habla LIBRE, guiado solo por su cuaderno con la
+misión nueva. Las únicas intervenciones del código que quedan son
+las 3 que pediste: no puede cerrar (sin herramientas de plata), el
+SÍ al alistamiento te lo transfiere, y el rescate de las 3 horas.
+
+OJO: BOT_CEREBRO_IA=on vuelve a gastar saldo de Gemini por
+conversación (decisión consciente del dueño, 3-ago).
+
+------------------------------------------------------------
+CÓMO DESPLEGAR
+------------------------------------------------------------
+1. Subir a la VM (ya sabes: si la subida no arranca, revisa el
+   bloqueador de ventanas emergentes del navegador):
+     bot-varman-PARA-SUBIR-v10.8-2026-08-03.json
+
+2. En ~/varman-bot:
+     mv ~/bot-varman-PARA-SUBIR-v10.8-2026-08-03.json workflows/bot-varman.json
+     ls -l workflows/bot-varman.json     # 1143780 bytes EXACTOS
+     grep -c cuadernoCierreAsesor workflows/bot-varman.json   # 1 o más
+
+3. nano .env  ->  los 4 flags de arriba  ->  Ctrl+O, Enter, Ctrl+X
+
+4. docker compose up -d --force-recreate n8n
+   bash importar-workflows.sh
+   (si queda inactivo: "Publish" en bot.varmancrew.com)
+
+5. Esperar 3-5 min  ->  bash verificar-salud.sh
+
+------------------------------------------------------------
+CÓMO PROBARLO (desde el 320, como cliente)
+------------------------------------------------------------
+a) "Hola quiero información de las samba jane" -> el cerebro debe
+   responder NATURAL (nada de "¿Te interesa el modelo de nuestra
+   publicación?") y buscar las Samba en el catálogo.
+b) Sigue el flujo: ficha+precio -> te pregunta la ciudad -> "Bogotá"
+   -> te informa el contra entrega -> "¿Procedemos con el
+   alistamiento de tu pedido?"
+c) Pregunta talla/colores en el camino -> responde con el catálogo.
+d) "sí" -> aviso CLIENTE LISTO al 320 + "un asesor te escribe" +
+   lo que escribas después te llega reenviado.
+e) Deja OTRA conversación a medias (con modelo mostrado) y revisa a
+   las ~3h: debe llegar el "¿Seguimos con tu pedido?".
+f) Al cerrar: soltar <numero> desde el 320.
+
+------------------------------------------------------------
+ROLLBACK
+------------------------------------------------------------
+  BOT_CIERRE_ASESOR=off  -> el cerebro vuelve a cerrar él solo (v10.6)
+  BOT_CEREBRO_IA=off     -> plantillas modo conversa (lo de esta tarde)
+  Ambos en el .env + docker compose up -d --force-recreate n8n

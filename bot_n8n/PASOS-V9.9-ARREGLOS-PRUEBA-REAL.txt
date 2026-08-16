@@ -1,0 +1,172 @@
+========================================================================
+  BOT VARMAN v9.9  —  ARREGLOS DE LA PRUEBA REAL DEL 25-JUL
+  Guía para subir a la VM. Léela completa antes de empezar (10 min).
+========================================================================
+
+QUÉ ARREGLA (las 9 quejas de tu prueba, en tu orden)
+
+ 1. Ya no manda la ficha de la publicación apenas dices "Hola".
+    Ahora saluda, se presenta y te pregunta qué modelo buscas. Si tienes
+    refPauta puesta, la NOMBRA como sugerencia, pero sin foto ni precio.
+    Si tu primer mensaje ya trae marca, modelo o foto, te atiende ESO de
+    una (no te hace esperar).
+
+ 2. Ya no repite frases como si estuviera pegado.
+    Eran DOS causas: (a) el cerebro y la máquina vieja se turnaban en el
+    mismo chat; (b) cuando el cerebro gastaba sus vueltas, el turno salía
+    con una plantilla fija. Ahora el cerebro se queda con la conversación
+    y hay un candado que impide mandar dos veces seguidas el mismo texto.
+
+ 3. AHORA SÍ VE LAS FOTOS QUE MANDAS.  <<< el arreglo más grande
+    El bot tenía escrito "tú ves las imágenes" pero el código nunca le
+    mandaba la foto: adivinaba. Ahora la imagen viaja de verdad. Y si
+    duda, te muestra hasta 2 opciones y pregunta "¿es este el modelo que
+    buscas?" en vez de afirmar uno equivocado.
+
+ 4. Respeta la marca que pides.
+    Pides Reebok y NO te salen Puma. Si no hay de esa marca, te dice que
+    no la encontró y te pasa a un asesor (tu regla del 25-jul), nunca te
+    ofrece otra marca como si fuera lo que pediste.
+
+ 5. Entiende "adidas equipment" = "Adidas EQT".
+    Lee el nombre que tú escribes en la app. También clásicas/classic,
+    baletas/ballet, air force/af1.
+
+ 6. El género se pregunta UNA sola vez en toda la conversación.
+    Si no contestas, sigue sin ese dato y te muestra modelos igual.
+
+ 7. Si ya elegiste una referencia, no te manda más modelos.
+    (Las baletas rojas que nunca pediste.) Solo si tú pides ver más.
+
+ 8. Pides el catálogo → te lo manda EN ESE MISMO MENSAJE.
+    Con el saludo por delante y sin preguntarte antes dama o caballero.
+
+ 9. Comando "mancipiola" + el silencio baja de 4 h a 30 min.
+
+------------------------------------------------------------------------
+COMANDO NUEVO: "mancipiola"
+------------------------------------------------------------------------
+Escríbele al bot la palabra  mancipiola  (sola, desde CUALQUIER número)
+y esa conversación se reinicia por completo: se borra el silencio del
+handoff, el pedido a medias, la memoria y el saludo ya dado. Te responde
+"Listo, sesión reiniciada."
+
+Sirve justo para lo que te pasaba: probabas, el bot te pasaba a un asesor
+y quedaba mudo contigo el resto de la tarde. Ahora sales en 1 segundo.
+
+Y aunque no lo uses, el silencio tras un handoff ahora dura 30 MINUTOS
+(antes 4 horas). Si lo quieres en otro valor, en el .env:
+    BOT_SILENCIO_HORAS=4      (4 horas, como antes)
+    BOT_SILENCIO_HORAS=0.5    (30 min, el nuevo default)
+
+------------------------------------------------------------------------
+CÓMO SUBIRLO (la secuencia que YA funcionó el 23-jul; respétala)
+------------------------------------------------------------------------
+El archivo está en tu Escritorio, con el nombre fechado de siempre:
+
+    bot-varman-PARA-SUBIR-v9.9-2026-07-25.json
+
+1) Súbelo con el botón de subir archivo de la consola SSH y ESPERA a que
+   la subida termine del todo (la notificación verde) antes de seguir.
+
+2) Mira dónde cayó (la consola SSH lo deja en tu carpeta personal, NO en
+   workflows/):
+       ls -la ~/bot-varman-PARA-SUBIR-*.json ~/varman-bot/workflows/
+
+3) Muévelo a su sitio con el nombre final (sobrescribe el viejo, que es
+   lo que queremos):
+       mv ~/bot-varman-PARA-SUBIR-v9.9-2026-07-25.json ~/varman-bot/workflows/bot-varman.json
+
+4) *** EL PASO QUE FALTABA — no te lo saltes ***
+   Comprueba que el archivo que vas a importar es el NUEVO:
+       grep -c mancipiola ~/varman-bot/workflows/bot-varman.json
+   Tiene que responder 1 o más. Si responde 0, el archivo nuevo no llegó
+   o el mv no se hizo, y no sirve de nada seguir: vuelve al paso 1.
+
+   >>> ESTE ES EL CHEQUEO QUE IMPORTA. Dos veces pasó que el import corrió
+       sobre el bot-varman.json VIEJO de workflows/: n8n en verde, sin un
+       solo error, y el bot igualito que antes. Sin este grep no hay forma
+       de enterarse.
+
+5) PARA n8n antes de importar (si no, se atasca peleando por el archivo
+   de la base — nos pasó, 15 min colgado):
+       cd ~/varman-bot && docker compose stop n8n
+
+6) Importa:
+       cd ~/varman-bot && docker compose run --rm --no-deps -u node n8n import:workflow --input=/workflows/bot-varman.json
+
+7) Arranca:
+       cd ~/varman-bot && docker compose start n8n
+
+8) MUY IMPORTANTE: el import DESACTIVA el workflow. Entra a la interfaz
+   de n8n y dale al botón **Publish** (arriba a la derecha). Si no lo
+   haces, el bot NO responde (el webhook queda en 404).
+
+9) Verifica:
+       cd ~/varman-bot && ./verificar-salud.sh
+   Tiene que decir 7 bien · 0 fallos.
+
+10) Prueba desde WhatsApp: escríbele  mancipiola
+    Si responde "Listo, sesión reiniciada." → quedó arriba de verdad.
+
+------------------------------------------------------------------------
+NO TIENES QUE TOCAR EL .env
+------------------------------------------------------------------------
+Todo lo de arriba funciona con los flags que YA tienes encendidos.
+Hay dos variables OPCIONALES nuevas, solo si las quieres:
+
+    BOT_ASESOR_NOMBRE=Cristian    (el nombre con el que se presenta;
+                                   si no la pones, usa "Cristian")
+    BOT_SILENCIO_HORAS=0.5        (ya explicado arriba)
+
+------------------------------------------------------------------------
+CÓMO SABER EN 2 MINUTOS QUE QUEDÓ BIEN
+------------------------------------------------------------------------
+Escríbele al 304 desde tu celular, en este orden:
+
+  1. "mancipiola"          → "Listo, sesión reiniciada."
+  2. "Hola"                → saludo + te pregunta qué modelo buscas.
+                             NO te debe llegar foto ni precio.
+                             Y el saludo debe cuadrar con la hora real.
+  3. "quiero unas reebok"  → solo Reebok (o "no lo encontré" + asesor).
+                             NUNCA una Puma o una Nike.
+  4. "mancipiola"
+  5. "me mandas el catálogo?" → saludo + el link, en ese mismo momento.
+  6. "mancipiola"
+  7. mándale una FOTO de un modelo tuyo → te responde sobre ESE modelo,
+     o te da hasta 2 opciones preguntando cuál es. Nunca un modelo
+     cualquiera, y nunca "no puedo ver imágenes".
+
+Si algo de esto falla, escríbeme la conversación tal cual y lo convierto
+en un caso de prueba, como hicimos con esta tanda.
+
+------------------------------------------------------------------------
+ROLLBACK (si algo sale mal)
+------------------------------------------------------------------------
+Opción A, la rápida — apagar el cerebro y volver al bot de antes:
+    en el .env:  BOT_CEREBRO_IA=off
+    y luego:     docker compose up -d --force-recreate n8n
+
+Opción B — volver al JSON anterior:
+    el v9.8 está guardado en workflows/respaldo/bot-varman-v9.8.json
+    (mismo procedimiento de import de arriba).
+
+------------------------------------------------------------------------
+PRUEBAS QUE SE CORRIERON (25-jul)
+------------------------------------------------------------------------
+  · 352 PASS · 0 FAIL   — batería clásica (el bot que ya vende, intacto)
+  · 79 PASS · 0 FAIL    — arnés del cerebro con Gemini REAL, DOS corridas
+                          seguidas en verde (11 guiones nuevos salidos
+                          de tu propia conversación de prueba)
+
+------------------------------------------------------------------------
+LO QUE QUEDA PENDIENTE DE TU LADO
+------------------------------------------------------------------------
+ · VIDEO: el bot ya sabe mandar el video del par real (es tu mejor
+   gancho), pero la app todavía no tiene dónde guardar la URL del video
+   por referencia. Mientras no exista ese campo, el bot simplemente no lo
+   menciona. Cuando lo agregues en la app, empieza a funcionar solo.
+
+ · Ponerle nombre completo a TODAS las referencias en la app. El bot
+   busca por ese nombre: una ref sin nombre es una ref que no se puede
+   encontrar por marca ni por color.

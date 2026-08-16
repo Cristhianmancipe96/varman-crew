@@ -34,7 +34,7 @@ ENV.BOT_MSGS_POR_MIN = '999';
 // v6 enciende el suyo. Se fuerzan OFF aquí para que el resultado NO dependa de
 // lo que esté activado en el .env real (Cristhian puede activar flags cuando
 // despliegue). Así el suite prueba SIEMPRE ambos estados de forma determinista.
-for (const k of ['BOT_ROBUSTEZ', 'BOT_CLASIF_V2', 'BOT_DISPATCH_V2', 'BOT_MARCA_NORM', 'BOT_DATOS_V2', 'BOT_TEXTOS_V2', 'BOT_FOTO_ASESOR', 'BOT_TALLAS_V2', 'BOT_FLUIDEZ_RECONDUCE', 'BOT_FLUIDEZ_CATALOGO', 'BOT_ASISTENTE_V2', 'BOT_FLUIDEZ_ACUSE', 'BOT_CATALOGO_WEB', 'BOT_NOMBRE_MODELO', 'WOMPI_PUB_KEY', 'WOMPI_PRV_KEY', 'WOMPI_EVENTS_SECRET', 'WOMPI_ENV', 'CATALOGO_NATIVO', 'WHATSAPP_CATALOG_ID']) delete ENV[k];
+for (const k of ['BOT_ROBUSTEZ', 'BOT_CLASIF_V2', 'BOT_DISPATCH_V2', 'BOT_MARCA_NORM', 'BOT_DATOS_V2', 'BOT_TEXTOS_V2', 'BOT_FOTO_ASESOR', 'BOT_TALLAS_V2', 'BOT_FLUIDEZ_RECONDUCE', 'BOT_FLUIDEZ_CATALOGO', 'BOT_ASISTENTE_V2', 'BOT_FLUIDEZ_ACUSE', 'BOT_CATALOGO_WEB', 'BOT_NOMBRE_MODELO', 'BOT_FUENTE_DETALLE', 'BOT_MODELO_ASESOR', 'BOT_ANTIRUIDO', 'BOT_TALLA_ROBUSTA', 'BOT_TALLA_NACIONAL_DEF', 'BOT_TALLA_BOTONES', 'BOT_ANTIBUCLE', 'BOT_ANTIBUCLE_MAX', 'BOT_PAUTA_CATALOGO', 'BOT_SALUDO_NO_REINICIA', 'BOT_COLOR_CATALOGO', 'BOT_CATALOGO_PIDE', 'BOT_REF_PAUTA', 'BOT_SI_CATALOGO', 'BOT_AVISO_PLANTILLA', 'BOT_LOG_FALLOS', 'BOT_FOTO_REFS', 'BOT_TEXTOS_SOCIO', 'BOT_TONO_SOCIO', 'BOT_CIERRE_CONFIANZA', 'BOT_DESCUENTO_CIFRA', 'BOT_SILENCIO_HANDOFF', 'BOT_SILENCIO_HORAS', 'BOT_MODO_CONVERSA', 'BOT_ESCAPE_DATOS', 'BOT_PAGO_PRIMERO', 'BOT_ELIGE_PAGO', 'BOT_BOGOTA_CE', 'BOT_CIERRE_ASESOR', 'BOT_LEAD_CALIENTE', 'BOT_LEAD_UMBRAL', 'WHATSAPP_PLANTILLA_AVISO', 'WHATSAPP_PLANTILLA_IDIOMA', 'WOMPI_PUB_KEY', 'WOMPI_PRV_KEY', 'WOMPI_EVENTS_SECRET', 'WOMPI_ENV', 'CATALOGO_NATIVO', 'WHATSAPP_CATALOG_ID']) delete ENV[k];
 
 // ---------- workflow ----------
 const wf = JSON.parse(fs.readFileSync(path.join(DIR, 'workflows', 'bot-varman.json'), 'utf8'));
@@ -198,7 +198,9 @@ async function correrCerebroReal(parsedMsg) {
 const RUN_MID = 'wamidTEST_' + Date.now() + '_';
 let _midSeq = 0;
 function msj(over) {
-  return Object.assign({ wa_id: TEST_WA, nombre: 'Cliente Prueba', tipo: 'text', texto: '', inter_id: '', imagen_id: '', fuente: '', message_id: RUN_MID + (++_midSeq) }, over);
+  // fuente_titulo/tipo/url: detalle del referral (FUENTE-DETALLE) — vacíos por
+  // defecto, igual que los emite "Parsear mensaje" cuando no hay referral
+  return Object.assign({ wa_id: TEST_WA, nombre: 'Cliente Prueba', tipo: 'text', texto: '', inter_id: '', imagen_id: '', fuente: '', fuente_titulo: '', fuente_tipo: '', fuente_url: '', message_id: RUN_MID + (++_midSeq) }, over);
 }
 // helpers para leer la salida nueva (tandas de fotos)
 const esLista = (m) => m && m.type === 'interactive' && m.interactive && m.interactive.type === 'list';
@@ -253,6 +255,9 @@ function check(nombre, cond, extra) {
       if ([TEST_WA, TEST_WA2, TEST_WA3].indexOf(d.cliente_wa) >= 0) await fsDel(d._path);
     }
   }
+  // [REF-PAUTA] el fsSet de abajo PISA el doc completo → conservar la refPauta
+  // que el dueño haya elegido en la app y restaurarla en la limpieza final.
+  const cfgPrevio = await fsGet('tiendas/varman/botConfig/general');
   await fsSet('tiendas/varman/botConfig/general', { pausado: false, actualizado: new Date().toISOString(), por: 'test' });
 
   console.log('== 1. SMOKE contra catalogo VIVO: saludo -> catalogo (Gemini REAL) ==');
@@ -583,6 +588,123 @@ function check(nombre, cond, extra) {
   await fsSet('tiendas/varman/botSesiones/' + TEST_WA, Object.assign({}, SES_TALLA, { updatedAt: new Date().toISOString() }));
   r = await correrCerebro(msj({ texto: 'uf no se cual es mi talla' })); // sin flag NO llama a Gemini
   check('flag OFF: comportamiento v5 idéntico (talla inválida)', r.length === 1 && /35 a la 45/.test(r[0].text.body), r);
+  await fsDel('tiendas/varman/botSesiones/' + TEST_WA);
+
+  console.log('== 18e. TALLA-ROBUSTA: rompe el bucle real de "Taya 38" (2026-07) ==');
+  // Bug real: robustez ON + Gemini repregunta sin `dato` → la talla "Taya 38"
+  // se pierde y el bot repite la pregunta en bucle.
+  ENV.BOT_ROBUSTEZ = 'on';
+  delete ENV.BOT_TALLA_ROBUSTA;
+  await fsSet('tiendas/varman/botSesiones/' + TEST_WA, Object.assign({}, SES_TALLA, { updatedAt: new Date().toISOString() }));
+  mockGemini = { handoff: false, dato: '', respuesta: '¿Me confirmas tu talla y si es para hombre o mujer? 👟' };
+  r = await correrCerebro(msj({ texto: 'Taya 38' }));
+  ses = await fsGet('tiendas/varman/botSesiones/' + TEST_WA);
+  check('robusta OFF (bug): "Taya 38" NO se captura, sigue en talla', ses && ses.estado === 'talla', ses);
+  // Fix: con BOT_TALLA_ROBUSTA el número claro se captura ANTES de Gemini.
+  ENV.BOT_TALLA_ROBUSTA = 'on';
+  mockGemini = null;
+  await fsSet('tiendas/varman/botSesiones/' + TEST_WA, Object.assign({}, SES_TALLA, { updatedAt: new Date().toISOString() }));
+  r = await correrCerebro(msj({ texto: 'Taya 38' }));
+  ses = await fsGet('tiendas/varman/botSesiones/' + TEST_WA);
+  check('robusta ON (fix): "Taya 38" → talla 38 anotada, avanza a datos', ses && ses.estado === 'datos' && ses.talla === '38', ses);
+
+  console.log('== 18f. TALLA-ROBUSTA: arma la talla en pedazos con typos (nacional) ==');
+  ENV.BOT_TALLA_NACIONAL_DEF = 'on';
+  delete ENV.BOT_ROBUSTEZ; // determinista, sin Gemini
+  await fsSet('tiendas/varman/botSesiones/' + TEST_WA, Object.assign({}, SES_TALLA, { updatedAt: new Date().toISOString() }));
+  r = await correrCerebro(msj({ texto: 'mijo nasional' })); // sistema (con typo), sin número
+  ses = await fsGet('tiendas/varman/botSesiones/' + TEST_WA);
+  check('parte 1: recuerda "nacional" y pide el número (sigue en talla)', ses && ses.estado === 'talla' && ses.tallaPendSis === 'nacional', ses);
+  r = await correrCerebro(msj({ texto: 'la 38' })); // número; ya hay sistema → pide género
+  ses = await fsGet('tiendas/varman/botSesiones/' + TEST_WA);
+  check('parte 2: junta el número, pide el género (talla pendiente 38)', ses && ses.estado === 'talla' && Number(ses.tallaPendNum) === 38, ses);
+  r = await correrCerebro(msj({ texto: 'q para cabayero' })); // género con typo
+  ses = await fsGet('tiendas/varman/botSesiones/' + TEST_WA);
+  check('parte 3: "cabayero" → 38 nacional H = 40 europea, avanza a datos', ses && ses.estado === 'datos' && ses.talla === '40', ses);
+  delete ENV.BOT_TALLA_NACIONAL_DEF;
+
+  console.log('== 18g. TALLA-BOTONES: lista interactiva de tallas + captura del tap ==');
+  ENV.BOT_TALLA_BOTONES = 'on';
+  await fsDel('tiendas/varman/botSesiones/' + TEST_WA);
+  r = await correrCerebro(msj({ texto: 'Hola! Quiero la Ref 05 ($480.000 COP) \u{1F45F}' }));
+  check('botones: al arrancar el pedido manda una LISTA de tallas (talla:NN)',
+    r.some((m) => esLista(m) && (m.interactive.action.sections || []).some((s) => (s.rows || []).some((f) => f.id === 'talla:40'))), r);
+  check('botones: fila rotulada por NACIONAL con la europea (EUR) en paréntesis',
+    r.some((m) => esLista(m) && (m.interactive.action.sections || []).some((s) => (s.rows || []).some((f) => /nacional/i.test(f.title || '') && /EUR/i.test(f.title || '')))), r);
+  check('botones: nacional 38 → id talla:40 (guarda la EUR correcta)',
+    r.some((m) => esLista(m) && (m.interactive.action.sections || []).some((s) => (s.rows || []).some((f) => f.id === 'talla:40' && /Nacional 38/.test(f.title || '')))), r);
+  check('botones: máx 10 filas en total (límite de WhatsApp)',
+    r.every((m) => !esLista(m) || (m.interactive.action.sections || []).reduce((n, s) => n + (s.rows || []).length, 0) <= 10), r);
+  r = await correrCerebro(msj({ tipo: 'interactive', inter_id: 'talla:40' }));
+  ses = await fsGet('tiendas/varman/botSesiones/' + TEST_WA);
+  check('botones: tocar "Talla 40" → talla 40 anotada, avanza a datos', ses && ses.estado === 'datos' && ses.talla === '40', ses);
+  delete ENV.BOT_TALLA_BOTONES;
+
+  console.log('== 18h. ANTIBUCLE: tras N vueltas sin avanzar en talla → asesor ==');
+  delete ENV.BOT_TALLA_ROBUSTA; // determinista, sin robusta ni Gemini
+  ENV.BOT_ANTIBUCLE = 'on'; ENV.BOT_ANTIBUCLE_MAX = '2';
+  await fsSet('tiendas/varman/botSesiones/' + TEST_WA, Object.assign({}, SES_TALLA, { updatedAt: new Date().toISOString() }));
+  r = await correrCerebro(msj({ texto: 'no entiendo nada jaja' })); // vuelta 1: repregunta, no handoff
+  check('antibucle: 1ª vuelta sin avanzar → todavía NO pasa a asesor', !r.some((m) => m.to === DUENO), r);
+  r = await correrCerebro(msj({ texto: 'ombe pues' })); // vuelta 2: handoff
+  check('antibucle: 2ª vuelta → avisa al cliente y al dueño (asesor)',
+    r.some((m) => m.to === TEST_WA && /te escrib/i.test(m.text.body)) && r.some((m) => m.to === DUENO), r);
+  delete ENV.BOT_ANTIBUCLE; delete ENV.BOT_ANTIBUCLE_MAX;
+
+  console.log('== 18i. PAUTA-CATALOGO: llegada de anuncio → invita al catálogo ==');
+  ENV.BOT_PAUTA_CATALOGO = 'on';
+  await fsDel('tiendas/varman/botSesiones/' + TEST_WA);
+  r = await correrCerebro(msj({ texto: 'Hola! Quiero la Ref 05 ($480.000 COP) \u{1F45F}', fuente: 'ctwa:AD777' }));
+  check('pauta ON + anuncio: invita a ver el catálogo (url #catalogo)', r.some((m) => m.type === 'text' && /#catalogo/.test(m.text.body)), r);
+  await fsDel('tiendas/varman/botSesiones/' + TEST_WA);
+  r = await correrCerebro(msj({ texto: 'Hola! Quiero la Ref 05 ($480.000 COP) \u{1F45F}' })); // sin fuente
+  check('pauta: SIN anuncio NO aparece la invitación al catálogo', !r.some((m) => m.type === 'text' && /#catalogo/.test(m.text.body)), r);
+  delete ENV.BOT_PAUTA_CATALOGO;
+  await fsDel('tiendas/varman/botSesiones/' + TEST_WA);
+
+  console.log('== 18j. SALUDO-NO-REINICIA: un saludo a mitad de pedido NO reinicia ==');
+  ENV.BOT_SALUDO_NO_REINICIA = 'on';
+  await fsSet('tiendas/varman/botSesiones/' + TEST_WA, Object.assign({}, SES_TALLA, { updatedAt: new Date().toISOString() }));
+  r = await correrCerebro(msj({ texto: 'Ola buenas' }));
+  ses = await fsGet('tiendas/varman/botSesiones/' + TEST_WA);
+  check('saludo: NO reinicia, sigue en talla con la ref 05', ses && ses.estado === 'talla' && ses.ref === '05', ses);
+  check('saludo: re-ancla al pedido (menciona la ref, NO la bienvenida)',
+    r.some((m) => m.type === 'text' && /Ref 05|[Ss]eguimos con tu pedido/.test(m.text.body))
+    && !r.some((m) => /qu[eé] modelo o marca buscas/i.test((m.text || {}).body || '')), r);
+  // discriminación: "hola quiero la ref 03" NO es un saludo puro → no se intercepta
+  r = await correrCerebro(msj({ texto: 'hola quiero la ref 03' }));
+  check('saludo: "hola quiero la ref 03" NO se trata como saludo (no re-ancla)',
+    !r.some((m) => /[Ss]eguimos con tu pedido/.test((m.text || {}).body || '')), r);
+  delete ENV.BOT_SALUDO_NO_REINICIA;
+
+  console.log('== 18k. COLOR-CATALOGO: pide otro color → honesto + catálogo ==');
+  ENV.BOT_COLOR_CATALOGO = 'on';
+  await fsSet('tiendas/varman/botSesiones/' + TEST_WA, Object.assign({}, SES_TALLA, { updatedAt: new Date().toISOString() }));
+  r = await correrCerebro(msj({ texto: 'lo tiene en color negro?' }));
+  ses = await fsGet('tiendas/varman/botSesiones/' + TEST_WA);
+  check('color: honesto (solo el de la foto) + catálogo (url #catalogo)',
+    r.some((m) => m.type === 'text' && /color de la foto/i.test(m.text.body) && /#catalogo/.test(m.text.body)), r);
+  check('color: NO pierde el pedido (sigue en talla)', ses && ses.estado === 'talla', ses);
+  r = await correrCerebro(msj({ texto: '40' })); // una talla normal NO se confunde con color
+  ses = await fsGet('tiendas/varman/botSesiones/' + TEST_WA);
+  check('color: "40" (sin color) avanza normal a datos', ses && ses.estado === 'datos' && ses.talla === '40', ses);
+  delete ENV.BOT_COLOR_CATALOGO;
+  await fsDel('tiendas/varman/botSesiones/' + TEST_WA);
+
+  console.log('== 18L. CATALOGO-PIDE: pide el catálogo a mitad de pedido → lo envía ==');
+  ENV.BOT_CATALOGO_PIDE = 'on';
+  await fsSet('tiendas/varman/botSesiones/' + TEST_WA, { estado: 'datos', ref: '05', precio: 480000, talla: '40', nombrePerfil: 'Cliente Prueba', updatedAt: new Date().toISOString() });
+  r = await correrCerebro(msj({ texto: 'Manda el catalogo' }));
+  ses = await fsGet('tiendas/varman/botSesiones/' + TEST_WA);
+  check('catálogo: lo ENVÍA (link #catalogo) en vez de esquivar', r.some((m) => m.type === 'text' && /#catalogo/.test(m.text.body)), r);
+  check('catálogo: NO pierde el pedido (sigue en datos)', ses && ses.estado === 'datos', ses);
+  r = await correrCerebro(msj({ texto: 'muéstramelos' })); // otra forma común
+  check('catálogo: "muéstramelos" también lo envía', r.some((m) => m.type === 'text' && /#catalogo/.test(m.text.body)), r);
+  // una dirección normal en datos NO dispara el catálogo (avanza el flujo)
+  r = await correrCerebro(msj({ texto: 'Juan Perez, Calle 10 #5-20, Bogota, 3001234567' }));
+  ses = await fsGet('tiendas/varman/botSesiones/' + TEST_WA);
+  check('catálogo: una dirección normal NO dispara el catálogo (avanza a pago)', ses && ses.estado === 'pago', ses);
+  delete ENV.BOT_CATALOGO_PIDE;
   await fsDel('tiendas/varman/botSesiones/' + TEST_WA);
 
   console.log('== 19. v6: Wompi (link de pago + webhook con firma) ==');
@@ -1396,12 +1518,12 @@ function check(nombre, cond, extra) {
   // ON: respuesta humana única pidiendo texto
   ENV.BOT_FLUIDEZ_RECONDUCE = 'on';
   r = await correrCerebro(msj({ tipo: 'audio' }));
-  check('F10 flag ON: nota de voz → "te leo mejor" (1 burbuja, sin catálogo)', r.length === 1 && r[0].type === 'text' && /te leo mejor/i.test(r[0].text.body), r.map((m) => m.type));
+  check('F10 flag ON: nota de voz → "te leo mejor" (1 burbuja, sin catálogo)', r.length === 1 && r[0].type === 'text' && /no puedo escuchar notas de voz|escríbeme|Me lo escribes/i.test(r[0].text.body), r.map((m) => m.type));
   // ON con pedido en curso: mismo texto y la sesión queda intacta
   await setPedido37('talla');
   r = await correrCerebro(msj({ tipo: 'sticker' }));
   ses = await fsGet('tiendas/varman/botSesiones/' + TEST_WA);
-  check('F10 flag ON: sticker a mitad de pedido → pide texto y NO pierde el paso', r.length === 1 && /te leo mejor/i.test(r[0].text.body) && ses && ses.estado === 'talla', ses && { estado: ses.estado });
+  check('F10 flag ON: sticker a mitad de pedido → pide texto y NO pierde el paso', r.length === 1 && /no puedo escuchar notas de voz|escríbeme|Me lo escribes/i.test(r[0].text.body) && ses && ses.estado === 'talla', ses && { estado: ses.estado });
   delete ENV.BOT_FLUIDEZ_RECONDUCE;
   await fsDel('tiendas/varman/botSesiones/' + TEST_WA);
 
@@ -1591,6 +1713,531 @@ function check(nombre, cond, extra) {
   if (pedidoNMPath) await fsDel(pedidoNMPath);
   await fsDel('tiendas/varman/botSesiones/' + TEST_WA);
 
+  console.log('== 48b. CV1: insistir por una marca que SÍ tenemos → asesor (flag BOT_MODELO_ASESOR) ==');
+  delete ENV.BOT_ROBUSTEZ; // determinista
+  ENV.BOT_CATALOGO_WEB = 'on';
+  await fsDel('tiendas/varman/botSesiones/' + TEST_WA);
+  // 1ª vez que pregunta por Jordan (marca que SÍ tenemos): mensaje normal de marca-web
+  mockGemini = { intent: 'buscar_marca', respuesta: '', marca: 'jordan' };
+  ENV.BOT_MODELO_ASESOR = 'on';
+  r = await correrCerebro(msj({ texto: 'Tienes Jordan Retro 4?' }));
+  check('CV1: 1ª vez marca que SÍ tenemos → mensaje del catálogo web (no asesor)', r.length === 1 && /De \*Jordan\* tenemos/.test(r[0].text.body) && LINK_CAT.test(r[0].text.body), r[0] && r[0].text);
+  ses = await fsGet('tiendas/varman/botSesiones/' + TEST_WA);
+  check('CV1: recuerda la marca mostrada en la sesión', ses && ses.marcaWebMostrada === 'jordan', ses && ses.marcaWebMostrada);
+  // 2ª vez la MISMA marca = insiste por un modelo puntual → asesor, NO repetir
+  r = await correrCerebro(msj({ texto: 'Retro 4 tienes?' }));
+  mockGemini = null;
+  const clienteCV1 = r.find((m) => m.to === TEST_WA);
+  const avisoCV1 = r.find((m) => m.to === DUENO);
+  check('CV1: 2ª vez (insiste) → NO repite, pasa al asesor', clienteCV1 && /un asesor te confirme/i.test(clienteCV1.text.body) && !/De \*Jordan\* tenemos/.test(clienteCV1.text.body), clienteCV1 && clienteCV1.text);
+  check('CV1: al 320 le llega el aviso del modelo puntual', DUENO ? (avisoCV1 && /modelo puntual de Jordan/i.test(avisoCV1.text.body)) : true, avisoCV1 && avisoCV1.text);
+  // regresión flag OFF: 2 veces la misma marca → repite el mensaje (comportamiento de hoy)
+  delete ENV.BOT_MODELO_ASESOR;
+  await fsDel('tiendas/varman/botSesiones/' + TEST_WA);
+  mockGemini = { intent: 'buscar_marca', respuesta: '', marca: 'jordan' };
+  await correrCerebro(msj({ texto: 'Jordan?' }));
+  r = await correrCerebro(msj({ texto: 'Jordan?' }));
+  mockGemini = null;
+  check('CV1 flag OFF: insistir repite el mensaje del catálogo (hoy), no asesor', r.length === 1 && /De \*Jordan\* tenemos/.test(r[0].text.body), r[0] && r[0].text);
+  delete ENV.BOT_CATALOGO_WEB;
+  await fsDel('tiendas/varman/botSesiones/' + TEST_WA);
+
+  console.log('== 48c. CV1-A: emparejar el MODELO por nombre y mandar la ref exacta ==');
+  delete ENV.BOT_ROBUSTEZ; // determinista
+  ENV.BOT_CATALOGO_WEB = 'on';
+  ENV.BOT_MODELO_ASESOR = 'on';
+  // catálogo a medida (formato REST) SOLO para este test — NO toca el fixture. 3 Jordan
+  // con nombre completo en `marca` (como los pone el dueño en la app); 2 son "retro 4".
+  const catDoc = (ref, cat, marca, precio, fid) => ({
+    name: 'projects/varman-crew/databases/(default)/documents/tiendas/varman/catalogo/' + ref,
+    fields: { ref: { stringValue: ref }, cat: { stringValue: cat }, marca: { stringValue: marca },
+      precio: { integerValue: String(precio) }, activo: { booleanValue: true },
+      orden: { integerValue: ref }, fotos: { arrayValue: { values: fid ? [{ stringValue: fid }] : [] } } }
+  });
+  const catModelo = { documents: [
+    catDoc('50', 'urbanas', 'Jordan retro 4 Cave Stone', 264900, 'fmtestcave01'), // foto NUEVA (Firestore → web)
+    catDoc('51', 'urbanas', 'Jordan retro 4 Thunder', 260000),
+    catDoc('52', 'urbanas', 'Jordan retro 1 craft', 250000)
+  ] };
+  await fsDel('tiendas/varman/botSesiones/' + TEST_WA);
+  mockGemini = { intent: 'buscar_marca', respuesta: '', marca: 'jordan' };
+  // (A1) nombra el modelo exacto → venta DIRECTA en WhatsApp: arranca el pedido
+  // (ficha con Ref y precio + pregunta de talla), SIN link del catálogo
+  r = await correrCerebro(msj({ texto: 'Tienes las Jordan retro 4 Cave Stone?' }), catModelo);
+  let cuerpoA1 = r.map((m) => (m.text && m.text.body) || (m.image && m.image.caption) || '').join('\n');
+  ses = await fsGet('tiendas/varman/botSesiones/' + TEST_WA);
+  check('CV1-A: modelo exacto → arranca el pedido (Ref 50 + precio + talla), sin link', /Cave Stone/.test(cuerpoA1) && /50/.test(cuerpoA1) && /264\.900/.test(cuerpoA1) && /talla/i.test(cuerpoA1) && !LINK_CAT.test(cuerpoA1), cuerpoA1);
+  check('CV1-A: la sesión quedó esperando la talla de la Ref 50', ses && ses.estado === 'talla' && ses.ref === '50', ses && { estado: ses.estado, ref: ses.ref });
+  const imgA1 = r.find((m) => m.type === 'image');
+  check('CV1-A: manda la FOTO nueva por enlace web (/foto/<fid>.jpg, la sirve Cloudflare)', imgA1 && /\/foto\/fmtestcave01\.jpg$/.test(imgA1.image.link), imgA1 && imgA1.image);
+  // (A2) nombra "retro 4" (hay 2) → lista las 2 con Ref para elegir + link secundario
+  await fsDel('tiendas/varman/botSesiones/' + TEST_WA);
+  r = await correrCerebro(msj({ texto: 'Tienen Jordan retro 4?' }), catModelo);
+  check('CV1-A: "retro 4" (2 variantes) → lista Ref 50 y 51 para elegir, no la 52', r.length === 1 && /tenemos 2/i.test(r[0].text.body) && /Ref 50/.test(r[0].text.body) && /Ref 51/.test(r[0].text.body) && !/Ref 52/.test(r[0].text.body) && /"Ref 50"/.test(r[0].text.body) && LINK_CAT.test(r[0].text.body), r[0] && r[0].text);
+  // (A3) solo la marca (sin modelo) → mensaje de marca de siempre (no pinpoint)
+  await fsDel('tiendas/varman/botSesiones/' + TEST_WA);
+  r = await correrCerebro(msj({ texto: 'Tienen Jordan?' }), catModelo);
+  check('CV1-A: solo la marca → mensaje de marca (3 modelos), sin ref exacta', r.length === 1 && /De \*Jordan\* tenemos 3/.test(r[0].text.body) && !/Ref 50/.test(r[0].text.body), r[0] && r[0].text);
+  // regresión flag OFF: nombrar el modelo NO pinpointea (comportamiento de hoy)
+  delete ENV.BOT_MODELO_ASESOR;
+  await fsDel('tiendas/varman/botSesiones/' + TEST_WA);
+  r = await correrCerebro(msj({ texto: 'Tienes las Jordan retro 4 Cave Stone?' }), catModelo);
+  check('CV1-A flag OFF: nombrar el modelo → mensaje de marca (hoy), sin ref exacta', r.length === 1 && /De \*Jordan\* tenemos 3/.test(r[0].text.body) && !/Ref 50/.test(r[0].text.body), r[0] && r[0].text);
+  mockGemini = null;
+  delete ENV.BOT_CATALOGO_WEB;
+  await fsDel('tiendas/varman/botSesiones/' + TEST_WA);
+
+  console.log('== 48d. ANTIRUIDO: un "?" suelto no repite la bienvenida (flag BOT_ANTIRUIDO) ==');
+  mockGemini = { intent: 'saludo', respuesta: '' }; // lo que hoy dispara la bienvenida
+  ENV.BOT_ANTIRUIDO = 'on';
+  await fsDel('tiendas/varman/botSesiones/' + TEST_WA);
+  r = await correrCerebro(msj({ texto: '?' }));
+  check('ANTIRUIDO ON: un "?" suelto NO genera respuesta (no repite bienvenida)', r.length === 0, r);
+  await fsDel('tiendas/varman/botSesiones/' + TEST_WA);
+  r = await correrCerebro(msj({ texto: '🔥🔥' }));
+  check('ANTIRUIDO ON: mensaje de solo emojis tampoco responde', r.length === 0, r);
+  await fsDel('tiendas/varman/botSesiones/' + TEST_WA);
+  r = await correrCerebro(msj({ texto: 'hola?' }));
+  check('ANTIRUIDO ON: "hola?" (tiene letras) SÍ se responde', r.length >= 1, r);
+  // regresión flag OFF: "?" se comporta como hoy (sí contesta la bienvenida)
+  delete ENV.BOT_ANTIRUIDO;
+  await fsDel('tiendas/varman/botSesiones/' + TEST_WA);
+  r = await correrCerebro(msj({ texto: '?' }));
+  check('ANTIRUIDO OFF: un "?" suelto sí responde (comportamiento de hoy)', r.length >= 1, r);
+  mockGemini = null;
+  await fsDel('tiendas/varman/botSesiones/' + TEST_WA);
+
+  console.log('== 49. FUENTE-DETALLE: atribución detallada de pauta (flag BOT_FUENTE_DETALLE) ==');
+  delete ENV.BOT_ROBUSTEZ; // determinista (los pasos del pedido sin Gemini)
+  // --- flag ON · caso Facebook: el detalle llega en el PRIMER mensaje (como el
+  // referral real de Meta) y debe SOBREVIVIR toda la navegación vía sesión,
+  // igual que la fuente simple (imita la sección 11)
+  ENV.BOT_FUENTE_DETALLE = 'on';
+  await fsDel('tiendas/varman/botSesiones/' + TEST_WA);
+  r = await correrCerebro(msj({ tipo: 'interactive', inter_id: 'cat:deportivas', fuente: 'ctwa:AD900', fuente_titulo: 'Tus próximos tenis están aquí', fuente_tipo: 'ad', fuente_url: 'https://fb.me/abc' }));
+  ses = await fsGet('tiendas/varman/botSesiones/' + TEST_WA);
+  check('FD flag ON: el detalle queda en la sesión mientras navega', ses && /Tus próximos tenis/.test(String(ses.fuenteDetalle || '')), ses && ses.fuenteDetalle);
+  r = await correrCerebro(msj({ tipo: 'interactive', inter_id: 'ref:' + ref })); // SIN detalle: debe sobrevivir
+  r = await correrCerebro(msj({ texto: '40' }));
+  r = await correrCerebro(msj({ texto: 'Juan Prueba, Calle Falsa 123, Bogota, 3001234567' }));
+  r = await correrCerebro(msj({ tipo: 'interactive', inter_id: 'pay:nequi' }));
+  r = await correrCerebro(msj({ tipo: 'image', imagen_id: 'FAKE_MEDIA_FD1' }));
+  const mPathFD1 = (r[1] && r[1].text.body.match(/Pedido guardado: (\S+)/)) || [];
+  const pedidoFD1 = mPathFD1[1] ? await fsGet(mPathFD1[1]) : null;
+  check('FD: el pedido lleva fuente_titulo (sobrevivió la navegación)', pedidoFD1 && pedidoFD1.fuente_titulo === 'Tus próximos tenis están aquí', pedidoFD1 && pedidoFD1.fuente_titulo);
+  check('FD: fuente_tipo=ad y fuente_plataforma=facebook (deducida de fb.me)', pedidoFD1 && pedidoFD1.fuente_tipo === 'ad' && pedidoFD1.fuente_plataforma === 'facebook', pedidoFD1);
+  check('FD: la fuente simple de hoy NO cambia (ctwa:AD900)', pedidoFD1 && pedidoFD1.fuente === 'ctwa:AD900', pedidoFD1 && pedidoFD1.fuente);
+  check('FD: el aviso al 320 dice de qué anuncio vino', r[1] && /Vino de: Tus próximos tenis están aquí \(facebook\)/.test(r[1].text.body), r[1] && r[1].text);
+  // --- flag ON · caso Instagram: la plataforma se deduce de la url del referral
+  await fsSet('tiendas/varman/botSesiones/' + TEST_WA, { estado: 'comprobante', ref, precio: 250000, metodo: 'Nequi', talla: '40', datosEnvio: 'x', nombrePerfil: 'Cliente Prueba', updatedAt: new Date().toISOString() });
+  r = await correrCerebro(msj({ tipo: 'image', imagen_id: 'FAKE_MEDIA_FD2', fuente: 'ctwa:AD901', fuente_titulo: 'Story de tenis', fuente_tipo: 'ad', fuente_url: 'https://l.instagram.com/xyz' }));
+  const mPathFD2 = (r[1] && r[1].text.body.match(/Pedido guardado: (\S+)/)) || [];
+  const pedidoFD2 = mPathFD2[1] ? await fsGet(mPathFD2[1]) : null;
+  check('FD: url con instagram → fuente_plataforma=instagram', pedidoFD2 && pedidoFD2.fuente_plataforma === 'instagram' && pedidoFD2.fuente_titulo === 'Story de tenis', pedidoFD2);
+  check('FD: el aviso al 320 dice (instagram)', r[1] && /Vino de: Story de tenis \(instagram\)/.test(r[1].text.body), r[1] && r[1].text);
+  // --- flag OFF (regresión): los MISMOS campos en el mensaje → NADA nuevo:
+  // ni campos en el pedido ni línea extra en el aviso (byte-idéntico a hoy)
+  delete ENV.BOT_FUENTE_DETALLE;
+  await fsSet('tiendas/varman/botSesiones/' + TEST_WA, { estado: 'comprobante', ref, precio: 250000, metodo: 'Nequi', talla: '40', datosEnvio: 'x', nombrePerfil: 'Cliente Prueba', updatedAt: new Date().toISOString() });
+  r = await correrCerebro(msj({ tipo: 'image', imagen_id: 'FAKE_MEDIA_FD3', fuente: 'ctwa:AD902', fuente_titulo: 'Tus próximos tenis están aquí', fuente_tipo: 'ad', fuente_url: 'https://fb.me/abc' }));
+  const mPathFD3 = (r[1] && r[1].text.body.match(/Pedido guardado: (\S+)/)) || [];
+  const pedidoFD3 = mPathFD3[1] ? await fsGet(mPathFD3[1]) : null;
+  check('FD flag OFF: el pedido NO lleva fuente_titulo/tipo/plataforma', pedidoFD3 && pedidoFD3.fuente_titulo === undefined && pedidoFD3.fuente_tipo === undefined && pedidoFD3.fuente_plataforma === undefined, pedidoFD3);
+  check('FD flag OFF: la fuente simple sigue llegando (ctwa:AD902)', pedidoFD3 && pedidoFD3.fuente === 'ctwa:AD902', pedidoFD3 && pedidoFD3.fuente);
+  check('FD flag OFF: el aviso al 320 es el de siempre (sin "Vino de")', r[1] && !/Vino de:/.test(r[1].text.body) && /NUEVO PEDIDO/.test(r[1].text.body), r[1] && r[1].text);
+  // limpieza local de la sección (pedidos + comprobantes de prueba)
+  for (const mp of [mPathFD1[1], mPathFD2[1], mPathFD3[1]]) {
+    if (mp) { await fsDel(mp); await fsDel('tiendas/varman/comprobantes/' + mp.split('/').pop()); }
+  }
+  await fsDel('tiendas/varman/botSesiones/' + TEST_WA);
+
+  console.log('== 21. v6.9: REF-PAUTA ("precio"/"más info" → ref de la publicación) ==');
+  ENV.BOT_REF_PAUTA = 'on';
+  mockGemini = null;
+  await fsSet('tiendas/varman/botConfig/general', { pausado: false, refPauta: '05', actualizado: new Date().toISOString(), por: 'test' });
+  await fsDel('tiendas/varman/botSesiones/' + TEST_WA);
+  // "precio" pelado → ficha de la Ref 05 (elegida "en la app") + arranca pedido
+  r = await correrCerebro(msj({ texto: 'precio' }));
+  ses = await fsGet('tiendas/varman/botSesiones/' + TEST_WA);
+  check('RP: "precio" abre con el intro de la publicación', r[0] && r[0].type === 'text' && /publicaci/i.test(r[0].text.body), r[0]);
+  check('RP: "precio" muestra la ficha de la Ref 05', r.some((m) => m.type === 'image' && /Ref 05/.test(m.image.caption || '')), r);
+  check('RP: arranca el pedido (sesión en talla, ref 05)', ses && ses.estado === 'talla' && ses.ref === '05', ses);
+  await fsDel('tiendas/varman/botSesiones/' + TEST_WA);
+  r = await correrCerebro(msj({ texto: '¿Cuál es el precio?' }));
+  ses = await fsGet('tiendas/varman/botSesiones/' + TEST_WA);
+  check('RP: "¿Cuál es el precio?" también va a la Ref 05', ses && ses.estado === 'talla' && ses.ref === '05', ses);
+  await fsDel('tiendas/varman/botSesiones/' + TEST_WA);
+  // el precio del ENVÍO no es el precio del par → NO secuestra (flujo normal)
+  mockGemini = { intent: 'pregunta_precio', respuesta: '' };
+  r = await correrCerebro(msj({ texto: 'cuánto cuesta el envío' }));
+  ses = await fsGet('tiendas/varman/botSesiones/' + TEST_WA);
+  check('RP: "cuánto cuesta el envío" NO se desvía a la Ref 05 (sin sesión de pedido)', (!ses || !ses.estado) && !r.some((m) => m.type === 'image' && /Ref 05/.test(m.image.caption || '')), { ses, r });
+  await fsDel('tiendas/varman/botSesiones/' + TEST_WA);
+  // "quiero más información" → pregunta por la ref de la publicación + oferta pendiente
+  mockGemini = null;
+  r = await correrCerebro(msj({ texto: 'Quiero más información' }));
+  ses = await fsGet('tiendas/varman/botSesiones/' + TEST_WA);
+  check('RP: "más información" pregunta si busca la Ref 05', r[0] && r[0].type === 'text' && /Ref 05/.test(r[0].text.body) && /publicaci/i.test(r[0].text.body), r[0]);
+  check('RP: la oferta queda pendiente en la sesión (ofertaRef=05)', ses && ses.ofertaRef === '05' && !ses.estado, ses);
+  // …y el "sí" del cliente muestra la ficha y arranca el pedido
+  r = await correrCerebro(msj({ texto: 'Si mil gracias' }));
+  ses = await fsGet('tiendas/varman/botSesiones/' + TEST_WA);
+  check('RP: el "sí" muestra la Ref 05', r.some((m) => m.type === 'image' && /Ref 05/.test(m.image.caption || '')), r);
+  check('RP: el "sí" arranca el pedido (talla) y limpia la oferta', ses && ses.estado === 'talla' && ses.ref === '05' && !ses.ofertaRef, ses);
+  await fsDel('tiendas/varman/botSesiones/' + TEST_WA);
+  // regresión flag OFF: "precio" sigue el flujo de HOY (Gemini), sin ficha ni pedido
+  delete ENV.BOT_REF_PAUTA;
+  mockGemini = { intent: 'pregunta_precio', respuesta: '' };
+  r = await correrCerebro(msj({ texto: 'precio' }));
+  ses = await fsGet('tiendas/varman/botSesiones/' + TEST_WA);
+  check('RP flag OFF: "precio" NO muestra ficha ni crea pedido (flujo de hoy)', (!ses || !ses.estado) && !r.some((m) => m.type === 'image'), { ses, r });
+  mockGemini = null;
+  await fsDel('tiendas/varman/botSesiones/' + TEST_WA);
+
+  console.log('== 22. v6.9: SI-CATALOGO (afirmación suelta → catálogo) ==');
+  ENV.BOT_SI_CATALOGO = 'on';
+  await fsDel('tiendas/varman/botSesiones/' + TEST_WA);
+  r = await correrCerebro(msj({ texto: 'Si mil gracias' }));
+  check('SC: "Si mil gracias" → catálogo (lista de categorías), sin repetir la pregunta',
+    esLista(r[0]) && filasDe(r[0]).some((f) => String(f.id).indexOf('cat:') === 0), r[0]);
+  r = await correrCerebro(msj({ texto: 'dale' }));
+  check('SC: "dale" también muestra el catálogo', esLista(r[0]), r[0]);
+  // una pregunta que EMPIEZA por "si" no es afirmación → sigue al clasificador
+  mockGemini = { intent: 'otro', respuesta: 'Sí, la tenemos disponible' };
+  r = await correrCerebro(msj({ texto: 'si tienen la 40?' }));
+  check('SC: "si tienen la 40?" NO es afirmación (va al clasificador)', r[0] && r[0].type === 'text' && /tenemos/.test(r[0].text.body), r[0]);
+  // regresión flag OFF: la afirmación vuelve al clasificador como hoy
+  delete ENV.BOT_SI_CATALOGO;
+  mockGemini = { intent: 'otro', respuesta: 'Quedo atento por aquí' };
+  r = await correrCerebro(msj({ texto: 'Si mil gracias' }));
+  check('SC flag OFF: la afirmación va al clasificador (como hoy)', r[0] && r[0].type === 'text' && /atento/.test(r[0].text.body), r[0]);
+  mockGemini = null;
+  await fsDel('tiendas/varman/botSesiones/' + TEST_WA);
+
+  console.log('== 23. v6.9: AVISO-PLANTILLA (avisos al 320 como plantilla aprobada) ==');
+  ENV.BOT_AVISO_PLANTILLA = 'on';
+  ENV.WHATSAPP_PLANTILLA_AVISO = 'aviso_bot';
+  ENV.WHATSAPP_PLANTILLA_IDIOMA = 'es';
+  // handoff determinista ("asesor") → aviso al 320 como PLANTILLA
+  r = await correrCerebro(msj({ texto: 'quiero hablar con un asesor' }));
+  check('AP: al cliente le sigue llegando TEXTO normal', r[0] && r[0].type === 'text' && r[0].to === TEST_WA, r[0]);
+  check('AP: el aviso al 320 va como plantilla aviso_bot (es)', r[1] && r[1].to === DUENO && r[1].type === 'template'
+    && r[1].template.name === 'aviso_bot' && r[1].template.language.code === 'es', r[1]);
+  const paramAP = r[1] && r[1].template.components[0].parameters[0].text;
+  check('AP: la variable va aplanada (sin saltos de línea) y con el cliente', typeof paramAP === 'string' && paramAP.indexOf('\n') < 0 && /Cliente Prueba/.test(paramAP), paramAP);
+  // el resumen diario también sale como plantilla (llega aunque no haya ventana)
+  const swAP = await fnLimpiar.call({ helpers: { httpRequest: httpRuteado } }, { all: () => [] }, ENV, {}, () => ({}), require);
+  check('AP: el resumen diario va como plantilla al 320', swAP[0] && swAP[0].json.type === 'template' && swAP[0].json.to === DUENO
+    && /Resumen VarMan Bot/.test(swAP[0].json.template.components[0].parameters[0].text), swAP[0] && swAP[0].json);
+  // regresión flag OFF: el aviso vuelve a ser texto libre byte-idéntico a hoy
+  delete ENV.BOT_AVISO_PLANTILLA;
+  r = await correrCerebro(msj({ texto: 'quiero hablar con un asesor' }));
+  check('AP flag OFF: el aviso al 320 es texto libre como hoy', r[1] && r[1].type === 'text' && /atención humana/.test(r[1].text.body), r[1]);
+  delete ENV.WHATSAPP_PLANTILLA_AVISO;
+  delete ENV.WHATSAPP_PLANTILLA_IDIOMA;
+
+  console.log('== 24. v6.9: LOG-FALLOS (status failed → botErrores) ==');
+  r = await correrCerebro(msj({ tipo_evento: 'fallo_envio', destinatario: TEST_WA, message_id: 'wamid.FALLO_TEST', error_code: '131047', error_title: 'Re-engagement message' }));
+  check('LF: un fallo de entrega NO genera mensajes (solo registro)', r.length === 0, r);
+  const errsLF = await fsRunQuery('botErrores', 10, 'fecha');
+  check('LF: quedó en botErrores con el código 131047', errsLF.some((e) => e.origen === 'entrega-whatsapp' && /131047/.test(String(e.error || '')) && e.wa_id === TEST_WA), errsLF.slice(0, 2));
+
+  console.log('== 25. v6.9: FOTO-REFS (foto → "soy bot" + refs de la app en lista) ==');
+  ENV.BOT_FOTO_REFS = 'on';
+  ENV.BOT_FOTO_ASESOR = 'on'; // conviven: con refs elegidas manda FOTO-REFS; sin refs cae al asesor
+  await fsDel('tiendas/varman/botSesiones/' + TEST_WA);
+  // refsFoto como ARRAY (así lo escribe la app con el SDK de Firebase)
+  const setRefsFoto = (refs) => httpReal({ method: 'PATCH',
+    url: FS_BASE + '/tiendas/varman/botConfig/general?updateMask.fieldPaths=refsFoto',
+    headers: { Authorization: 'Bearer ' + TOK },
+    body: { fields: { refsFoto: { arrayValue: { values: refs.map((x) => ({ stringValue: x })) } } } } });
+  await setRefsFoto(['05', '03']);
+  r = await correrCerebro(msj({ tipo: 'image', imagen_id: 'FAKE_FOTO_REFS' }));
+  const listaFR = r.find((m) => m.type === 'interactive' && m.interactive && m.interactive.type === 'list' && m.to === TEST_WA);
+  check('FR: foto → se presenta como bot que NO puede ver imágenes', !!listaFR && /bot/i.test(listaFR.interactive.body.text) && /no puedo ver/i.test(listaFR.interactive.body.text), listaFR && listaFR.interactive.body);
+  const filasFR = listaFR ? listaFR.interactive.action.sections[0].rows : [];
+  check('FR: la lista trae las refs de la app (05 y 03) + "Ninguna de estas"',
+    filasFR.length === 3 && filasFR[0].id === 'ref:05' && filasFR[1].id === 'ref:03' && filasFR[2].id === 'foto:asesor', filasFR.map((f) => f.id));
+  check('FR: manda las fotos de esas refs para que compare con SU imagen',
+    imagenes(r).filter((m) => m.to === TEST_WA).length === 2, imagenes(r).map((m) => m.to));
+  check('FR: avisa al 320 y le reenvía la foto del cliente (media_id)',
+    r.some((m) => m.to === DUENO && m.type === 'text' && /mandó una foto/.test(m.text.body))
+    && r.some((m) => m.to === DUENO && m.type === 'image' && m.image.id === 'FAKE_FOTO_REFS'), r.filter((m) => m.to === DUENO));
+  // tocar una referencia de la lista arranca el pedido de siempre (cero typos)
+  r = await correrCerebro(msj({ tipo: 'interactive', inter_id: 'ref:05' }));
+  ses = await fsGet('tiendas/varman/botSesiones/' + TEST_WA);
+  check('FR: tocar "Referencia 05" arranca el pedido (talla, ref 05)', ses && ses.estado === 'talla' && ses.ref === '05', ses);
+  await fsDel('tiendas/varman/botSesiones/' + TEST_WA);
+  // "Ninguna de estas" → asesor: cliente atendido + aviso claro al 320
+  r = await correrCerebro(msj({ tipo: 'interactive', inter_id: 'foto:asesor' }));
+  check('FR: "Ninguna de estas" → handoff al cliente', r[0] && r[0].type === 'text' && /equipo/.test(r[0].text.body), r[0]);
+  check('FR: el 320 sabe que la ref del cliente NO está en la lista', r[1] && r[1].to === DUENO && /NO está en la lista/.test(r[1].text.body), r[1]);
+  // sin refs elegidas en la app → cae al flujo de HOY (foto → asesor)
+  await setRefsFoto([]);
+  r = await correrCerebro(msj({ tipo: 'image', imagen_id: 'FAKE_FOTO_REFS2' }));
+  check('FR sin refs en la app: la foto pasa al asesor (flujo de hoy)', r[0] && r[0].type === 'text' && /asesor/i.test(r[0].text.body) && !r.some((m) => m.type === 'interactive'), r[0]);
+  // regresión flag OFF: aunque haya refs elegidas, la foto va al asesor como hoy
+  delete ENV.BOT_FOTO_REFS;
+  await setRefsFoto(['05', '03']);
+  r = await correrCerebro(msj({ tipo: 'image', imagen_id: 'FAKE_FOTO_REFS3' }));
+  check('FR flag OFF: la foto va al asesor como hoy (sin lista)', r[0] && r[0].type === 'text' && /asesor/i.test(r[0].text.body) && !r.some((m) => m.type === 'interactive'), r[0]);
+  delete ENV.BOT_FOTO_ASESOR;
+  await setRefsFoto([]);
+  await fsDel('tiendas/varman/botSesiones/' + TEST_WA);
+
+  console.log('== 26. LEAD-CALIENTE: filtro de ventas potenciales (flag BOT_LEAD_CALIENTE) ==');
+  await fsDel('tiendas/varman/botSesiones/' + TEST_WA);
+  await fsDel('tiendas/varman/botLeads/' + TEST_WA);
+  await fsDel('tiendas/varman/botSesiones/' + TEST_WA2);
+  await fsDel('tiendas/varman/botLeads/' + TEST_WA2);
+
+  // -- flag OFF: cero rastro, ni doc de lead ni comandos nuevos --
+  r = await correrCerebro(msj({ texto: 'me sirve pagar con nequi, cuanto por transferencia' }));
+  let leadDoc = await fsGet('tiendas/varman/botLeads/' + TEST_WA);
+  check('flag OFF: no se crea ningún botLeads', leadDoc === null, leadDoc);
+  r = await correrCerebro(msj({ wa_id: DUENO, texto: 'calientes' }));
+  check('flag OFF: "calientes" NO es un comando (sigue como texto de cliente)', !r.some((m) => /CLIENTES POTENCIALES/i.test((m.text || {}).body || '')), r);
+  await fsDel('tiendas/varman/botSesiones/' + DUENO);
+
+  ENV.BOT_LEAD_CALIENTE = 'on';
+  ENV.BOT_LEAD_UMBRAL = '6';
+
+  // -- suma de señales sin cruzar el umbral: NO avisa al 320 todavía --
+  r = await correrCerebro(msj({ texto: '¿tienen la talla 38? me interesa' }));
+  leadDoc = await fsGet('tiendas/varman/botLeads/' + TEST_WA);
+  check('LC: dio la talla → suma "dio_talla" (3 pts)', leadDoc && (leadDoc.senales || '').indexOf('dio_talla') >= 0 && leadDoc.pts === 3, leadDoc);
+  check('LC: bajo el umbral (3<6) → todavía NO avisa al 320', !r.some((m) => m.to === DUENO), r);
+
+  // -- dos señales de pago más (3+4=7 pts) → cruza el umbral 6 → avisa UNA vez --
+  r = await correrCerebro(msj({ texto: '¿cómo hago el pago? tengo nequi' }));
+  leadDoc = await fsGet('tiendas/varman/botLeads/' + TEST_WA);
+  check('LC: pregunta cómo pagar (3) + acepta nequi (4) suman 10 con lo previo', leadDoc && leadDoc.pts === 10, leadDoc);
+  const avisoLead = r.find((m) => m.to === DUENO && m.type === 'text' && /CLIENTE POTENCIAL/i.test(m.text.body));
+  check('LC: al cruzar el umbral SÍ avisa al 320', !!avisoLead, r);
+  check('LC: el aviso trae el puntaje, el wa.me y las señales legibles', avisoLead
+    && avisoLead.text.body.includes('(10 pts)') && avisoLead.text.body.includes('wa.me/' + TEST_WA)
+    && /dio su talla/i.test(avisoLead.text.body) && /pregunt[oó] c[oó]mo pagar/i.test(avisoLead.text.body), avisoLead);
+  check('LC: queda marcado avisado en el doc', leadDoc && !!leadDoc.avisadoAt, leadDoc);
+
+  // -- un turno más, ya sobre el umbral: NO se repite el aviso (uno por cliente) --
+  r = await correrCerebro(msj({ texto: 'listo, ya casi' }));
+  check('LC: no reenvía el aviso una segunda vez', !r.some((m) => m.to === DUENO && /CLIENTE POTENCIAL/i.test((m.text || {}).body || '')), r);
+
+  // -- objeción de confianza también suma (no resta) --
+  await fsDel('tiendas/varman/botSesiones/' + TEST_WA2);
+  await fsDel('tiendas/varman/botLeads/' + TEST_WA2);
+  r = await correrCerebro(msj({ wa_id: TEST_WA2, texto: '¿es seguro? la semana pasada me estafaron' }));
+  leadDoc = await fsGet('tiendas/varman/botLeads/' + TEST_WA2);
+  check('LC: objeción de confianza suma (no resta) 2 pts', leadDoc && (leadDoc.senales || '').indexOf('objecion_confianza') >= 0 && leadDoc.pts === 2, leadDoc);
+
+  // -- contra entrega insistente SIN aceptar anticipado → bloqueado, no cuenta como lead --
+  await fsDel('tiendas/varman/botSesiones/' + TEST_WA2);
+  await fsSet('tiendas/varman/botLeads/' + TEST_WA2, { wa: TEST_WA2, pts: 0, senales: '', turnos: 0, ceVeces: 0 });
+  r = await correrCerebro(msj({ wa_id: TEST_WA2, nombre: 'ClienteBloqueado', texto: '¿manejan contra entrega en mi ciudad?' }));
+  r = await correrCerebro(msj({ wa_id: TEST_WA2, nombre: 'ClienteBloqueado', texto: 'pero yo solo pago contra entrega' }));
+  leadDoc = await fsGet('tiendas/varman/botLeads/' + TEST_WA2);
+  check('LC: 2ª insistencia en contra entrega sin aceptar anticipado → bloqueado', leadDoc && leadDoc.bloqueoPago === true, leadDoc);
+  check('LC: bloqueado no dispara el aviso aunque sume puntos', !r.some((m) => m.to === DUENO && /CLIENTE POTENCIAL/i.test((m.text || {}).body || '')), r);
+
+  console.log('== 27. LEAD-CALIENTE: comandos del 320 (calientes / tomar / soltar / link) ==');
+  r = await correrCerebro(msj({ wa_id: DUENO, texto: 'calientes' }));
+  const listaCalientes = r[0] && r[0].text && r[0].text.body || '';
+  check('LC: "calientes" lista al que cruzó el umbral', /CLIENTES POTENCIALES/i.test(listaCalientes) && listaCalientes.includes(TEST_WA), r[0]);
+  check('LC: "calientes" NO incluye al bloqueado por contra entrega (va aparte)', /pidieron contra entrega/i.test(listaCalientes) && listaCalientes.includes('ClienteBloqueado'), r[0]);
+
+  r = await correrCerebro(msj({ wa_id: DUENO, texto: 'tomar ' + TEST_WA }));
+  check('LC: "tomar" confirma y avisa que el flag de silencio está apagado', r.some((m) => /Listo, el bot se calla/i.test((m.text || {}).body || ''))
+    && r.some((m) => /silencio del bot está apagado/i.test((m.text || {}).body || '')), r);
+  let sesTomada = await fsGet('tiendas/varman/botSesiones/' + TEST_WA);
+  check('LC: "tomar" marca enHandoffAt en la sesión del cliente', sesTomada && !!sesTomada.enHandoffAt, sesTomada);
+
+  r = await correrCerebro(msj({ wa_id: DUENO, texto: 'soltar ' + TEST_WA }));
+  check('LC: "soltar" confirma', r.some((m) => /vuelve a atender/i.test((m.text || {}).body || '')), r);
+  sesTomada = await fsGet('tiendas/varman/botSesiones/' + TEST_WA);
+  check('LC: "soltar" borra enHandoffAt', sesTomada && !sesTomada.enHandoffAt, sesTomada);
+
+  r = await correrCerebro(msj({ wa_id: DUENO, texto: 'link' }));
+  check('LC: "link" sin parámetros → instrucciones de uso', r[0] && /link 07 38/.test(r[0].text.body), r[0]);
+
+  r = await correrCerebro(msj({ wa_id: DUENO, texto: 'link 99 38' }));
+  check('LC: "link" con ref inexistente → avisa, no revienta', r[0] && /No encontré la \*Ref 99\*/.test(r[0].text.body), r[0]);
+
+  r = await correrCerebro(msj({ wa_id: DUENO, texto: 'link 07 38 10' }));
+  check('LC: "link 07 38 10" trae el resumen con el 10% ya calculado', r[0] && r[0].text.body.includes('Ref 07')
+    && r[0].text.body.includes(fmtP(350000)) && /Descuento 10%/.test(r[0].text.body) && r[0].text.body.includes(fmtP(35000))
+    && r[0].text.body.includes(fmtP(315000)), r[0]);
+  check('LC: segunda burbuja es el mensaje YA REDACTADO para pegarle al cliente', r[1] && r[1].type === 'text'
+    && /link de pago/.test(r[1].text.body) && r[1].text.body.includes(fmtP(315000))
+    && r[1].text.body.includes('checkout.wompi.co'), r[1]);
+  const pedidoLinkPath = (r[0].text.body.match(/_Pedido: (.+)_/) || [])[1];
+  const pedidoLink = pedidoLinkPath ? await fsGet(pedidoLinkPath) : null;
+  check('LC: el pedido queda registrado ANTES de mandar el link (para que el webhook lo confirme)',
+    pedidoLink && pedidoLink.estado === 'pago_pendiente' && pedidoLink.ref === '07' && pedidoLink.total === 315000, pedidoLink);
+
+  // -- regresión flag OFF: todo vuelve a ser byte-idéntico a hoy --
+  delete ENV.BOT_LEAD_CALIENTE;
+  delete ENV.BOT_LEAD_UMBRAL;
+  await fsDel('tiendas/varman/botSesiones/' + TEST_WA);
+  await fsDel('tiendas/varman/botLeads/' + TEST_WA);
+  r = await correrCerebro(msj({ texto: '¿cómo hago el pago? tengo nequi, mi talla es 38' }));
+  leadDoc = await fsGet('tiendas/varman/botLeads/' + TEST_WA);
+  check('LC flag OFF: ni con señales fuertes se crea botLeads', leadDoc === null, leadDoc);
+  if (pedidoLinkPath) await fsDel(pedidoLinkPath);
+  await fsDel('tiendas/varman/botLeads/' + TEST_WA);
+  await fsDel('tiendas/varman/botLeads/' + TEST_WA2);
+  await fsDel('tiendas/varman/botSesiones/' + TEST_WA);
+  await fsDel('tiendas/varman/botSesiones/' + TEST_WA2);
+  await fsDel('tiendas/varman/botSesiones/' + DUENO);
+
+  console.log('== 28. ELIGE-PAGO: menú real de métodos en vez de asumir Wompi (flag BOT_ELIGE_PAGO) ==');
+  // Requiere modo conversa + pago-primero + Wompi configurado (el escenario
+  // real: fuera de Bogotá, con Wompi en la VM) — igual que el brief v10.3.
+  await fsDel('tiendas/varman/botSesiones/' + TEST_WA);
+  ENV.WOMPI_PUB_KEY = 'pub_test_x'; ENV.WOMPI_PRV_KEY = 'prv_test_x'; ENV.WOMPI_ENV = 'test'; ENV.WOMPI_EVENTS_SECRET = 'test_secret_123';
+  ENV.BOT_MODO_CONVERSA = 'on'; ENV.BOT_PAGO_PRIMERO = 'on';
+
+  // -- flag BOT_ELIGE_PAGO OFF: se conserva el comportamiento de hoy (asume
+  // Wompi y solo pide permiso para ESE link) --
+  r = await correrCerebro(msj({ texto: 'quiero la ref 07' }));
+  r = await correrCerebro(msj({ texto: 'sí' }));
+  r = await correrCerebro(msj({ texto: 'Cali' }));
+  r = await correrCerebro(msj({ texto: 'sí, los quiero' }));
+  check('flag OFF: sigue preguntando SOLO por el link de Wompi (texto, no menú)',
+    r.length === 1 && r[0].type === 'text' && /link de pago/i.test(r[0].text.body) && !r.some((m) => m.type === 'interactive'), r);
+  await fsDel('tiendas/varman/botSesiones/' + TEST_WA);
+
+  // -- flag ON: el cierre pregunta con el menú REAL de métodos --
+  ENV.BOT_ELIGE_PAGO = 'on';
+  r = await correrCerebro(msj({ texto: 'quiero la ref 07' }));
+  check('EP: saludo + pregunta por la ref detectada', r.some((m) => /muestro ese modelo/i.test((m.text || {}).body || '')), r);
+  r = await correrCerebro(msj({ texto: 'sí' }));
+  check('EP: muestra la ficha y pregunta la ciudad', r.some((m) => /ciudad/i.test(m.image ? m.image.caption : (m.text || {}).body || '')), r);
+  r = await correrCerebro(msj({ texto: 'Cali' }));
+  check('EP: acusa la ciudad y pregunta si los lleva', r.some((m) => /Cali/.test((m.text || {}).body || '')), r);
+  r = await correrCerebro(msj({ texto: 'sí, los quiero' }));
+  const menuPago = r.find((m) => m.type === 'interactive');
+  check('EP: en vez de asumir Wompi, muestra el MENÚ real (lista, 4 métodos: Nequi/Daviplata/Bre-B/Wompi)',
+    menuPago && menuPago.interactive.type === 'list'
+    && ['pay:nequi', 'pay:daviplata', 'pay:breb', 'pay:wompi'].every((id) =>
+      menuPago.interactive.action.sections[0].rows.some((row) => row.id === id)), menuPago);
+  check('EP: NO manda contra entrega (fuera de Bogotá)', !menuPago.interactive.action.sections[0].rows.some((row) => row.id === 'pay:contraentrega'), menuPago);
+  let sesEP = await fsGet('tiendas/varman/botSesiones/' + TEST_WA);
+  check('EP: la sesión queda esperando la elección del método', sesEP && sesEP.convEsperaMetodo === '1', sesEP);
+
+  // -- elige un método MANUAL (Nequi) tocando el botón: pide datos ANTES del
+  // comprobante (para no perder la dirección de envío) y avisa AL 320 YA,
+  // sin esperar la foto del comprobante --
+  r = await correrCerebro(msj({ tipo: 'interactive', inter_id: 'pay:nequi' }));
+  check('EP: pide nombre y dirección (no las instrucciones de pago todavía)', r.some((m) => /nombre completo/i.test((m.text || {}).body || '') && /direcci[oó]n/i.test((m.text || {}).body || '')), r);
+  const avisoMetodo = r.find((m) => m.to === DUENO && /eligi[oó] pagar por \*Nequi\*/i.test((m.text || {}).body || ''));
+  check('EP: avisa al 320 EN EL MOMENTO de elegir el método (antes del comprobante)', !!avisoMetodo, r);
+  check('EP: el aviso trae el modelo y la ciudad', avisoMetodo && /Jordan/i.test(avisoMetodo.text.body) && /Cali/.test(avisoMetodo.text.body), avisoMetodo);
+  sesEP = await fsGet('tiendas/varman/botSesiones/' + TEST_WA);
+  check('EP: la sesión pasó a "datos" con el método ya recordado', sesEP && sesEP.estado === 'datos' && sesEP.metodoClave === 'nequi', sesEP);
+
+  // -- da los datos: NO se le vuelve a preguntar el método (ya lo eligió) —
+  // va derecho a las instrucciones de pago de Nequi --
+  r = await correrCerebro(msj({ texto: 'Juana Pérez, Calle 5 # 10-20' }));
+  check('EP: al completar los datos, salta el menú y va DERECHO a las instrucciones de Nequi',
+    !r.some((m) => m.type === 'interactive') && r.some((m) => /Nequi/i.test((m.text || {}).body || '')), r);
+  sesEP = await fsGet('tiendas/varman/botSesiones/' + TEST_WA);
+  check('EP: sesión en "comprobante" con los datos de envío ya guardados', sesEP && sesEP.estado === 'comprobante' && /Juana P[eé]rez/i.test(sesEP.datosEnvio || ''), sesEP);
+  await fsDel('tiendas/varman/botSesiones/' + TEST_WA);
+
+  // -- elige Wompi desde el nuevo menú: sigue el camino de SIEMPRE (link ya,
+  // datos después) — no se toca nada de lo que ya vende --
+  r = await correrCerebro(msj({ texto: 'quiero la ref 07' }));
+  r = await correrCerebro(msj({ texto: 'sí' }));
+  r = await correrCerebro(msj({ texto: 'Cali' }));
+  r = await correrCerebro(msj({ texto: 'sí, los quiero' }));
+  r = await correrCerebro(msj({ tipo: 'interactive', inter_id: 'pay:wompi' }));
+  check('EP: Wompi desde el menú nuevo sigue mandando el link de una (camino de siempre)',
+    r.some((m) => /link de pago/i.test((m.text || {}).body || '')), r);
+  sesEP = await fsGet('tiendas/varman/botSesiones/' + TEST_WA);
+  check('EP: Wompi sigue difiriendo los datos (estado datosPost)', sesEP && sesEP.estado === 'datosPost', sesEP);
+
+  delete ENV.BOT_ELIGE_PAGO;
+  delete ENV.BOT_MODO_CONVERSA;
+  delete ENV.BOT_PAGO_PRIMERO;
+  delete ENV.WOMPI_PUB_KEY; delete ENV.WOMPI_PRV_KEY; delete ENV.WOMPI_ENV; delete ENV.WOMPI_EVENTS_SECRET;
+  await fsDel('tiendas/varman/botSesiones/' + TEST_WA);
+  for (const p of await fsRunQuery('pedidos', 20, 'creado')) {
+    if (p.cliente_wa === TEST_WA && p.canal === 'whatsapp-bot') await fsDel(p._path);
+  }
+
+  console.log('== 29. CIERRE-ASESOR: el bot califica, el dueño cierra (flag BOT_CIERRE_ASESOR) ==');
+  await fsDel('tiendas/varman/botSesiones/' + TEST_WA);
+  ENV.BOT_MODO_CONVERSA = 'on';
+  // flag OFF (línea base): el "sí" sigue arrancando el flujo de datos de siempre
+  r = await correrCerebro(msj({ texto: 'quiero la ref 07' }));
+  r = await correrCerebro(msj({ texto: 'sí' }));
+  r = await correrCerebro(msj({ texto: 'Bogotá' }));
+  check('flag OFF: el acuse de Bogotá es el de siempre y pregunta "¿Te gustaría llevarlos?"',
+    r.some((m) => /mismo día/i.test((m.text || {}).body || ''))
+    && r.some((m) => /Te gustaría llevarlos/i.test((m.text || {}).body || ''))
+    && !r.some((m) => /Procedemos a alistar/i.test((m.text || {}).body || '')), r);
+  r = await correrCerebro(msj({ texto: 'sí, los quiero' }));
+  check('flag OFF: sigue pidiendo los datos él mismo (no avisa CLIENTE LISTO)',
+    r.some((m) => /nombre completo/i.test((m.text || {}).body || ''))
+    && !r.some((m) => m.to === DUENO && /CLIENTE LISTO/i.test((m.text || {}).body || '')), r);
+  await fsDel('tiendas/varman/botSesiones/' + TEST_WA);
+  // flag ON: guion fijo → aviso al 320 → la conversación pasa al dueño
+  ENV.BOT_CIERRE_ASESOR = 'on'; ENV.BOT_SILENCIO_HANDOFF = 'on';
+  r = await correrCerebro(msj({ texto: 'quiero la ref 07' }));
+  r = await correrCerebro(msj({ texto: 'sí' }));
+  r = await correrCerebro(msj({ texto: 'Bogotá' }));
+  check('CA: el acuse de Bogotá INFORMA el contra entrega',
+    r.some((m) => /contra entrega/i.test((m.text || {}).body || '')), r);
+  check('CA: pregunta "¿Procedemos a alistar tu pedido?"',
+    r.some((m) => /Procedemos a alistar tu pedido/i.test((m.text || {}).body || '')), r);
+  r = await correrCerebro(msj({ texto: 'sí, los quiero' }));
+  const avisoCA = r.find((m) => m.to === DUENO && /CLIENTE LISTO PARA CERRAR/i.test((m.text || {}).body || ''));
+  check('CA: con el SÍ avisa al 320 (CLIENTE LISTO con modelo y ciudad)',
+    !!avisoCA && /Jordan/i.test(avisoCA.text.body) && /Bogotá/.test(avisoCA.text.body), r);
+  check('CA: al cliente le dice que un asesor le escribe (y NO pide datos ni pago)',
+    r.some((m) => m.to !== DUENO && /asistente virtual/i.test((m.text || {}).body || ''))
+    && !r.some((m) => m.to !== DUENO && /nombre completo|link de pago/i.test((m.text || {}).body || ''))
+    && !r.some((m) => m.type === 'interactive'), r);
+  let sesCA = await fsGet('tiendas/varman/botSesiones/' + TEST_WA);
+  check('CA: la sesión quedó en handoff (enHandoffAt puesto)', sesCA && !!sesCA.enHandoffAt, sesCA);
+  r = await correrCerebro(msj({ texto: 'listo, quedo atento' }));
+  check('CA: lo que el cliente escriba después se REENVÍA al 320 y el bot calla',
+    r.every((m) => m.to === DUENO)
+    && r.some((m) => /listo, quedo atento/i.test((m.text || {}).body || '')), r);
+  delete ENV.BOT_CIERRE_ASESOR; delete ENV.BOT_SILENCIO_HANDOFF; delete ENV.BOT_MODO_CONVERSA;
+  await fsDel('tiendas/varman/botSesiones/' + TEST_WA);
+
+  console.log('== 30. CIERRE-ASESOR-IA: el cerebro califica y el código traspasa (flags BOT_CEREBRO_IA + BOT_CIERRE_ASESOR) ==');
+  await fsDel('tiendas/varman/botSesiones/' + TEST_WA);
+  ENV.BOT_CEREBRO_IA = 'on'; ENV.BOT_CIERRE_ASESOR = 'on'; ENV.BOT_SILENCIO_HANDOFF = 'on';
+  // Gemini simulado con TEXTO crudo (cero gasto de saldo): lo que importa aquí
+  // es el DETECTOR determinista del sí y el traspaso, no la redacción del modelo.
+  mockGemini = 'Con gusto, ¿en qué ciudad estás ubicado? 😊';
+  r = await correrCerebro(msj({ texto: 'hola, quiero unos tenis' }));
+  check('CAI: el cerebro responde (texto del mock, sin plantillas viejas)',
+    r.some((m) => /en qué ciudad estás/i.test((m.text || {}).body || '')), r);
+  mockGemini = '¡Perfecto! En Bogotá pagas contra entrega. ¿Procedemos con el alistamiento de tu pedido? 😊';
+  r = await correrCerebro(msj({ texto: 'Bogotá' }));
+  check('CAI: pregunta el alistamiento (quedó en el historial para el detector)',
+    r.some((m) => /alistamiento de tu pedido/i.test((m.text || {}).body || '')), r);
+  mockGemini = 'ESTE TEXTO NO DEBE SALIR: el detector debe cortar antes de llamar a Gemini';
+  r = await correrCerebro(msj({ texto: 'sí' }));
+  const avisoCAI = r.find((m) => m.to === DUENO && /CLIENTE LISTO PARA CERRAR/i.test((m.text || {}).body || ''));
+  check('CAI: con el SÍ, el CÓDIGO avisa al 320 (CLIENTE LISTO, con la ciudad)',
+    !!avisoCAI && /Bogotá/.test(avisoCAI.text.body), r);
+  check('CAI: al cliente le dice que un asesor le escribe (y Gemini NO se llamó)',
+    r.some((m) => m.to !== DUENO && /asistente virtual/i.test((m.text || {}).body || ''))
+    && !r.some((m) => /NO DEBE SALIR/.test((m.text || {}).body || '')), r);
+  let sesCAI = await fsGet('tiendas/varman/botSesiones/' + TEST_WA);
+  check('CAI: la sesión quedó en handoff (enHandoffAt puesto)', sesCAI && !!sesCAI.enHandoffAt, sesCAI);
+  r = await correrCerebro(msj({ texto: 'listo, quedo atento' }));
+  check('CAI: lo que escriba después se REENVÍA al 320 y el bot calla',
+    r.every((m) => m.to === DUENO)
+    && r.some((m) => /listo, quedo atento/i.test((m.text || {}).body || '')), r);
+  mockGemini = null;
+  delete ENV.BOT_CEREBRO_IA; delete ENV.BOT_CIERRE_ASESOR; delete ENV.BOT_SILENCIO_HANDOFF;
+  await fsDel('tiendas/varman/botSesiones/' + TEST_WA);
+
   console.log('== Limpieza final de documentos de prueba ==');
   if (mPathE1[1]) {
     await fsDel(mPathE1[1]);
@@ -1630,7 +2277,19 @@ function check(nombre, cond, extra) {
       if (id.indexOf('wamidTEST') === 0 || id.indexOf('wamid_dup') === 0) await fsDel('tiendas/varman/botProcesados/' + id);
     }
   } catch (e) {}
-  await fsSet('tiendas/varman/botConfig/general', { pausado: false, actualizado: new Date().toISOString(), por: 'test-final' });
+  await fsSet('tiendas/varman/botConfig/general', Object.assign(
+    { pausado: false, actualizado: new Date().toISOString(), por: 'test-final' },
+    (cfgPrevio && cfgPrevio.refPauta) ? { refPauta: cfgPrevio.refPauta } : {}));
+  // [FOTO-REFS] restaurar el array refsFoto que el dueño tenga elegido en la
+  // app (el fsSet de arriba pisa el doc y el toFs del arnés no escribe arrays)
+  if (cfgPrevio && Array.isArray(cfgPrevio.refsFoto) && cfgPrevio.refsFoto.length) {
+    try {
+      await httpReal({ method: 'PATCH',
+        url: FS_BASE + '/tiendas/varman/botConfig/general?updateMask.fieldPaths=refsFoto',
+        headers: { Authorization: 'Bearer ' + await tokenAdmin() },
+        body: { fields: { refsFoto: { arrayValue: { values: cfgPrevio.refsFoto.map((x) => ({ stringValue: String(x) })) } } } } });
+    } catch (e) {}
+  }
 
   console.log('\n== RESULTADO: ' + ok + ' PASS · ' + mal + ' FAIL ==');
   process.exit(mal ? 1 : 0);

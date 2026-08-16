@@ -1,0 +1,131 @@
+============================================================
+ BOT VarMan Crew — v10.4 "BOGOTÁ NO SE PIERDE"   (2-ago-2026)
+============================================================
+
+QUÉ PASÓ (visto en vivo, 2-ago 4:49 pm):
+  Cliente: "Bogotá"
+  Bot:     "Para dejarlo agendado me confirmas tu nombre completo,
+            por favor."
+El cliente de Bogotá NUNCA supo que el envío es GRATIS ni que puede
+pagar CONTRA ENTREGA — que es EL argumento de venta allá.
+
+POR QUÉ (la causa real, no la aparente):
+NO era que faltara el texto. El texto existe y el bot SÍ lo estaba
+generando: la guarda [FIX-CONTRAENTREGA-GARANTIZADA] ya se lo había
+pegado al mensaje. El problema es que MÁS ABAJO corre otra guarda,
+[FIX-PROMESA-PEDIDO], que cuando el modelo promete un pedido que
+todavía no existe REEMPLAZA EL CUERPO ENTERO del mensaje por
+"Para dejarlo agendado me confirmas {falta}".
+Dos guardas peleando por el mismo mensaje: gana la última, y de paso
+borra la línea de Bogotá. Por eso el síntoma se veía intermitente.
+
+------------------------------------------------------------
+1) QUÉ CAMBIA
+------------------------------------------------------------
+a) Cuando esa reescritura ocurre en una conversación de Bogotá, la
+   línea de Bogotá se CONSERVA delante del pedido de dato:
+     "En Bogotá el envío va GRATIS, la entrega es el mismo día y
+      puedes pagar CONTRA ENTREGA (o anticipado por Wompi si
+      prefieres). Para dejarlo agendado me confirmas tu nombre
+      completo, por favor."
+
+b) NUEVO (pedido del dueño): cuando el cliente DESCONFÍA ("¿es
+   seguro?", "¿no me van a estafar?", "¿qué garantía tengo?"), el bot
+   responde la desconfianza con el contra entrega:
+     Bogotá  -> "Tranquilo, las fotos son REALES: nosotros mismos se
+                 las tomamos a los pares que tenemos aquí. Y en Bogotá
+                 el envío es CONTRA ENTREGA: recibes tu pedido, revisas
+                 la calidad y pagas ahí mismo."
+     Otra    -> "Tranquilo, las fotos son REALES: nosotros mismos se
+                 las tomamos a los pares que tenemos aquí. El contra
+                 entrega lo manejamos en Bogotá; para tu ciudad te
+                 grabamos un video del par real antes de enviarlo y te
+                 compartimos la guía de rastreo."
+   Sale UNA sola vez por conversación, y no sale si la respuesta del
+   bot ya lo decía por su cuenta.
+   El orden es a propósito: primero las fotos propias (responde "¿será
+   que esto existe?") y después el contra entrega (quita el riesgo del
+   dinero).
+
+>>> POR QUÉ SON DOS TEXTOS Y NO UNO <<<
+El contra entrega SOLO existe en Bogotá — es regla del negocio que ya
+estaba en el bot (`contraentregaSoloBogota`). Prometerle contra
+entrega a alguien de Pasto sería vender algo que después no se puede
+entregar, y ese cliente llega al momento del pago sintiéndose
+engañado. Si el dueño decide abrir el contra entrega a todo el país,
+se cambia la regla del negocio primero y el texto después.
+
+------------------------------------------------------------
+2) FLAG NUEVO (.env de la VM)
+------------------------------------------------------------
+  BOT_BOGOTA_CE=on
+
+Con el flag OFF (o ausente): todo byte-idéntico a como está hoy.
+
+OJO: esto solo aplica al camino del CEREBRO-IA (BOT_CEREBRO_IA=on).
+Si ese flag está apagado, el bot va por el flujo clásico y este
+arreglo no entra (el clásico ya dice lo de Bogotá por otro camino).
+
+------------------------------------------------------------
+3) CÓMO DESPLEGAR
+------------------------------------------------------------
+1. Subir del Escritorio a la VM:
+     bot-varman-PARA-SUBIR-v10.4-2026-08-03.json
+
+2. En la VM, dentro de ~/varman-bot:
+     mv ~/bot-varman-PARA-SUBIR-v10.4-2026-08-03.json workflows/bot-varman.json
+     ls -l workflows/bot-varman.json     # 1112917 bytes EXACTOS
+
+   OJO: NO dejar respaldos .json dentro de workflows/ — el script de
+   import se los traga todos y el último alfabéticamente gana. Los
+   respaldos van a workflows/respaldo/.
+
+3. Comprobar que sí es el nuevo:
+     grep -c confianzaCEBogota workflows/bot-varman.json
+   Tiene que dar 1 o más. Si da 0, el mv no se hizo: PARA.
+
+4. Agregar al .env:
+     BOT_BOGOTA_CE=on
+
+5. Reiniciar y reimportar:
+     docker compose up -d --force-recreate n8n
+     bash importar-workflows.sh
+   Si queda inactivo, darle "Publish" en bot.varmancrew.com.
+
+6. Esperar 3-5 min y comprobar:
+     bash verificar-salud.sh
+
+------------------------------------------------------------
+4) CÓMO PROBARLO (desde el 320, como cliente)
+------------------------------------------------------------
+  a) Pide un modelo -> di "Bogotá" -> la respuesta debe traer el
+     envío gratis + contra entrega, no solo "confírmame tu nombre".
+  b) Escribe "¿esto es seguro? no me vayan a estafar" -> debe
+     responder con el contra entrega (si dijiste Bogotá) o con el
+     video + guía (si dijiste otra ciudad).
+
+------------------------------------------------------------
+4-bis) LO QUE **NO** ESTÁ PROBADO — LÉELO
+------------------------------------------------------------
+La batería offline da 391 PASS · 0 FAIL, pero eso solo prueba que
+este cambio NO ROMPIÓ lo de antes. NO prueba que el arreglo funcione.
+
+Motivo: el arnés de pruebas NUNCA enciende BOT_CEREBRO_IA. Ningún
+test cubre el camino del cerebro de Gemini — que es justo el que está
+corriendo en producción y donde vive este arreglo. Cobertura real de
+ese camino: CERO, y así estaba desde antes de este cambio.
+
+Por eso los dos bloques nuevos van envueltos en try/catch: si algo
+falla, el cliente igual recibe su respuesta de siempre y el error
+queda registrado en el log de errores. Lo peor que puede pasar es que
+el arreglo no se note, no que el bot se quede mudo.
+
+PENDIENTE REAL (deuda técnica, anotarla): escribir pruebas offline
+del camino cerebro-IA con Gemini mockeado. Mientras no existan, todo
+cambio en ese camino se prueba EN VIVO y con el flag como rollback.
+
+------------------------------------------------------------
+5) ROLLBACK (1 paso)
+------------------------------------------------------------
+  BOT_BOGOTA_CE=off  en el .env  +  docker compose up -d --force-recreate n8n
+No toca ningún otro flag ni el resto del diálogo.

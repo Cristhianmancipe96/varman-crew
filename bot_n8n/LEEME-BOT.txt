@@ -61,8 +61,43 @@ Guía completa y lecciones del primer deploy real:
   - bot_n8n\deploy\GUIA-GCP.md
   - bot_n8n\briefs\RUNBOOK-DEPLOY-V6-2026-07-08.md
 
+**********************************************************
+  ¡¡ LEE ESTO ANTES DE SUBIR EL BOT !!  (pasó DOS veces)
+**********************************************************
+  EL ARCHIVO SUBIDO NO QUEDA EN workflows/. La consola SSH del navegador
+  lo deja en la CARPETA PERSONAL (~). Si no lo mueves, n8n importa el
+  bot-varman.json VIEJO que ya está en workflows/ y:
+      · el import corre PERFECTO, sin un solo error
+      · verificar-salud.sh da 7 bien · 0 fallos
+      · n8n queda en verde y el workflow publicado
+      · Y EL BOT SIGUE EXACTAMENTE IGUAL QUE ANTES.
+  No hay NADA que te avise. Se pierde la tarde probando un bot viejo
+  creyendo que es el nuevo (25-jul: dos veces seguidas; se descubrió
+  porque el bot-varman.json de workflows/ pesaba 873.599 bytes = v9.8,
+  mientras las DOS copias del v9.9 (914.037) seguían tiradas en ~).
+
+  SIEMPRE, sin excepción, entre el `mv` y el import:
+
+      grep -c mancipiola ~/varman-bot/workflows/bot-varman.json
+
+  Tiene que dar 1 o más. Si da 0, el archivo que vas a importar es el
+  viejo: PARA y arregla el mv. (Para versiones futuras, cambia
+  "mancipiola" por cualquier palabra que solo exista en la versión nueva
+  — un nombre de fix, un flag nuevo, lo que sea.)
+
+  Chequeo alterno igual de bueno: comparar el TAMAÑO del archivo en
+  workflows/ con el que dice el build al construir. Si no coinciden,
+  el mv no se hizo.
+
+  Y de vez en cuando limpia los sobrantes: en ~ se acumulan copias
+  PARA-SUBIR de meses anteriores y duplicados "_(1)" que la consola crea
+  cuando subes un nombre que ya existe. Entre más archivos parecidos,
+  más fácil mover el que no era.
+**********************************************************
+
 Puntos clave (VM e2-micro, 1 GB — es chica):
   - Subir archivos: SSH del navegador de GCP -> ⚙ -> "Subir archivo".
+    OJO: cae en ~, NO en workflows/ (ver el recuadro de arriba).
   - Recargar variables del .env: docker compose up -d --force-recreate n8n
     (un simple "up -d" NO recarga si el contenedor ya existe).
   - n8n 2.x: activar/desactivar workflows con publish:workflow /

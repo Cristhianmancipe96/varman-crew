@@ -1,0 +1,164 @@
+==========================================================
+  PASOS v6.9 — AVISOS QUE SÍ LLEGAN + REF DE LA PUBLICACIÓN
+  (2026-07-18 — para Cristhian; ~20 min en total)
+==========================================================
+
+POR QUÉ ESTA VERSIÓN (la falla de los reportes):
+  El bot (304) solo puede mandarte TEXTO LIBRE al 320 si TÚ le escribiste
+  al 304 en las últimas 24 horas ("ventana de 24h" de WhatsApp). Si no,
+  Meta ACEPTA el mensaje (n8n lo ve verde, devuelve id) pero NUNCA lo
+  entrega a tu celular. Por eso: miércoles no llegó, jueves sí (le habías
+  escrito el miércoles), viernes no. Lo mismo pasa con los reenvíos de
+  fotos de clientes y los avisos de venta.
+  LA SOLUCIÓN: una PLANTILLA APROBADA de WhatsApp — esas llegan SIEMPRE,
+  con o sin ventana. Se crea UNA vez en Meta (Paso 1) y el bot la usa
+  para TODOS los avisos que te manda (flag BOT_AVISO_PLANTILLA).
+
+  MIENTRAS APRUEBAN LA PLANTILLA (truco de hoy): escríbele cualquier cosa
+  al 304 una vez al día → esa noche sí te llega el resumen y los avisos.
+
+QUÉ TRAE v6.9 (todo detrás de flags, OFF por defecto):
+  1. BOT_AVISO_PLANTILLA  → avisos al 320 como plantilla (llegan siempre).
+  2. BOT_LOG_FALLOS       → si Meta NO entrega un mensaje, queda registrado
+                            en botErrores (visible en el resumen diario).
+                            Antes esa falla era 100% invisible.
+  3. BOT_REF_PAUTA        → "precio" / "quiero más información" responden
+                            con la referencia que TÚ eliges en la app
+                            (pestaña Tienda → "Bot: referencia de la
+                            publicación"). "Más información" primero
+                            pregunta si busca esa ref; el "sí" la muestra
+                            y sigue el pedido (foto + precio + talla).
+  4. BOT_SI_CATALOGO      → si el bot ofrece el catálogo y el cliente
+                            contesta "Si mil gracias" (o "claro", "dale"),
+                            se lo muestra de una (antes repetía la pregunta).
+  5. BOT_FOTO_REFS        → cliente manda FOTO: el bot le dice CLARO que es
+                            un bot y no puede ver imágenes, le muestra las
+                            referencias que TÚ marques en la app (fotos +
+                            lista desplegable para TOCAR la suya, cero
+                            errores de escritura) y pregunta si es una de
+                            esas. "Ninguna de estas" → asesor humano. La
+                            foto siempre se te reenvía al 320. Si no marcas
+                            ninguna ref en la app, se comporta como el
+                            punto 6.
+  6. Texto nuevo cuando la foto pasa al asesor (sin flag, va fijo): ya no
+     dice "no las tengo"; dice que un asesor lo atiende para terminar su
+     pedido. El reenvío de la foto al 320 sigue igual.
+
+----------------------------------------------------------
+PASO 1 — Crear la plantilla en Meta (5 min, una sola vez)
+----------------------------------------------------------
+  ✅ YA HECHO (18 jul): quedó creada como  aviso_bt  (con typo, da igual)
+     en idioma Spanish (COL) → código  es_CO. En revisión de Meta.
+     Por eso el .env del Paso 3 lleva EXACTO: aviso_bt + es_CO.
+     (Los pasos de abajo quedan de referencia para futuras plantillas.)
+
+  1. Entra a business.facebook.com → WhatsApp Manager (administrador de
+     WhatsApp) de la cuenta VarMan (WABA 1572485474895736)
+     → "Herramientas de la cuenta" → "Plantillas de mensajes" → CREAR.
+  2. Categoría:  UTILIDAD  (no Marketing).
+  3. Nombre:     aviso_bot     (así, en minúsculas, sin espacios)
+  4. Idioma:     Español  (a secas → el código queda "es". OJO: si eliges
+                 "Español (España)" el código sería es_ES y tocaría poner
+                 ese MISMO código en el .env del Paso 3).
+  5. Cuerpo (copia y pega tal cual, con las líneas en blanco). OJO: Meta NO
+     deja que la plantilla empiece o termine en la variable, por eso lleva la
+     línea fija "VarMan Crew 👟" al final. Y "Tipo de variable" queda en
+     "Número" (son las variables numeradas {{1}}, las que usa el bot):
+
+🤖 *Aviso del bot VarMan*
+
+{{1}}
+
+VarMan Crew 👟
+
+  6. Te pedirá un EJEMPLO de {{1}} — pega esto:
+     Nuevo pedido: Ref 51 · Talla 41 · $250.000 · Cliente Juan +573001234567
+  7. Sin encabezado, sin pie de página, sin botones. Enviar.
+  8. Aprobación: las de Utilidad suelen aprobarse en minutos (máx horas).
+     Te llega la notificación de Meta cuando esté "Activa".
+
+----------------------------------------------------------
+PASO 2 — Subir el bot v6.9 a la VM (como siempre)
+----------------------------------------------------------
+  - En tu Escritorio quedó:  bot-varman-PARA-SUBIR-v6.9-<fecha>.json
+    (el build borra los "PARA-SUBIR" viejos: el que veas es el correcto).
+  - Súbelo a la VM por el SSH del navegador de GCP (⚙ → "Subir archivo"),
+    renómbralo a bot-varman.json e impórtalo/actívalo como siempre
+    (respaldo del anterior en workflows/respaldo/ para rollback).
+
+----------------------------------------------------------
+PASO 3 — Variables nuevas en el .env de la VM (solo AGREGAR)
+----------------------------------------------------------
+  ⚠ NUNCA sobrescribir el .env: solo AGREGAR estas líneas al final.
+
+  # avisos al 320 como plantilla (enciéndelo cuando Meta APRUEBE la plantilla)
+  # OJO: el nombre y el idioma deben ser EXACTOS a como quedó en Meta:
+  # se creó como "aviso_bt" en Spanish (COL) → código es_CO
+  BOT_AVISO_PLANTILLA=on
+  WHATSAPP_PLANTILLA_AVISO=aviso_bt
+  WHATSAPP_PLANTILLA_IDIOMA=es_CO
+
+  # registrar fallos de entrega en botErrores (visible en el resumen diario)
+  BOT_LOG_FALLOS=on
+
+  # "precio"/"más información" → ref elegida en la app + "sí"→catálogo
+  BOT_REF_PAUTA=on
+  BOT_SI_CATALOGO=on
+
+  # foto del cliente → "soy un bot" + refs marcadas en la app en lista
+  BOT_FOTO_REFS=on
+
+  Luego recargar (un "up -d" a secas NO recarga variables):
+    docker compose up -d --force-recreate n8n
+  (n8n tarda 3-5 min en volver; el webhook ~1 min más.)
+
+----------------------------------------------------------
+PASO 4 — Publicar las reglas de Firestore (2 min)
+----------------------------------------------------------
+  El selector de la app guarda en botConfig y necesita la regla nueva.
+  El MISMO pegado ya incluye también al vendedor (pendiente del 15-jul):
+  1. console.firebase.google.com → proyecto varman-crew → Firestore → Reglas.
+  2. Borra todo y pega COMPLETO el bloque de app\reglas-firestore.txt.
+  3. Publicar.
+
+----------------------------------------------------------
+PASO 5 — Desplegar la app (Cloudflare Pages, como siempre)
+----------------------------------------------------------
+  La app tiene DOS controles nuevos en la pestaña Tienda (tarjeta "🤖 Bot"):
+  1. "Referencia de la publicación" (desplegable): la ref con la que el bot
+     responde "precio" / "quiero más información".
+  2. "📸 Cuando el cliente manda una foto" (chips para marcar, máx 9): las
+     refs que el bot ofrece en lista cuando recibe una foto.
+  Despliega la carpeta app\ como lo haces siempre y configúralas.
+
+----------------------------------------------------------
+PRUEBAS (desde un número que NO sea el 320, o el 320 mismo)
+----------------------------------------------------------
+  [ ] "precio"                → ficha (foto+precio) de la ref elegida + pide talla
+  [ ] "quiero más información"→ pregunta si buscas esa ref → responde "sí"
+                                → ficha + pide talla
+  [ ] manda una FOTO          → "soy un bot, no puedo ver imágenes" + fotos
+                                de las refs marcadas + lista para tocar la
+                                suya; tócala → arranca el pedido. "Ninguna
+                                de estas" → asesor. La foto te llega al 320.
+                                (Sin refs marcadas en la app: "un asesor te
+                                atiende para terminar tu pedido", como antes.)
+  [ ] "Si mil gracias" tras una oferta de catálogo → muestra el catálogo
+  [ ] PLANTILLA: pide "asesor" desde otro número SIN haberle escrito tú al
+      304 ese día → el aviso te debe llegar al 320 (como "Aviso del bot
+      VarMan"). Y el resumen de las 3:15am debe llegar TODOS los días.
+
+ROLLBACK (1 paso): pon en off el flag del cambio que moleste en el .env
+  (BOT_AVISO_PLANTILLA / BOT_REF_PAUTA / BOT_SI_CATALOGO / BOT_LOG_FALLOS /
+  BOT_FOTO_REFS)
+  y docker compose up -d --force-recreate n8n. El JSON anterior queda en
+  workflows\respaldo\bot-varman-v6.8.json.
+
+OJO:
+  - Si Meta rechaza el nombre aviso_bot o eliges otro idioma, ajusta
+    WHATSAPP_PLANTILLA_AVISO / WHATSAPP_PLANTILLA_IDIOMA con el nombre y
+    código EXACTOS de la plantilla aprobada.
+  - El reenvío de la FOTO del cliente al 320 sigue siendo texto libre
+    (una imagen no puede ir en plantilla): si la ventana está cerrada, la
+    foto puede no llegar, pero el AVISO con el número del cliente SÍ llega
+    (plantilla) y con eso puedes abrirle el chat.

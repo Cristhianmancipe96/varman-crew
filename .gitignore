@@ -35,3 +35,17 @@ desktop.ini
 
 # Local-only vault, never ship
 _ARCHIVO-NO-SUBIR/
+
+# Barridos de conversaciones: son los registros CRUDOS que salen de la VM.
+# Traen datos personales de clientes reales (nombres, teléfonos, direcciones) y
+# además credenciales vivas capturadas dentro de las peticiones HTTP que n8n
+# guarda con cada ejecución: verificado el 16-ago-2026, 1 llave de Gemini
+# (AIza…) y 4 tokens de Meta (EAA…). El repo es PÚBLICO: esto NUNCA entra.
+# Los barridos se guardan fuera del repo o en la carpeta de exportación de la VM.
+bot_n8n/barridos/
+
+# Local Búnker: la base del local del socio trae los precios de COMPRA de sus
+# 8 bodegas (datos de terceros, de otro negocio). Se usa una sola vez para
+# importarla desde la app y se regenera del Excel; no tiene por qué viajar al
+# repo — menos aún si algún día el repo se hace público como portafolio.
+data/bunker/

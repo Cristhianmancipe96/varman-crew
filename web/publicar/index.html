@@ -1198,6 +1198,94 @@ html[data-genero="caballero"]{
 .vm-compra-total b{color:var(--ink,#fff);}
 .vm-compra-seguro{font-size:11.5px;color:var(--ink-3,#8a8a92);margin-top:10px;line-height:1.5;}
 .vm-banner-gracias{position:fixed;left:50%;transform:translateX(-50%);bottom:24px;z-index:1100;background:var(--surf-3,#1c1c22);border:1px solid var(--brand,#ff6b00);color:var(--ink,#fff);padding:14px 18px;border-radius:14px;font-size:14px;max-width:92vw;box-shadow:0 16px 48px rgba(0,0,0,.5);}
+
+/* ── CARRITO (2026-07-18): comprar 2+ productos en un solo pago ──
+   Todo vive detrás de COMPRA_WOMPI, igual que la compra de un producto. */
+.vm-add-row{margin-top:14px;}
+.vm-add{width:100%;height:46px;border-radius:12px;border:1.5px solid var(--gacc,var(--brand,#ff6b00));background:transparent;color:var(--gacc,var(--brand,#ff6b00));font-family:'Bebas Neue',sans-serif;font-size:19px;letter-spacing:.06em;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:background .15s ease,color .15s ease;}
+.vm-add:hover{background:var(--gacc,var(--brand,#ff6b00));color:oklch(0.13 0.01 0);}
+.vm-add i{font-size:18px;}
+/* botón flotante del carrito (encima del de WhatsApp) */
+.vm-cart-fab{position:fixed;right:24px;bottom:96px;z-index:1000;width:56px;height:56px;border-radius:50%;border:none;background:var(--surf-3,#1c1c22);border:1.5px solid var(--brand,#ff6b00);color:var(--brand,#ff6b00);font-size:24px;cursor:pointer;display:none;align-items:center;justify-content:center;box-shadow:0 8px 28px rgba(0,0,0,.45);transition:transform .15s ease;}
+.vm-cart-fab.on{display:flex;}
+.vm-cart-fab:hover{transform:scale(1.08);}
+.vm-cart-badge{position:absolute;top:-4px;right:-4px;min-width:22px;height:22px;padding:0 5px;border-radius:11px;background:var(--brand,#ff6b00);color:var(--ink-on-brand,#111);font-size:12px;font-weight:800;font-family:inherit;display:flex;align-items:center;justify-content:center;}
+/* panel del carrito */
+.vm-cart{position:fixed;inset:0;z-index:1200;display:none;}
+.vm-cart.on{display:block;}
+.vm-cart-overlay{position:absolute;inset:0;background:rgba(0,0,0,.66);backdrop-filter:blur(3px);}
+.vm-cart-box{position:absolute;right:0;top:0;bottom:0;width:min(440px,100vw);background:var(--surf,#121216);border-left:1px solid var(--border,rgba(255,255,255,.12));display:flex;flex-direction:column;box-shadow:-16px 0 48px rgba(0,0,0,.5);}
+@media(max-width:520px){.vm-cart-box{width:100vw;}}
+.vm-cart-head{display:flex;align-items:center;justify-content:space-between;padding:18px 20px;border-bottom:1px solid var(--border,rgba(255,255,255,.1));}
+.vm-cart-head h3{font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:.06em;margin:0;color:var(--ink,#fff);}
+.vm-cart-close{background:none;border:none;color:var(--ink-2,#b8b8c0);font-size:30px;line-height:1;cursor:pointer;padding:0 4px;}
+.vm-cart-body{flex:1;overflow-y:auto;padding:16px 20px;}
+.vm-cart-vacio{color:var(--ink-3,#8a8a92);font-size:14px;text-align:center;padding:40px 10px;line-height:1.7;}
+.vm-cart-item{display:flex;gap:12px;padding:12px 0;border-bottom:1px solid var(--border,rgba(255,255,255,.08));}
+.vm-cart-item img{width:64px;height:64px;object-fit:cover;border-radius:10px;background:var(--surf-2,#0e0e12);flex:0 0 64px;}
+.vm-cart-it-info{flex:1;min-width:0;}
+.vm-cart-it-tit{font-weight:800;font-size:14px;color:var(--ink,#fff);}
+.vm-cart-it-sub{font-size:12px;color:var(--ink-2,#b8b8c0);margin-top:3px;}
+.vm-cart-it-pre{font-size:13px;color:var(--ink,#fff);font-weight:700;margin-top:5px;}
+.vm-cart-it-row{display:flex;align-items:center;gap:8px;margin-top:8px;}
+.vm-cart-it-row button{width:30px;height:30px;border-radius:8px;border:1.5px solid var(--border,rgba(255,255,255,.14));background:transparent;color:var(--ink,#fff);font-size:16px;line-height:1;cursor:pointer;}
+.vm-cart-it-row button:hover{border-color:var(--brand,#ff6b00);}
+.vm-cart-it-n{min-width:22px;text-align:center;font-weight:800;font-size:14px;color:var(--ink,#fff);}
+.vm-cart-quitar{margin-left:auto;background:none;border:none!important;color:var(--ink-3,#8a8a92)!important;font-size:12px!important;width:auto!important;cursor:pointer;text-decoration:underline;}
+.vm-cart-quitar:hover{color:#ff8a8a!important;}
+.vm-cart-foot{border-top:1px solid var(--border,rgba(255,255,255,.1));padding:16px 20px;}
+.vm-cart-total{display:flex;justify-content:space-between;align-items:baseline;font-size:15px;color:var(--ink-2,#b8b8c0);margin-bottom:12px;}
+.vm-cart-total b{color:var(--ink,#fff);font-size:19px;}
+.vm-cart-ir{width:100%;height:52px;border-radius:12px;border:none;background:var(--brand,#ff6b00);color:var(--ink-on-brand,#111);font-family:'Bebas Neue',sans-serif;font-size:21px;letter-spacing:.06em;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;}
+.vm-cart-ir:hover{background:var(--brand-hover,#ff8124);}
+.vm-cart-ir:disabled{opacity:.65;cursor:default;}
+.vm-cart-form{display:none;margin-top:14px;}
+.vm-cart-form.abierto{display:block;}
+.vm-cart-form label{display:block;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-2,#b8b8c0);margin:10px 0 5px;}
+.vm-cart-form input,.vm-cart-form textarea{width:100%;background:var(--surf-2,#0e0e12);border:1.5px solid var(--border,rgba(255,255,255,.12));border-radius:10px;color:var(--ink,#fff);padding:11px 12px;font-size:15px;font-family:inherit;resize:vertical;}
+.vm-cart-form input:focus,.vm-cart-form textarea:focus{border-color:var(--brand,#ff6b00);outline:none;}
+.vm-cart-err{display:none;color:#ff8a8a;font-size:12.5px;font-weight:600;margin:10px 0 0;}
+.vm-cart-err.on{display:block;}
+/* avisito "agregado al carrito" */
+.vm-toast{position:fixed;left:50%;transform:translateX(-50%);bottom:24px;z-index:1300;background:var(--surf-3,#1c1c22);border:1px solid var(--brand,#ff6b00);color:var(--ink,#fff);padding:12px 18px;border-radius:12px;font-size:14px;max-width:92vw;box-shadow:0 12px 36px rgba(0,0,0,.5);}
+
+/* ── [AUDIT móvil 2026-07-18] la página NO se puede arrastrar de lado: los
+   decorados anchos (marquesina, palabra del hero) quedan recortados en vez de
+   ensanchar el layout (en 375px el layout se estiraba a 411px y todo, incluido
+   el botón del menú, quedaba corrido). `clip` no crea scroller; `hidden` es el
+   fallback para navegadores viejos. ── */
+html,body{overflow-x:hidden;overflow-x:clip;}
+
+/* ── Placas DAMA/CABALLERO: foco accesible + contador de modelos ── */
+.gen-opt:focus-visible{outline:2px solid var(--ga);outline-offset:3px;}
+.gen-count{font-weight:800;}
+/* barra de estado del filtro: SIEMPRE se sabe qué se está viendo y cómo volver */
+.vm-filtro-estado{display:none;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 var(--s4,16px);padding:10px 14px;background:var(--surf-1,#15151a);border:1.5px solid color-mix(in oklab, var(--gacc-estado,var(--brand,#ff6b00)), transparent 55%);border-radius:12px;font-size:13px;color:var(--ink,#fff);}
+.vm-filtro-estado.on{display:flex;}
+.vm-filtro-estado b{color:var(--gacc-estado,var(--brand,#ff6b00));}
+.vm-filtro-quitar{margin-left:auto;min-height:34px;padding:6px 14px;border-radius:99px;border:1.5px solid var(--border,rgba(255,255,255,.14));background:transparent;color:var(--ink,#fff);font-size:12.5px;font-weight:700;cursor:pointer;transition:border-color .15s ease,background .15s ease;}
+.vm-filtro-quitar:hover{border-color:var(--gacc-estado,var(--brand,#ff6b00));background:color-mix(in oklab, var(--gacc-estado,var(--brand,#ff6b00)), transparent 88%);}
+
+/* ── Franja "envío GRATIS" (modal, formulario y carrito) ── */
+.vm-envio{display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:10px;background:color-mix(in oklab, var(--brand,#ff6b00), transparent 88%);border:1px solid color-mix(in oklab, var(--brand,#ff6b00), transparent 70%);color:var(--ink,#fff);font-size:13px;line-height:1.4;margin-bottom:14px;}
+.vm-envio b{color:var(--brand,#ff6b00);}
+
+/* ── Carrito: pulido móvil (2026-07-18) ── */
+.vm-cart-fab{right:18px;bottom:88px;width:58px;height:58px;}
+.vm-cart.on .vm-cart-box{animation:vmCartIn .32s cubic-bezier(0.22,1,0.36,1);}
+.vm-cart.on .vm-cart-overlay{animation:vmCartFade .25s ease;}
+@keyframes vmCartIn{from{transform:translateX(48px);opacity:0}to{transform:none;opacity:1}}
+@keyframes vmCartFade{from{opacity:0}to{opacity:1}}
+.vm-cart-close{width:44px;height:44px;display:flex;align-items:center;justify-content:center;}
+.vm-cart-foot{padding:16px 20px calc(16px + env(safe-area-inset-bottom, 0px));}
+.vm-cart-it-cu{color:var(--ink-2,#b8b8c0);font-weight:600;font-size:11.5px;}
+.vm-cart-badge.pop{animation:vmBadgePop .3s cubic-bezier(0.22,1,0.36,1);}
+@keyframes vmBadgePop{from{transform:scale(.55)}to{transform:scale(1)}}
+.vm-cart-vercat{margin-top:14px;padding:12px 20px;border-radius:11px;border:1.5px solid var(--brand,#ff6b00);background:transparent;color:var(--brand,#ff6b00);font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:.06em;cursor:pointer;}
+.vm-cart-vercat:hover{background:var(--brand,#ff6b00);color:var(--ink-on-brand,#111);}
+@media (prefers-reduced-motion: reduce){
+  .vm-cart.on .vm-cart-box,.vm-cart.on .vm-cart-overlay,.vm-cart-badge.pop{animation:none;}
+}
 </style>
 </head>
 <body>
@@ -1375,6 +1463,10 @@ document.documentElement.classList.add('no-gsap');
       <span class="gen-x" aria-hidden="true">✕</span>
     </button>
   </div>
+  <!-- Barra de estado del filtro (2026-07-18): cuando hay un filtro activo
+       (género y/o categoría) dice QUÉ se está viendo, cuántos modelos hay y
+       cómo volver a verlo todo — para que nadie "se pierda" buscando. -->
+  <div class="vm-filtro-estado" id="vm-filtro-estado" role="status" aria-live="polite"></div>
   <div class="prod-grid">
     <div class="prod-card" data-cat="deportivas" role="button" tabindex="0" aria-label="Ver Deportivas, $259.900 COP">
       <div class="prod-img prod-carousel">
@@ -2204,7 +2296,49 @@ function applyFilter(cat) {
     document.querySelector('.prod-grid').after(empty);
   }
   empty.style.display = visibles === 0 ? 'block' : 'none';
+  actualizarEstadoFiltro(cat, visibles);
 }
+/* [2026-07-18] las placas dicen CUÁNTOS modelos hay y la barra de estado dice
+   QUÉ se está viendo y cómo volver a todo — nadie se pierde filtrando. */
+const ETIQ_CAT = { deportivas: 'Deportivas', casuales: 'Casuales', urbanas: 'Urbanas' };
+function cuentaGenero(g) {
+  let n = 0;
+  document.querySelectorAll('.prod-card').forEach(c => {
+    const cg = (c.dataset.genero || '').toLowerCase();
+    if (!cg || cg === 'unisex' || cg === g) n++;
+  });
+  return n;
+}
+function pintarContadoresGenero() {
+  document.querySelectorAll('.g-btn').forEach(b => {
+    const sub = b.querySelector('.gen-sub');
+    if (!sub) return;
+    if (!sub.dataset.base) sub.dataset.base = sub.textContent.trim();
+    const n = cuentaGenero(b.dataset.gfilter);
+    sub.innerHTML = sub.dataset.base + ' · <span class="gen-count">' + n + '</span> modelos';
+  });
+}
+window.vmPintarContadoresGenero = pintarContadoresGenero; // la hidratación del catálogo la re-llama
+function actualizarEstadoFiltro(cat, visibles) {
+  const box = document.getElementById('vm-filtro-estado');
+  if (!box) return;
+  const hayGen = vmGenero !== 'todos';
+  const hayCat = cat !== 'todos';
+  if (!hayGen && !hayCat) { box.classList.remove('on'); box.innerHTML = ''; return; }
+  const partes = [];
+  if (hayGen) partes.push('<b>' + (vmGenero === 'dama' ? 'Dama' : 'Caballero') + '</b>');
+  if (hayCat) partes.push(hayGen ? ETIQ_CAT[cat] : '<b>' + ETIQ_CAT[cat] + '</b>');
+  box.style.setProperty('--gacc-estado',
+    vmGenero === 'dama' ? 'oklch(0.70 0.17 356)'
+    : vmGenero === 'caballero' ? 'oklch(0.66 0.14 240)' : 'var(--brand)');
+  box.innerHTML = '👟 Viendo: ' + partes.join(' · ') + ' — ' + visibles + (visibles === 1 ? ' modelo' : ' modelos')
+    + ' <button type="button" class="vm-filtro-quitar" id="vm-filtro-quitar">Ver todo ✕</button>';
+  box.classList.add('on');
+}
+document.addEventListener('click', (e) => {
+  if (e.target.closest('#vm-filtro-quitar')) { setGenero('todos'); applyFilter('todos'); }
+});
+pintarContadoresGenero();
 function catActiva() {
   const act = document.querySelector('.f-btn.active:not(.g-btn)');
   return (act && act.dataset.filter) || 'todos';
@@ -2267,8 +2401,13 @@ hamburger.addEventListener('click', () => {
 });
 function closeMobileMenu() {
   hamburger.classList.remove('open');
-  mobileMenu.classList.remove('open');
-  document.body.style.overflow = '';
+  // [AUDIT 2026-07-18] solo restaurar el scroll si el MENÚ era quien lo tenía
+  // bloqueado: este cierre corre con CUALQUIER clic de la página y antes
+  // des-bloqueaba el fondo del modal de compra y del carrito abiertos.
+  if (mobileMenu.classList.contains('open')) {
+    mobileMenu.classList.remove('open');
+    document.body.style.overflow = '';
+  }
 }
 document.addEventListener('click', (e) => {
   if (!nav.contains(e.target) && !mobileMenu.contains(e.target)) closeMobileMenu();
@@ -2357,6 +2496,9 @@ if (contactForm && submitBtn) {
       <p class="vm-modal-desc"></p>
       <!-- Compra web (Wompi): visible solo con COMPRA_WOMPI = true -->
       <div class="vm-compra" id="vm-compra" hidden>
+        <!-- Envío gratis SIEMPRE visible al abrir un producto (pedido del
+             dueño 2026-07-18): que el cliente lo vea antes de decidir. -->
+        <div class="vm-envio">🚚 <b>Envío GRATIS</b>&nbsp;a todo el país 🇨🇴</div>
         <!-- Solo para referencias UNISEX: el cliente elige para quién es.
              Cambia la conversión de tallas y viaja en el pedido. -->
         <div class="vm-gensel" id="vm-gensel" hidden>
@@ -2382,6 +2524,11 @@ if (contactForm && submitBtn) {
           <span class="vm-cant-n" id="vm-cant-n">1</span>
           <button type="button" id="vm-cant-mas" aria-label="Una más">+</button>
         </div>
+        <!-- [CARRITO] agregar y seguir viendo (para llevar 2+ productos en un
+             solo pago). Se oculta al abrir el formulario de datos. -->
+        <div class="vm-add-row" id="vm-add-row">
+          <button type="button" class="vm-add" id="vm-add"><i class="ti ti-shopping-cart-plus"></i> Agregar al carrito</button>
+        </div>
         <div class="vm-compra-err" id="vm-compra-err" role="alert"></div>
         <form class="vm-compra-form" id="vm-compra-form" novalidate>
           <label for="vc-nombre">Tu nombre</label>
@@ -2405,11 +2552,61 @@ if (contactForm && submitBtn) {
           </div>
           <label for="vc-direccion">Dirección de envío (ciudad y barrio)</label>
           <textarea id="vc-direccion" name="direccion" rows="2" maxlength="400"></textarea>
+          <!-- también DENTRO del formulario: en el móvil la franja de arriba ya
+               quedó fuera de pantalla cuando el cliente está pagando -->
+          <div class="vm-envio" style="margin:12px 0 0;">🚚 <b>Envío GRATIS</b>&nbsp;a todo el país — ya va incluido</div>
           <div class="vm-compra-total" id="vm-compra-total"></div>
           <div class="vm-compra-seguro">🔒 Pago seguro con <b>Wompi</b> (Bancolombia): tarjeta, PSE o Nequi. No guardamos datos de tu tarjeta.</div>
         </form>
       </div>
       <button class="vm-modal-wa js-wa" data-ref="" data-precio=""><i class="ti ti-brand-whatsapp"></i> Pedir por WhatsApp</button>
+    </div>
+  </div>
+</div>
+<!-- [CARRITO 2026-07-18] botón flotante + panel. Solo se muestran con
+     COMPRA_WOMPI = true y con algo dentro; con la bandera en false quedan
+     inertes (el script del carrito ni arranca) = rollback total. -->
+<button class="vm-cart-fab" id="vm-cart-fab" aria-label="Ver mi carrito" title="Mi carrito">
+  <i class="ti ti-shopping-cart"></i>
+  <span class="vm-cart-badge" id="vm-cart-badge">0</span>
+</button>
+<div class="vm-cart" id="vm-cart" aria-hidden="true">
+  <div class="vm-cart-overlay" data-cart-close></div>
+  <div class="vm-cart-box" role="dialog" aria-modal="true" aria-label="Mi carrito">
+    <div class="vm-cart-head">
+      <h3>Mi carrito</h3>
+      <button class="vm-cart-close" data-cart-close aria-label="Cerrar carrito">&times;</button>
+    </div>
+    <div class="vm-cart-body" id="vm-cart-body"></div>
+    <div class="vm-cart-foot">
+      <div class="vm-envio" style="margin-bottom:10px;">🚚 <b>Envío GRATIS</b>&nbsp;a todo el país — incluido</div>
+      <div class="vm-cart-total" id="vm-cart-total"></div>
+      <button class="vm-cart-ir" id="vm-cart-ir"><i class="ti ti-lock"></i> Ir a pagar</button>
+      <form class="vm-cart-form" id="vm-cart-form" novalidate>
+        <label for="vk-nombre">Tu nombre</label>
+        <input id="vk-nombre" name="nombre" autocomplete="name" maxlength="80">
+        <label for="vk-celular">WhatsApp (para coordinar el envío)</label>
+        <div class="vm-tel-row">
+          <select id="vk-prefijo" aria-label="Código de país">
+            <option value="57" selected>🇨🇴 +57</option>
+            <option value="1">🇺🇸 +1</option>
+            <option value="34">🇪🇸 +34</option>
+            <option value="52">🇲🇽 +52</option>
+            <option value="58">🇻🇪 +58</option>
+            <option value="593">🇪🇨 +593</option>
+            <option value="51">🇵🇪 +51</option>
+            <option value="507">🇵🇦 +507</option>
+            <option value="56">🇨🇱 +56</option>
+            <option value="54">🇦🇷 +54</option>
+            <option value="55">🇧🇷 +55</option>
+          </select>
+          <input id="vk-celular" name="celular" type="tel" inputmode="numeric" autocomplete="tel" placeholder="3XX XXX XXXX" maxlength="17">
+        </div>
+        <label for="vk-direccion">Dirección de envío (ciudad y barrio)</label>
+        <textarea id="vk-direccion" name="direccion" rows="2" maxlength="400"></textarea>
+        <div class="vm-compra-seguro">🔒 Pago seguro con <b>Wompi</b> (Bancolombia): tarjeta, PSE o Nequi. No guardamos datos de tu tarjeta.</div>
+      </form>
+      <div class="vm-cart-err" id="vm-cart-err" role="alert"></div>
     </div>
   </div>
 </div>
@@ -2558,12 +2755,20 @@ document.addEventListener('click', function(e){
         esta página NUNCA marca nada como pagado. Ver web/NOTA-WEB-COMPRA-WOMPI-2026-07-11.md.
    OFF: este bloque queda inerte y los botones vuelven a WhatsApp (rollback total). */
 (function(){
-  var TALLAS_DEF = '35-45';      // por defecto hombre/unisex (colombiano)
+  // [2026-07-18] tope REAL del negocio: EU 44. Hombre EU = CO + 2 → CO máx 42
+  // (antes 35-45 ofrecía hasta EU 47, tallas que no llegan). Dama EU = CO + 1
+  // → 34-41 = EU 35-42, dentro del tope. Una ref con tallas propias en la app
+  // usa las suyas (el dueño manda).
+  var TALLAS_DEF = '35-42';      // por defecto hombre/unisex (CO; EU 37-44)
   var TALLAS_DEF_DAMA = '34-41'; // por defecto dama (CO; EU 35-42)
   var $ = function(id){ return document.getElementById(id); };
   var box = $('vm-compra'), chips = $('vm-tallas'), err = $('vm-compra-err');
   var form = $('vm-compra-form'), totalEl = $('vm-compra-total'), cantEl = $('vm-cant-n');
   var eqEl = $('vm-talla-eq');
+  // [CARRITO] botón "Agregar al carrito" + datos de la tarjeta abierta (foto y
+  // categoría) para pintar bonito la línea del carrito.
+  var addRow = $('vm-add-row'), btnAdd = $('vm-add');
+  var catSel = '', fotoSel = '';
   var btnModal = document.querySelector('.vm-modal-wa');
   if (!window.COMPRA_WOMPI || !box || !chips || !form || !btnModal) return;
 
@@ -2643,7 +2848,7 @@ document.addEventListener('click', function(e){
       : 'oklch(0.75 0.14 160)');
   }
   // recalcula las tallas del producto según el género vigente (para unisex sin
-  // tallas propias: dama 34-41, hombre 35-45). Conserva la talla si sigue válida.
+  // tallas propias: dama 34-41, hombre 35-42). Conserva la talla si sigue válida.
   function recalcularTallas(tallasProp){
     tallasAct = expandTallas(tallasProp) || expandTallas(esDama() ? TALLAS_DEF_DAMA : TALLAS_DEF);
     if (tallasAct.indexOf(selTalla) === -1) selTalla = '';
@@ -2659,6 +2864,11 @@ document.addEventListener('click', function(e){
     generoSel = String(card.getAttribute('data-genero') || '').toLowerCase();
     esUnisex = !(generoSel === 'dama' || generoSel === 'caballero');
     generoPick = '';
+    // [CARRITO] categoría y foto de la tarjeta (solo para mostrar en el carrito)
+    var catEl = card.querySelector('.prod-cat');
+    catSel = catEl ? catEl.textContent.trim() : '';
+    var imgEl = card.querySelector('.prod-img img');
+    fotoSel = imgEl ? imgEl.getAttribute('src') || '' : '';
     var tallasProp = card.getAttribute('data-tallas');
     // selector "¿para quién?": solo en unisex; arranca sin elegir
     if (genselBox){
@@ -2671,10 +2881,28 @@ document.addEventListener('click', function(e){
     recalcularTallas(tallasProp);
     acentoModal();
     form.classList.remove('abierto');
+    if (addRow) addRow.style.display = '';   // [CARRITO] vuelve a verse al abrir otro producto
     box.hidden = false;
     limpiarErr(); total();
     setBtn('<i class="ti ti-shopping-bag"></i> Comprar', false);
   };
+
+  // [CARRITO] "Agregar al carrito": mismas validaciones que comprar (género en
+  // unisex + talla), pero en vez de ir al pago guarda la línea y cierra el
+  // modal para que el cliente siga mirando. El pago de TODO va desde el panel.
+  if (btnAdd) btnAdd.addEventListener('click', function(){
+    limpiarErr();
+    if (esUnisex && !generoPick){ mostrarErr('Elige si es para dama o caballero \u{1F45F}'); return; }
+    if (!selTalla){ mostrarErr('Elige tu talla primero \u{1F45F}'); return; }
+    if (!window.vmCartAgregar) return;
+    var ok = window.vmCartAgregar({
+      ref: refSel, talla: selTalla, cantidad: cant, genero: generoFinal(),
+      precio: precioSel, cat: catSel, foto: fotoSel
+    });
+    if (!ok) return;
+    var cerrarBtn = document.querySelector('#vm-modal [data-close]');
+    if (cerrarBtn) cerrarBtn.click();   // cierra el modal como siempre (misma lógica)
+  });
 
   // botones "¿para quién?" (solo en productos unisex)
   if (genselBox) genselBox.addEventListener('click', function(e){
@@ -2716,6 +2944,8 @@ document.addEventListener('click', function(e){
     if (!form.classList.contains('abierto')){
       form.classList.add('abierto');
       formAbiertoEn = Date.now();
+      // [CARRITO] ya está pagando ESTE producto: el botón de agregar estorba
+      if (addRow) addRow.style.display = 'none';
       setBtn('<i class="ti ti-lock"></i> Ir a pagar', false);
       total();
       var n = $('vc-nombre'); if (n) n.focus();
@@ -2778,6 +3008,189 @@ document.addEventListener('click', function(e){
       if (window.history && history.replaceState) history.replaceState(null, '', location.pathname);
     }
   } catch(e){}
+})();
+
+/* ─── CARRITO (2026-07-18): llevar 2+ productos en un solo pago ───────────
+   El cliente puede "Agregar al carrito" desde el modal y seguir mirando; al
+   final paga TODO junto con un solo link de Wompi (/api/comprar con `items`).
+   El carrito vive en localStorage (sobrevive recargas). El precio que se ve
+   aquí es solo informativo: el que COBRA lo calcula el worker leyendo el
+   catálogo real. Con COMPRA_WOMPI=false este bloque no arranca (rollback). */
+(function(){
+  var $ = function(id){ return document.getElementById(id); };
+  var fab = $('vm-cart-fab'), badge = $('vm-cart-badge'), panel = $('vm-cart');
+  var body = $('vm-cart-body'), totalEl = $('vm-cart-total'), btnIr = $('vm-cart-ir');
+  var form = $('vm-cart-form'), err = $('vm-cart-err');
+  if (!window.COMPRA_WOMPI || !fab || !panel || !body) return;
+
+  var LS = 'vm_carrito_v1';
+  var items = [];          // { ref, talla, cantidad, genero, precio, cat, foto }
+  var enviando = false;    // una sola petición de pago a la vez
+  var abiertoEn = 0;       // guard del doble clic al abrir el formulario
+
+  function guardar(){ try { localStorage.setItem(LS, JSON.stringify(items)); } catch(e){} }
+  function cargar(){
+    try {
+      var x = JSON.parse(localStorage.getItem(LS) || '[]');
+      if (Array.isArray(x)) items = x.filter(function(i){ return i && i.ref && i.talla; }).slice(0, 8);
+    } catch(e){ items = []; }
+  }
+  function pares(){ return items.reduce(function(a,i){ return a + (Number(i.cantidad)||1); }, 0); }
+  function totalCOP(){ return items.reduce(function(a,i){ return a + (Number(i.precio)||0) * (Number(i.cantidad)||1); }, 0); }
+  function fmtCOP(n){ try { return '$ ' + Number(n).toLocaleString('es-CO') + ' COP'; } catch(e){ return '$ ' + n; } }
+  function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
+    return ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[c]; }); }
+
+  function toast(msj){
+    var t = document.createElement('div');
+    t.className = 'vm-toast'; t.setAttribute('role','status'); t.innerHTML = msj;
+    document.body.appendChild(t);
+    setTimeout(function(){ if (t.parentNode) t.parentNode.removeChild(t); }, 2600);
+  }
+  function mostrarErr(m){ err.textContent = m; err.classList.add('on'); }
+  function limpiarErr(){ err.textContent = ''; err.classList.remove('on'); }
+
+  function pintar(){
+    badge.textContent = pares();
+    // pop sutil del contador cada vez que cambia (reduced-motion lo apaga)
+    badge.classList.remove('pop'); void badge.offsetWidth; badge.classList.add('pop');
+    fab.classList.toggle('on', items.length > 0);
+    if (!items.length){
+      body.innerHTML = '<div class="vm-cart-vacio">Tu carrito está vacío 🛒<br>Elige un modelo, su talla y toca <b>«Agregar al carrito»</b>.'
+        + '<br><button type="button" class="vm-cart-vercat" id="vm-cart-vercat">Ver el catálogo 👟</button></div>';
+      totalEl.innerHTML = '';
+      btnIr.style.display = 'none';
+      form.classList.remove('abierto');
+      return;
+    }
+    btnIr.style.display = '';
+    var html = '';
+    items.forEach(function(i, idx){
+      var cantI = Number(i.cantidad) || 1;
+      var precioI = Number(i.precio) || 0;
+      html += '<div class="vm-cart-item">'
+        + (i.foto ? '<img src="' + esc(i.foto) + '" alt="">' : '<img alt="">')
+        + '<div class="vm-cart-it-info">'
+        + '<div class="vm-cart-it-tit">Ref ' + esc(i.ref) + (i.cat ? ' · ' + esc(i.cat) : '') + '</div>'
+        + '<div class="vm-cart-it-sub">Talla ' + esc(i.talla) + ' (CO)' + (i.genero ? ' · ' + esc(i.genero) : '') + '</div>'
+        // subtotal grande y, si lleva 2+, el desglose "(2 × $X)" para que no
+        // parezca el precio de UN par
+        + '<div class="vm-cart-it-pre">' + fmtCOP(precioI * cantI)
+        + (cantI > 1 ? ' <span class="vm-cart-it-cu">(' + cantI + ' × ' + fmtCOP(precioI) + ')</span>' : '') + '</div>'
+        + '<div class="vm-cart-it-row">'
+        + '<button type="button" data-menos="' + idx + '" aria-label="Uno menos">&minus;</button>'
+        + '<span class="vm-cart-it-n">' + (Number(i.cantidad)||1) + '</span>'
+        + '<button type="button" data-mas="' + idx + '" aria-label="Uno más">+</button>'
+        + '<button type="button" class="vm-cart-quitar" data-quitar="' + idx + '">Quitar</button>'
+        + '</div></div></div>';
+    });
+    body.innerHTML = html;
+    totalEl.innerHTML = '<span>Total (' + pares() + (pares() === 1 ? ' par' : ' pares') + ')</span><b>' + fmtCOP(totalCOP()) + '</b>';
+  }
+
+  // API que usa el modal para agregar el producto abierto
+  window.vmCartAgregar = function(it){
+    if (!it || !it.ref || !it.talla) return false;
+    if (items.length >= 8 && !items.some(function(x){ return x.ref === it.ref && x.talla === it.talla && x.genero === it.genero; })){
+      toast('El carrito ya tiene 8 referencias 🙈'); return false;
+    }
+    if (pares() >= 10){ toast('Máximo 10 pares por pedido 🙈'); return false; }
+    var igual = items.find(function(x){ return x.ref === it.ref && x.talla === it.talla && x.genero === it.genero; });
+    if (igual) igual.cantidad = Math.min(5, (Number(igual.cantidad)||1) + (Number(it.cantidad)||1));
+    else items.push({ ref: it.ref, talla: it.talla, cantidad: Math.min(5, Number(it.cantidad)||1),
+                      genero: it.genero || '', precio: Number(it.precio)||0, cat: it.cat || '', foto: it.foto || '' });
+    guardar(); pintar();
+    toast('🛍 Agregado — <b>' + pares() + (pares() === 1 ? ' par' : ' pares') + '</b> en tu carrito');
+    return true;
+  };
+  window.vmCartAbrir = function(){
+    panel.classList.add('on'); panel.setAttribute('aria-hidden','false'); limpiarErr();
+    document.body.style.overflow = 'hidden';   // el fondo no se desplaza (móvil)
+  };
+  function cerrar(){
+    panel.classList.remove('on'); panel.setAttribute('aria-hidden','true');
+    document.body.style.overflow = '';
+  }
+
+  fab.addEventListener('click', window.vmCartAbrir);
+  panel.addEventListener('click', function(e){ if (e.target.closest('[data-cart-close]')) cerrar(); });
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape' && panel.classList.contains('on')) cerrar(); });
+
+  body.addEventListener('click', function(e){
+    var b = e.target.closest('button'); if (!b) return;
+    if (b.id === 'vm-cart-vercat'){
+      // carrito vacío → llevar al catálogo (cerrar panel + scroll suave)
+      cerrar();
+      var catSec = document.getElementById('catalogo');
+      if (catSec) catSec.scrollIntoView({ behavior: 'smooth' });
+      return;
+    }
+    var iMas = b.getAttribute('data-mas'), iMenos = b.getAttribute('data-menos'), iQ = b.getAttribute('data-quitar');
+    if (iMas !== null && iMas !== undefined){
+      var it = items[+iMas];
+      if (it && pares() < 10) it.cantidad = Math.min(5, (Number(it.cantidad)||1) + 1);
+      else if (pares() >= 10) toast('Máximo 10 pares por pedido 🙈');
+    } else if (iMenos !== null && iMenos !== undefined){
+      var it2 = items[+iMenos];
+      if (it2){ it2.cantidad = (Number(it2.cantidad)||1) - 1; if (it2.cantidad < 1) items.splice(+iMenos, 1); }
+    } else if (iQ !== null && iQ !== undefined){
+      items.splice(+iQ, 1);
+    } else return;
+    guardar(); pintar(); limpiarErr();
+  });
+
+  function pagar(){
+    if (enviando || !items.length) return;
+    limpiarErr();
+    if (!form.classList.contains('abierto')){
+      form.classList.add('abierto');
+      abiertoEn = Date.now();
+      var n = $('vk-nombre'); if (n) n.focus();
+      return;
+    }
+    if (Date.now() - abiertoEn < 450) return; // 2º clic de un doble clic
+    var nombre = $('vk-nombre').value.trim();
+    var pref = ($('vk-prefijo') && $('vk-prefijo').value) || '57';
+    var cel = $('vk-celular').value.replace(/\D/g, '');
+    var dir = $('vk-direccion').value.trim();
+    if (cel.indexOf(pref) === 0 && cel.length > 10) cel = cel.slice(pref.length);
+    if (nombre.length < 2){ mostrarErr('Escribe tu nombre.'); return; }
+    if (pref === '57' && !/^3\d{9}$/.test(cel)){ mostrarErr('Escribe tu WhatsApp: 10 dígitos empezando por 3.'); return; }
+    if (pref !== '57' && !/^\d{6,12}$/.test(cel)){ mostrarErr('Revisa el número de WhatsApp (solo dígitos, sin el prefijo).'); return; }
+    if (dir.length < 5){ mostrarErr('Escribe la dirección de envío (ciudad y barrio).'); return; }
+    enviando = true;
+    btnIr.disabled = true;
+    btnIr.innerHTML = 'Creando tu pago seguro…';
+    fetch('/api/comprar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        items: items.map(function(i){ return { ref: i.ref, talla: i.talla, cantidad: i.cantidad, genero: i.genero }; }),
+        nombre: nombre, celular: pref + cel, direccion: dir
+      })
+    }).then(function(r){ return r.json().then(function(j){ return { ok: r.ok, j: j }; }); })
+      .then(function(res){
+        if (res.ok && res.j && res.j.url){
+          // el carrito se vacía al SALIR al checkout: si el cliente vuelve
+          // atrás sin pagar, el pedido queda pago_pendiente y puede rearmarlo.
+          items = []; guardar();
+          location.assign(res.j.url);
+          return;
+        }
+        throw new Error((res.j && res.j.error) || 'sin url');
+      })
+      .catch(function(e){
+        enviando = false;
+        btnIr.disabled = false;
+        btnIr.innerHTML = '<i class="ti ti-lock"></i> Ir a pagar';
+        mostrarErr((e && e.message && e.message !== 'sin url' ? e.message + '. ' : '')
+          + 'No pudimos crear el pago. Intenta de nuevo o escríbenos por WhatsApp (botón verde).');
+      });
+  }
+  btnIr.addEventListener('click', pagar);
+  form.addEventListener('submit', function(e){ e.preventDefault(); pagar(); });
+
+  cargar(); pintar();
 })();
 </script>
 <script>
@@ -2906,6 +3319,9 @@ document.addEventListener('click', function(e){
     });
     grid.innerHTML = html;
     if (window.COMPRA_WOMPI && window.vmActualizarBotonesCompra) window.vmActualizarBotonesCompra(grid);
+    // [2026-07-18] el catálogo real ya está en pantalla → refrescar el contador
+    // de modelos de las placas DAMA/CABALLERO con los datos de verdad
+    if (window.vmPintarContadoresGenero) window.vmPintarContadoresGenero();
     initCarousels(grid);
     initLazyFotos(grid);
     // efecto del cursor sobre las tarjetas nuevas (solo escritorio)

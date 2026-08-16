@@ -1,5 +1,13 @@
-REGLAS DE FIRESTORE — VarMan Crew (actualizadas 2026-07-12: ENDURECIDAS — todo
-exige ser del EQUIPO por lista de correos, ya no basta "estar autenticado".
+REGLAS DE FIRESTORE — VarMan Crew (actualizadas 2026-08-12: se agregó el LOCAL
+BÚNKER — cuatro colecciones nuevas [bunkerVentas, bunkerProveedores,
+bunkerPagos, bunkerGastos] que SOLO pueden leer/escribir los dos correos de
+esBunker(). Sin estas reglas la pestaña Búnker sale vacía con error de
+permisos. Antes 2026-07-18: se agregó botConfig
+— la app elige la "referencia de la publicación" que el bot responde a "precio"
+[pestaña Tienda]; sin esta regla ese selector no guarda. Antes 2026-07-15: se
+agregó el correo del VENDEDOR varmansneakersandclothes@gmail.com a esEquipo()
+— puede tienda/inventario/ventas/pedidos, NO caja. Antes 2026-07-12:
+ENDURECIDAS — todo exige ser del EQUIPO por lista de correos.
 Antes: 2026-07-09 pedidosOcultos · 2026-07-07 ANULAR VENTAS + colecciones v5)
 
 ⚠ HAY QUE VOLVER A PEGARLAS EN LA CONSOLA (2 min, pasos abajo). Si el vendedor
@@ -50,8 +58,22 @@ service cloud.firestore {
       return request.auth != null
         && request.auth.token.email in [
           'c.mancipe.96@gmail.com',
-          'andresvargasm91@gmail.com'
-          // , 'correo-del-vendedor@gmail.com'   ← agregar el del vendedor si tiene cuenta
+          'andresvargasm91@gmail.com',
+          'varmansneakersandclothes@gmail.com'   // vendedor (cuenta de la tienda) — agregado 2026-07-15
+        ];
+    }
+
+    // LOCAL BÚNKER (2026-08-12): el local del socio es un libro APARTE del
+    // negocio de VarMan Crew. Solo estos correos lo ven. Ojo: son datos de
+    // OTRO negocio (costos de compra de 8 bodegas y lo que se les debe), por
+    // eso NO se usa esEquipo() — el vendedor no tiene nada que hacer aquí.
+    // Si cambia, hay que actualizarlo en DOS lugares: aquí y SOCIOS_BUNKER
+    // al inicio de app.jsx.
+    function esBunker() {
+      return request.auth != null
+        && request.auth.token.email in [
+          'andresvargasm91@gmail.com',
+          'c.mancipe.96@gmail.com'
         ];
     }
 
@@ -138,6 +160,35 @@ service cloud.firestore {
       // Pedidos ocultados (de prueba/duplicados): solo socios los ven y los
       // tocan. Ocultar/mostrar NO modifica el documento del pedido.
       match /pedidosOcultos/{doc} { allow read, write: if esSocio(); }
+
+      // ---- NUEVA 2026-07-18 ----
+
+      // Config del bot que se edita desde la app (pestaña Tienda): la
+      // "referencia de la publicación" (refPauta) y las refs de la foto. El bot
+      // la LEE con la llave maestra (no usa esta regla).
+      // [SEGURIDAD 2026-07-21] Antes era `write: if esEquipo()`, lo que dejaba
+      // a CUALQUIER cuenta del equipo (incluida la del vendedor) escribir
+      // cualquier campo por API — por ejemplo `pausado` (apagar el bot de
+      // ventas) o borrar el documento entero. Ahora la escritura libre es solo
+      // de socios; el resto del equipo solo puede tocar las refs, nunca apagar
+      // el bot. (La app ya escribía solo esos campos con merge; ahora la regla
+      // lo IMPONE, no depende de la buena costumbre del cliente.)
+      // ---- NUEVAS 2026-08-12: LOCAL BÚNKER ----
+      // Las cuatro colecciones del local del socio (ventas del local, bodegas
+      // que le despachan, pagos a esas bodegas y gastos del local). Nada de
+      // esto toca el inventario ni la caja de VarMan Crew.
+      match /bunkerVentas/{doc}      { allow read, write: if esBunker(); }
+      match /bunkerProveedores/{doc} { allow read, write: if esBunker(); }
+      match /bunkerPagos/{doc}       { allow read, write: if esBunker(); }
+      match /bunkerGastos/{doc}      { allow read, write: if esBunker(); }
+
+      match /botConfig/{doc} {
+        allow read:  if esEquipo();
+        allow write: if esSocio();          // socios: control total (incl. pausar/crear/borrar)
+        allow update: if esEquipo()         // vendedor: SOLO las refs, nunca `pausado`
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['refPauta','refPautaActualizado','refsFoto','refsFotoActualizado']);
+      }
     }
   }
 }
@@ -145,6 +196,9 @@ service cloud.firestore {
 
 IMPORTANTE:
 - Si algún día cambian de correo o entra otro socio, hay que actualizar la
-  lista en DOS lugares: estas reglas y SOCIOS_CAJA al inicio de app.jsx.
+  lista en DOS lugares: estas reglas y SOCIOS_CAJA al inicio de app.jsx
+  (y SOCIOS_BUNKER si también debe ver el Local Búnker).
+- El Local Búnker NO se puede probar hasta publicar estas reglas: la pestaña
+  aparece, pero Firestore rechaza la lectura y todo sale en cero.
 - El vendedor sigue usando la app normal (inventario, ventas, tienda) sin
   ningún cambio; simplemente no ve ni puede leer la pestaña Caja.

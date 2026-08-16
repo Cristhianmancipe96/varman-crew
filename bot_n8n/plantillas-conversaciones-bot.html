@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VarMan Bot · Mapa de conversaciones y plantillas</title>
+<style>
+  :root{
+    --verde:#075E54; --verde2:#128C7E; --burbuja-bot:#ffffff; --burbuja-cli:#DCF8C6;
+    --fondo-chat:#ECE5DD; --tinta:#1f2937; --gris:#6b7280;
+    --ambar:#fff7e6; --ambar-b:#f0a500; --rojo:#fdecea; --rojo-b:#d93025;
+    --azul:#e8f0fe; --azul-b:#1a73e8; --verdeclaro:#e6f4ea; --verdeclaro-b:#188038;
+  }
+  *{box-sizing:border-box}
+  body{font-family:'Segoe UI',system-ui,sans-serif;margin:0;background:#f6f7f9;color:var(--tinta);line-height:1.5}
+  header{background:var(--verde);color:#fff;padding:24px 20px;position:sticky;top:0;z-index:10;box-shadow:0 2px 8px rgba(0,0,0,.2)}
+  header h1{margin:0;font-size:1.3em}
+  header p{margin:4px 0 0;opacity:.85;font-size:.85em}
+  .contenido{max-width:900px;margin:0 auto;padding:20px}
+  nav{background:#fff;border-radius:12px;padding:16px 20px;margin-bottom:24px;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+  nav a{display:inline-block;margin:3px 10px 3px 0;color:var(--verde2);text-decoration:none;font-size:.9em;font-weight:600}
+  nav a:hover{text-decoration:underline}
+  section{margin-bottom:36px}
+  h2{color:var(--verde);border-bottom:3px solid var(--verde2);padding-bottom:6px;font-size:1.15em;scroll-margin-top:100px}
+  h3{color:var(--verde2);font-size:1em;margin:24px 0 8px}
+  .escena{background:#fff;border-radius:12px;padding:16px;margin:14px 0;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+  .escena .titulo{font-weight:700;margin-bottom:2px}
+  .escena .cuando{font-size:.83em;color:var(--gris);margin-bottom:10px}
+  .chat{background:var(--fondo-chat);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:8px}
+  .msj{max-width:85%;padding:8px 12px;border-radius:10px;font-size:.9em;white-space:pre-wrap;box-shadow:0 1px 1px rgba(0,0,0,.12);position:relative}
+  .cli{background:var(--burbuja-cli);align-self:flex-end;border-top-right-radius:2px}
+  .bot{background:var(--burbuja-bot);align-self:flex-start;border-top-left-radius:2px}
+  .quien{display:block;font-size:.72em;font-weight:700;color:var(--verde2);margin-bottom:2px}
+  .cli .quien{color:#5b7c3a}
+  .accion{align-self:center;font-size:.78em;color:var(--gris);font-style:italic;background:#f0ede8;border-radius:999px;padding:2px 12px}
+  b,strong{font-weight:700}
+  .tag{display:inline-block;font-size:.7em;font-weight:700;border-radius:999px;padding:2px 8px;margin-left:6px;vertical-align:middle}
+  .tag.flag{background:var(--azul);color:var(--azul-b)}
+  .tag.ok{background:var(--verdeclaro);color:var(--verdeclaro-b)}
+  .tag.hueco{background:var(--rojo);color:var(--rojo-b)}
+  .tag.prop{background:var(--ambar);color:#8a5a00}
+  .nota{font-size:.83em;color:var(--gris);margin-top:8px}
+  .caja{border-left:4px solid;border-radius:8px;padding:10px 14px;margin:10px 0;font-size:.88em}
+  .caja.prop{background:var(--ambar);border-color:var(--ambar-b)}
+  .caja.hueco{background:var(--rojo);border-color:var(--rojo-b)}
+  .caja.info{background:var(--azul);border-color:var(--azul-b)}
+  table{width:100%;border-collapse:collapse;font-size:.85em;background:#fff;border-radius:10px;overflow:hidden}
+  th,td{padding:8px 10px;border-bottom:1px solid #eee;text-align:left;vertical-align:top}
+  th{background:var(--verde);color:#fff}
+  footer{text-align:center;color:var(--gris);font-size:.8em;padding:24px}
+  @media print{header{position:static}nav{display:none}}
+</style>
+</head>
+<body>
+<header>
+  <h1>🤖 VarMan Bot · Mapa de TODAS las conversaciones posibles</h1>
+  <p>Referencia para auditar y pulir las respuestas · Textos reales del bot v6.9 (fuente: <code>textos.js</code>) · 22 jul 2026</p>
+</header>
+<div class="contenido">
+
+<nav>
+  <b>Índice:</b>
+  <a href="#leyenda">Cómo leer esto</a>
+  <a href="#entrada">1. Entradas</a>
+  <a href="#compra">2. Flujo de compra</a>
+  <a href="#pago">3. Pago</a>
+  <a href="#objeciones">4. Objeciones y FAQ</a>
+  <a href="#dificiles">5. Situaciones difíciles</a>
+  <a href="#postventa">6. Post-venta</a>
+  <a href="#huecos">7. Huecos de la auditoría</a>
+</nav>
+
+<section id="leyenda">
+  <h2>Cómo leer este documento</h2>
+  <div class="escena">
+    <p style="margin-top:0">Cada tarjeta es un <b>escenario de conversación</b>: lo que escribe el cliente y lo que responde el bot <b>hoy</b> (texto real del código, con datos de ejemplo: Ref 51 · $329.900 · talla 40). Etiquetas:</p>
+    <p>
+      <span class="tag ok">ACTIVO</span> funciona hoy en producción &nbsp;·&nbsp;
+      <span class="tag flag">FLAG</span> existe detrás de un flag (puede estar apagado) &nbsp;·&nbsp;
+      <span class="tag hueco">HUECO</span> falla detectada en el barrido del 20 jul &nbsp;·&nbsp;
+      <span class="tag prop">PROPUESTA</span> plantilla nueva sugerida, aún no está en el bot
+    </p>
+    <div class="caja info">Las respuestas marcadas como <b>"IA (Gemini)"</b> no son texto fijo: las redacta la IA guiada por el prompt. Ahí lo que se audita es el prompt, no una plantilla. El resto son plantillas fijas de <code>textos.js</code> — esas se editan ahí y se regenera el workflow con el build (nunca el JSON a mano).</div>
+  </div>
+</section>
+
+<!-- ============ 1. ENTRADAS ============ -->
+<section id="entrada">
+  <h2>1. Puertas de entrada (primer mensaje del cliente)</h2>
+
+  <div class="escena">
+    <div class="titulo">1.1 Saludo simple <span class="tag ok">ACTIVO</span></div>
+    <div class="cuando">Cliente escribe "hola", "buenas", "info" sin más contexto. El bot da la bienvenida y ESPERA la pregunta (decisión del dueño: no bombardear con el catálogo de entrada).</div>
+    <div class="chat">
+      <div class="msj cli"><span class="quien">Cliente</span>Hola, buenas</div>
+      <div class="msj bot"><span class="quien">Bot</span>¡Hola! Bienvenido a <b>VarMan Crew</b> 👟 Cuéntame, ¿qué modelo o marca buscas, o en qué te puedo ayudar?</div>
+    </div>
+  </div>
+
+  <div class="escena">
+    <div class="titulo">1.2 Llega desde un ANUNCIO (pauta al 304) <span class="tag ok">ACTIVO</span></div>
+    <div class="cuando">El anuncio trae mensaje predefinido con la Ref. El bot muestra la ficha de esa ref y arranca el pedido. Con BOT_PAUTA_CATALOGO además invita al catálogo.</div>
+    <div class="chat">
+      <div class="msj cli"><span class="quien">Cliente</span>Hola, me interesa la Ref 51 que vi en su publicación</div>
+      <div class="msj bot"><span class="quien">Bot</span>¡Esa está buenísima! 🔥 Aquí te la muestro:</div>
+      <div class="accion">📷 foto del producto</div>
+      <div class="msj bot"><span class="quien">Bot</span>👟 <b>Ref 51</b>
+Adidas EQT · Caballero
+💵 <b>$329.900</b>
+
+¿Qué <b>talla</b> calzas? (de la <b>35 a la 45</b>) 👟</div>
+      <div class="msj bot"><span class="quien">Bot</span>👀 ¿Quieres ver otras referencias? Mira todo el catálogo con fotos y precios aquí:
+https://varmancrew.com/#catalogo</div>
+    </div>
+  </div>
+
+  <div class="escena">
+    <div class="titulo">1.3 "¿Cuál es el precio?" pelado (viene de la pauta) <span class="tag flag">BOT_REF_PAUTA</span></div>
+    <div class="cuando">Pregunta el precio sin decir de qué. El bot asume la ref de la publicación activa (la que el dueño marcó en la app) y muestra su ficha. Guardas: NO secuestra si el mensaje trae dígitos, ref o marca.</div>
+    <div class="chat">
+      <div class="msj cli"><span class="quien">Cliente</span>Precio?</div>
+      <div class="msj bot"><span class="quien">Bot</span>¡Claro! 😊 Te cuento del modelo de nuestra publicación 👇</div>
+      <div class="accion">📷 ficha (foto + precio) de la ref de pauta → sigue pidiendo talla</div>
+    </div>
+    <div class="caja hueco"><b>HUECO #1 del barrido:</b> ANTES de este flag, la respuesta de texto a "precio" daba solo el rango genérico o el link — un cliente con ref+talla listos preguntó 6 veces el precio y canceló. Verificar con tráfico post-18 jul que el flag lo cubra; si el cliente pregunta precio DE OTRA ref a mitad de pedido, aún puede caer al rango genérico. <b>Regla de la plantilla: la respuesta a "precio" siempre debe traer UNA CIFRA.</b></div>
+  </div>
+
+  <div class="escena">
+    <div class="titulo">1.4 "Quiero más información" (de la pauta) <span class="tag flag">BOT_REF_PAUTA</span></div>
+    <div class="chat">
+      <div class="msj cli"><span class="quien">Cliente</span>Quiero más información</div>
+      <div class="msj bot"><span class="quien">Bot</span>¡Con gusto! 😊 ¿Buscas la Ref 51, la de nuestra publicación? Escríbeme <b>sí</b> y te paso la foto y el precio 📸, o cuéntame qué otro modelo buscas 👟.</div>
+      <div class="msj cli"><span class="quien">Cliente</span>Sí</div>
+      <div class="msj bot"><span class="quien">Bot</span>¡Perfecto! 😊 Aquí te la muestro 👇</div>
+      <div class="accion">📷 ficha + pregunta de talla</div>
+    </div>
+  </div>
+
+  <div class="escena">
+    <div class="titulo">1.5 Pide el catálogo <span class="tag ok">ACTIVO · BOT_CATALOGO_WEB</span></div>
+    <div class="cuando">Decisión deliberada del dueño: el bot manda el LINK de la web, no fotos por WhatsApp (la VM se saturaba). No tratarlo como bug en la auditoría.</div>
+    <div class="chat">
+      <div class="msj cli"><span class="quien">Cliente</span>Me muestras qué tenis tienes?</div>
+      <div class="msj bot"><span class="quien">Bot</span>¡Con gusto! 👟 Mira todo el catálogo con fotos y precios aquí y elige el tuyo:
+https://varmancrew.com/#catalogo
+Cualquier cosa, aquí estoy 😊</div>
+    </div>
+    <div class="caja hueco"><b>HUECO #3 (dato, no bug):</b> tras el link, la mayoría no vuelve. Se optimiza DENTRO de la decisión: precio en texto, retomar el paso pendiente tras el link, y el seguimiento a ~2h (escena 6.4).</div>
+  </div>
+
+  <div class="escena">
+    <div class="titulo">1.6 Pregunta por una MARCA que sí tenemos <span class="tag ok">ACTIVO</span></div>
+    <div class="chat">
+      <div class="msj cli"><span class="quien">Cliente</span>Tienen Nike?</div>
+      <div class="msj bot"><span class="quien">Bot</span>¡Claro! De <b>Nike</b> tenemos 12 modelos 🔥 Míralos con fotos y precios aquí y elige el tuyo:
+https://varmancrew.com/#catalogo
+Desde la página lo pides de una 😊</div>
+    </div>
+  </div>
+
+  <div class="escena">
+    <div class="titulo">1.7 Marca que NO tenemos <span class="tag ok">ACTIVO</span></div>
+    <div class="cuando">Honestidad + puerta al asesor. El bot NUNCA inventa que tiene algo.</div>
+    <div class="chat">
+      <div class="msj cli"><span class="quien">Cliente</span>Tienen Balenciaga?</div>
+      <div class="msj bot"><span class="quien">Bot</span>De <b>Balenciaga</b> no tengo referencias marcadas todavía 🙈, pero mira todo lo que tenemos con fotos y precios aquí:
+https://varmancrew.com/#catalogo
+Y si buscas un modelo puntual, cuéntame (o mándame una foto) y un asesor te confirma si te lo conseguimos 📲</div>
+    </div>
+    <div class="nota">Si INSISTE por la misma marca: "Esas puntuales no las tengo ahorita 🙈. Ya le pasé el dato a un asesor…" → handoff con aviso al 320.</div>
+  </div>
+
+  <div class="escena">
+    <div class="titulo">1.8 Cliente manda una FOTO de un modelo <span class="tag flag">BOT_FOTO_REFS</span></div>
+    <div class="cuando">El bot dice claro que es un bot y no ve imágenes; muestra las refs que el dueño marcó en la app y da lista para tocar. La foto SIEMPRE se reenvía al 320.</div>
+    <div class="chat">
+      <div class="accion">📷 cliente envía foto de unos tenis</div>
+      <div class="msj bot"><span class="quien">Bot</span>¡Gracias por la foto! 🙌 Te cuento: soy el <b>asistente virtual (bot)</b> de VarMan Crew 🤖 y <b>no puedo ver las imágenes</b>. ¿Será alguna de estas referencias que nos están pidiendo mucho? Toca <b>«Ver referencias»</b> y elige la tuya para mostrártela con foto y precio 👇 Si no está, elige <b>«Ninguna de estas 🙋»</b> y te atiende una persona 📲.</div>
+      <div class="accion">📋 lista interactiva: refs marcadas + "Ninguna de estas 🙋"</div>
+    </div>
+    <div class="caja hueco"><b>HUECO #4:</b> si el cliente manda un ÁLBUM (varias fotos a la vez), el bot responde una vez POR FOTO (9 respuestas idénticas + ~18 avisos al 320 en un caso real). <b>Encargo pendiente: agrupar álbum + dedupe por message_id.</b></div>
+  </div>
+
+  <div class="escena">
+    <div class="titulo">1.9 Ref directa desde la web / "Ref 05" por texto <span class="tag ok">ACTIVO</span></div>
+    <div class="chat">
+      <div class="msj cli"><span class="quien">Cliente</span>Hola, quiero la Ref 05</div>
+      <div class="msj bot"><span class="quien">Bot</span>¡Esa está buenísima! 🔥 Aquí te la muestro:</div>
+      <div class="accion">📷 ficha + pregunta de talla</div>
+    </div>
+    <div class="nota">Ref inexistente → "Esa referencia no la encuentro en el catálogo 🙈…" + link + puerta al asesor.</div>
+  </div>
+
+  <div class="escena">
+    <div class="titulo">1.10 "Sí" / "claro" / "dale" suelto <span class="tag flag">BOT_SI_CATALOGO</span></div>
+    <div class="cuando">Sin pedido en curso, un "sí" suelto muestra el catálogo (antes el clasificador repetía la misma pregunta — caso real).</div>
+    <div class="chat">
+      <div class="msj cli"><span class="quien">Cliente</span>Si mil gracias</div>
+      <div class="msj bot"><span class="quien">Bot</span>¡Con gusto! 👟 Mira todo el catálogo con fotos y precios aquí y elige el tuyo:
+https://varmancrew.com/#catalogo
+Cualquier cosa, aquí estoy 😊</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 2. FLUJO DE COMPRA ============ -->
+<section id="compra">
+  <h2>2. Flujo de compra (el camino que vende)</h2>
+
+  <div class="escena">
+    <div class="titulo">2.1 El camino feliz completo <span class="tag ok">ACTIVO</span></div>
+    <div class="chat">
+      <div class="msj cli"><span class="quien">Cliente</span>Quiero la Ref 51</div>
+      <div class="accion">📷 foto</div>
+      <div class="msj bot"><span class="quien">Bot</span>👟 <b>Ref 51</b>
+Adidas EQT · Caballero
+💵 <b>$329.900</b>
+
+¿Qué <b>talla</b> calzas? (de la <b>35 a la 45</b>) 👟</div>
+      <div class="msj cli"><span class="quien">Cliente</span>40</div>
+      <div class="msj bot"><span class="quien">Bot</span>¡Talla 40 anotada! ✅
+
+Ahora regálame en un solo mensaje los datos de envío:
+
+<b>Nombre completo</b>
+<b>Dirección</b>
+<b>Ciudad</b>
+<b>Teléfono de contacto</b></div>
+      <div class="msj cli"><span class="quien">Cliente</span>Juan Pérez, Cra 10 # 20-30, Medellín, 3001234567</div>
+      <div class="msj bot"><span class="quien">Bot</span>¡Listo! 🙌 Envío a <b>Medellín</b> anotado 📦
+
+Total a pagar: <b>$329.900</b> (envío incluido 🚚)
+
+¿Cómo prefieres pagar?</div>
+      <div class="accion">📋 lista de métodos: Nequi · Daviplata · Bre-B · Tarjeta o PSE (Wompi) · Contra entrega (solo si es Bogotá)</div>
+    </div>
+  </div>
+
+  <div class="escena">
+    <div class="titulo">2.2 Talla en nacional / US / con typos <span class="tag flag">BOT_TALLA_ROBUSTA</span></div>
+    <div class="cuando">Capta la talla aunque llegue en pedazos o mal escrita ("nasional", "cabayero", "taya 38"). La conversión nacional→EUR cambia por género: dama +1, hombre +2.</div>
+    <div class="chat">
+      <div class="msj cli"><span class="quien">Cliente</span>Yo calzo 38 nacional</div>
+      <div class="msj bot"><span class="quien">Bot</span>Para darte la talla europea exacta 👟, dime: esa <b>38 nacional</b> ¿es para <b>hombre</b> o para <b>mujer</b>?</div>
+      <div class="msj cli"><span class="quien">Cliente</span>Hombre</div>
+      <div class="msj bot"><span class="quien">Bot</span>¡Listo! Esa equivale a la <b>talla 40</b> europea 👟 (la que manejamos). ¡Anotada! ✅
+
+Ahora regálame en un solo mensaje los datos de envío:
+
+<b>Nombre completo</b>
+<b>Dirección</b>
+<b>Ciudad</b>
+<b>Teléfono de contacto</b></div>
+    </div>
+  </div>
+
+  <div class="escena">
+    <div class="titulo">2.3 "No sé mi talla" <span class="tag flag">IA (Gemini asistente)</span></div>
+    <div class="cuando">La IA da un tip para medir el pie (largo en cm) y el bot convierte la medida a talla.</div>
+    <div class="chat">
+      <div class="msj cli"><span class="quien">Cliente</span>Uy no sé qué talla soy</div>
+      <div class="msj bot"><span class="quien">Bot</span><i>(IA)</i> ¡Tranquilo! 😊 Mide tu pie del talón al dedo más largo en centímetros y me dices cuánto te dio, yo te confirmo la talla.</div>
+      <div class="msj cli"><span class="quien">Cliente</span>Me dio 26 cm</div>
+      <div class="msj bot"><span class="quien">Bot</span>¡Perfecto! 📏 Esa medida corresponde aprox. a la <b>talla 41</b> europea 👟 ¡Anotada! ✅
+
+Ahora regálame en un solo mensaje los datos de envío: …</div>
+    </div>
+  </div>
+
+  <div class="escena">
+    <div class="titulo">2.4 Tallas por botones <span class="tag flag">BOT_TALLA_BOTONES</span></div>
+    <div class="cuando">Lista interactiva rotulada por talla NACIONAL con la EUR al lado (equivalencia hombre). Mujer/US/45 van por texto. Cero errores de dedo.</div>
+    <div class="chat">
+      <div class="msj bot"><span class="quien">Bot</span>Toca tu talla <b>nacional</b> 👇 (la que usas en Colombia); al lado va la <b>europea (EUR)</b>. Equivalencias de <b>hombre</b>: si eres <b>mujer</b>, usas <b>europea/US</b> o la <b>45</b>, escríbela y te la convierto 👟.</div>
+      <div class="accion">📋 lista: Nacional 33 (EUR 35) … Nacional 42 (EUR 44)</div>
+    </div>
+  </div>
+
+  <div class="escena">
+    <div class="titulo">2.5 Pide 2 pares / cantidad ambigua <span class="tag flag">BOT_FLUIDEZ</span></div>
+    <div class="chat">
+      <div class="msj cli"><span class="quien">Cliente</span>Puedo llevar 2?</div>
+      <div class="msj bot"><span class="quien">Bot</span>¡Claro que sí! 🙌 Puedes llevar los pares que quieras — y si llevas <b>2 pares</b> te dejo un <b>15% en todo el pedido</b> 🔥 Escríbeme <b>"2 pares"</b> y te lo anoto.</div>
+      <div class="msj cli"><span class="quien">Cliente</span>2 pares</div>
+      <div class="msj bot"><span class="quien">Bot</span>¡De una, <b>2 pares</b>! 🙌 El total sería <b>$659.800</b>.</div>
+    </div>
+    <div class="caja hueco"><b>DATO PELIGROSO del barrido:</b> hubo un caso donde se OFRECIÓ el 15% y el total salió SIN el descuento aplicado. Al auditar, verificar que promo ofrecida = promo cobrada.</div>
+  </div>
+
+  <div class="escena">
+    <div class="titulo">2.6 Pide otro COLOR <span class="tag flag">BOT_COLOR_CATALOGO</span></div>
+    <div class="cuando">El bot no inventa colores: solo el de la foto.</div>
+    <div class="chat">
+      <div class="msj cli"><span class="quien">Cliente</span>La tienes en rojo?</div>
+      <div class="msj bot"><span class="quien">Bot</span>Esa referencia solo la manejamos en el color de la foto 🙏. Si buscas otro color, aquí tienes el catálogo completo por si hay una que te guste 👇
+https://varmancrew.com/#catalogo
+
+Si te quedas con esta, dime tu <b>talla</b> 👟.</div>
+    </div>
+  </div>
+
+  <div class="escena">
+    <div class="titulo">2.7 Cambia de modelo a MITAD del pedido <span class="tag flag">BOT_FLUIDEZ_RECONDUCE</span></div>
+    <div class="chat">
+      <div class="msj cli"><span class="quien">Cliente</span>Mejor muéstrame la Ref 12</div>
+      <div class="msj bot"><span class="quien">Bot</span>¡Claro que sí! 😊 Cambiamos tu pedido a esta 👇</div>
+      <div class="accion">📷 ficha de la Ref 12 + talla</div>
+    </div>
+  </div>
+
+  <div class="escena">
+    <div class="titulo">2.8 "Manda el catálogo" a mitad de pedido <span class="tag flag">BOT_CATALOGO_PIDE (v6.8+)</span></div>
+    <div class="cuando">Antes Gemini esquivaba el link. Ahora lo manda SIN perder el pedido en curso.</div>
+    <div class="chat">
+      <div class="msj cli"><span class="quien">Cliente</span>Qué más tienen? Muéstramelos</div>
+      <div class="msj bot"><span class="quien">Bot</span>Míralo con fotos y precios aquí y elige el tuyo 👇
+https://varmancrew.com/#catalogo</div>
+    </div>
+  </div>
+
+  <div class="escena">
+    <div class="titulo">2.9 Datos incompletos <span class="tag flag">BOT_DATOS_V2</span></div>
+    <div class="chat">
+      <div class="msj cli"><span class="quien">Cliente</span>Juan Pérez, Medellín</div>
+      <div class="msj bot"><span class="quien">Bot</span>Casi listo 🙌 Para el envío me falta: <b>dirección y teléfono</b>. Regálame todo en un solo mensaje: <b>nombre completo, dirección, ciudad y teléfono</b>.</div>
+    </div>
+    <div class="caja hueco"><b>DATO PELIGROSO del barrido:</b> la validación aceptó un teléfono "33". Pendiente: validar teléfono de 10 dígitos y ciudad real.</div>
+  </div>
+
+  <div class="escena">
+    <div class="titulo">2.10 "Cancelar" <span class="tag ok">ACTIVO</span></div>
+    <div class="chat">
+      <div class="msj cli"><span class="quien">Cliente</span>Cancelar</div>
+      <div class="msj bot"><span class="quien">Bot</span>Listo, cancelé el pedido 👍. Cuando quieras retomar, escribe <b>hola</b> y te muestro el catálogo.</div>
+    </div>
+    <div class="caja hueco"><b>HUECO #2:</b> "cancelar", "asesor" y las preguntas ("¿envíos a Cali?") funcionan en el paso de TALLA, pero los estados de <b>datos</b> y <b>pago</b> hoy los IGNORAN (secuestran al cliente). Encargo pendiente: escape universal en todos los pasos.</div>
+  </div>
+</section>
+
+<!-- ============ 3. PAGO ============ -->
+<section id="pago">
+  <h2>3. Pago y cierre</h2>
+
+  <div class="escena">
+    <div class="titulo">3.1 Link Wompi (tarjeta / PSE / Nequi automático) <span class="tag ok">ACTIVO · PRODUCCIÓN</span></div>
+    <div class="chat">
+      <div class="accion">cliente toca "Tarjeta o PSE" en la lista</div>
+      <div class="msj bot"><span class="quien">Bot</span>¡Listo! 💳 Te comparto un <b>link de pago seguro por Wompi</b> para que pagues con tarjeta, PSE o Nequi por <b>$329.900</b>:
+
+👉 https://checkout.wompi.co/l/XXXX
+
+Apenas se acredite el pago, tu pedido queda <b>confirmado automáticamente</b> y te avisamos por aquí 🎉. Si prefieres otro medio, escribe <b>cancelar</b> y volvemos a empezar.</div>
+      <div class="accion">💳 el cliente paga → webhook de Wompi confirma solo</div>
+      <div class="msj bot"><span class="quien">Bot</span>¡Pago confirmado! ✅🎉
+
+Ya recibimos tu pago de la <b>Ref 51</b> (talla 40) y estamos <b>alistando tu pedido</b> con todo el cuidado 📦. Va empacado en su <b>caja original</b> y bien protegido para el envío.
+
+Apenas salga te compartimos por aquí la <b>guía de rastreo</b> para que sigas tu paquete. ¡Gracias por confiar en VarMan Crew! 👟🧡</div>
+    </div>
+  </div>
+
+  <div class="escena">
+    <div class="titulo">3.2 Nequi / Daviplata / Bre-B manual <span class="tag ok">ACTIVO</span></div>
+    <div class="chat">
+      <div class="accion">cliente toca "Nequi"</div>
+      <div class="msj bot"><span class="quien">Bot</span>Pagas por <b>Nequi</b> a este número/llave:
+
+👉 300 000 0000
+
+Total: <b>$329.900</b>
+
+Cuando hagas el pago, mándame la <b>foto del comprobante</b> aquí mismo 📸 y dejamos tu pedido confirmado.</div>
+      <div class="accion">📸 cliente manda comprobante</div>
+      <div class="msj bot"><span class="quien">Bot</span>¡Pedido recibido! 🎉
+
+<b>Referencia 51</b> · Talla 40 · $329.900
+
+Vamos a verificar tu pago y te confirmamos el envío por aquí mismo. ¡Gracias por comprar en VarMan Crew! 👟</div>
+    </div>
+    <div class="nota">Si hay QR configurado: van 3 mensajes (imagen QR → solo el dato para copiar → total + comprobante).</div>
+  </div>
+
+  <div class="escena">
+    <div class="titulo">3.3 Contra entrega (SOLO Bogotá) <span class="tag ok">ACTIVO</span></div>
+    <div class="cuando">La opción solo aparece en la lista si los datos de envío dicen Bogotá.</div>
+    <div class="chat">
+      <div class="accion">cliente de Bogotá toca "Contra entrega"</div>
+      <div class="msj bot"><span class="quien">Bot</span>¡Listo! 🛵 Tu pedido de la <b>Ref 51</b> queda con <b>pago contra entrega</b> en Bogotá por <b>$329.900</b>. Lo alistamos y coordinamos la entrega contigo; pagas cuando lo recibas. ¡Gracias por comprar en VarMan Crew! 👟</div>
+    </div>
+    <div class="chat" style="margin-top:10px">
+      <div class="accion">cliente de OTRA ciudad pide contra entrega</div>
+      <div class="msj bot"><span class="quien">Bot</span>El <b>pago contra entrega</b> lo manejamos solo en <b>Bogotá</b> 🛵. Para tu ciudad el envío va con pago anticipado 👇</div>
+    </div>
+    <div class="caja prop"><b>PROPUESTA (objeción #1 de los clientes) — plantilla nueva para fuera de Bogotá:</b><br><br>
+"¡Claro que te entiendo! 🙌 El pago contra entrega lo manejamos <b>solo en Bogotá</b>, porque ahí entregamos con logística propia el mismo día.<br><br>
+Para el resto del país trabajamos con pago anticipado 100% seguro por <b>Wompi (la plataforma de pagos de Bancolombia)</b>: puedes pagar con Nequi, PSE, Bancolombia o tarjeta, y te llega tu comprobante oficial de inmediato.<br><br>
+Y para que compres tranquilo:<br>
+✅ Te enviamos la <b>guía de la transportadora</b> apenas despachamos, para que rastrees tu pedido en todo momento<br>
+✅ <b>Envío GRATIS</b> a todo el país<br>
+✅ Somos tienda establecida: nos encuentras en varmancrew.com y en nuestras redes<br><br>
+¿Te comparto el link de pago para apartar tu talla? 👟"<br><br>
+<i>Refuerzos opcionales: video del par con el nombre del cliente antes de despachar · "si pagas antes de las 3pm se despacha hoy" · pantallazo de entregas reales.</i></div>
+  </div>
+
+  <div class="escena">
+    <div class="titulo">3.4 Wompi falla <span class="tag ok">ACTIVO</span></div>
+    <div class="chat">
+      <div class="msj bot"><span class="quien">Bot</span>Uy, no pude generar el link de pago en este momento 🙈. Puedes pagar por otro medio 👇</div>
+      <div class="accion">📋 botones Nequi / Daviplata / Bre-B</div>
+    </div>
+  </div>
+
+  <div class="escena">
+    <div class="titulo">3.5 No manda el comprobante <span class="tag ok">ACTIVO</span></div>
+    <div class="chat">
+      <div class="msj bot"><span class="quien">Bot</span>Cuando puedas, mándame la <b>foto del comprobante</b> 📸 para confirmar tu pedido. Si quieres cambiar algo, escribe <b>cancelar</b>.</div>
+    </div>
+    <div class="nota">Si repite el paso: "Apenas tengas la <b>foto del comprobante</b> me la mandas por aquí 📸 Si algo se complicó, escribe <b>asesor</b> y te ayudamos."</div>
+  </div>
+</section>
+
+<!-- ============ 4. OBJECIONES ============ -->
+<section id="objeciones">
+  <h2>4. Objeciones y preguntas frecuentes (las respuestas las da la IA guiada por el prompt)</h2>
+  <div class="caja info">Estas respuestas NO son plantilla fija: Gemini las redacta siguiendo el "contexto de tienda" del prompt. Al auditar, comparar lo que respondió contra estas reglas. Si una regla falla seguido → se convierte en plantilla fija (como pasó con el precio).</div>
+
+  <table>
+    <tr><th style="width:30%">Cliente pregunta…</th><th>Regla que la IA debe seguir (del prompt)</th><th style="width:15%">Estado</th></tr>
+    <tr><td>"¿Son originales?"</td><td>Responder EN POSITIVO destacando la <b>calidad 1.1</b> (alta gama, lucen espectaculares, aguantan el uso diario) y el precio. SIN repetir "no son originales" y SIN afirmar que son originales de marca.</td><td><span class="tag ok">ACTIVO</span></td></tr>
+    <tr><td>"¿Hacen rebaja? / muy caro"</td><td>Hasta <b>10%</b> dando una razón (primera compra, pago hoy, seguir en redes) y <b>15% por 2 pares</b>. Nunca más. El envío incluido es el otro argumento.</td><td><span class="tag ok">ACTIVO</span></td></tr>
+    <tr><td>"¿Cuánto tarda el envío?"</td><td>1 a 3 días hábiles en ciudades principales, 2 a 5 en zonas alejadas; si el pago entra antes del mediodía, se despacha el mismo día. Envío incluido a todo Colombia.</td><td><span class="tag ok">ACTIVO</span></td></tr>
+    <tr><td>"¿Contra entrega?" (fuera de Bogotá)</td><td>Contra entrega SOLO en Bogotá. → Usar la <b>plantilla propuesta 3.3</b> (validar → razón honesta → confianza → cierre). Nunca "por seguridad no".</td><td><span class="tag prop">PROPUESTA</span></td></tr>
+    <tr><td>"¿Tienen tienda física?"</td><td>Somos tienda virtual (sin punto físico) — apoyarse en los ganchos de confianza (guía de rastreo, Wompi, redes).</td><td><span class="tag ok">ACTIVO</span></td></tr>
+    <tr><td>"¿Qué tallas manejan?"</td><td>De la 35 a la 45 europeas; el bot convierte nacional (+1 dama / +2 hombre) y US.</td><td><span class="tag ok">ACTIVO</span></td></tr>
+    <tr><td>"¿Y si no me sirven / no me gustan?"</td><td>(Asistente v2) Gancho: "antes de enviar te grabo un video de tu pedido con tu nombre 📦". <i>Definir política de cambios explícita — hoy el prompt no la tiene.</i></td><td><span class="tag hueco">DEFINIR</span></td></tr>
+    <tr><td>"¿Envían a [ciudad]?"</td><td>Sí, a todo Colombia con envío incluido. <b>OJO:</b> dentro de datos/pago esta pregunta hoy se ignora (hueco #2).</td><td><span class="tag hueco">HUECO #2</span></td></tr>
+  </table>
+
+  <div class="escena">
+    <div class="titulo">4.1 Ejemplo: "¿son originales?" <span class="tag flag">IA (few-shot)</span></div>
+    <div class="chat">
+      <div class="msj cli"><span class="quien">Cliente</span>Esos sí son originales?</div>
+      <div class="msj bot"><span class="quien">Bot</span><i>(IA)</i> Son calidad 1.1, alta gama: lucen espectaculares y aguantan el uso diario, a muy buen precio 🔥 ¿Te muestro el catálogo?</div>
+    </div>
+  </div>
+
+  <div class="escena">
+    <div class="titulo">4.2 Ejemplo: "muy caro" en el paso de pago <span class="tag flag">IA (asistente v2)</span></div>
+    <div class="chat">
+      <div class="msj cli"><span class="quien">Cliente</span>Uy muy caro no?</div>
+      <div class="msj bot"><span class="quien">Bot</span><i>(IA)</i> El envío ya va incluido en el precio 🙌 y por ser tu primera compra te dejo un 10% si cerramos hoy, ¿elegimos el método de pago?</div>
+    </div>
+    <div class="caja info"><b>Regla de oro del asistente v2:</b> responder PRIMERO lo preguntado (máx. 2 frases) y CERRAR siempre reencaminando al paso con una mini llamada a la acción. Máximo UN gancho de confianza por mensaje, sin repetirlo.</div>
+  </div>
+</section>
+
+<!-- ============ 5. SITUACIONES DIFÍCILES ============ -->
+<section id="dificiles">
+  <h2>5. Situaciones difíciles y de rescate</h2>
+
+  <div class="escena">
+    <div class="titulo">5.1 Pide un asesor / persona real <span class="tag ok">ACTIVO (handoff)</span></div>
+    <div class="chat">
+      <div class="msj cli"><span class="quien">Cliente</span>Me pasas con una persona real?</div>
+      <div class="msj bot"><span class="quien">Bot</span>¡Claro! Ya le avisé a nuestro equipo 😊. En un momento te escriben desde el +57 320 225 0619.</div>
+    </div>
+    <div class="nota">El 320 recibe: "🔔 Cliente pide atención humana + nombre + WhatsApp + último mensaje". <b>HUECO #2:</b> dentro de datos/pago el handoff NO dispara hoy.</div>
+  </div>
+
+  <div class="escena">
+    <div class="titulo">5.2 Saludo a mitad de pedido <span class="tag flag">BOT_SALUDO_NO_REINICIA</span></div>
+    <div class="cuando">Antes un "hola" reiniciaba todo y se perdía el pedido. Ahora re-ancla.</div>
+    <div class="chat">
+      <div class="msj cli"><span class="quien">Cliente</span>Hola?</div>
+      <div class="msj bot"><span class="quien">Bot</span>¡Hola de nuevo! 👋 Seguimos con tu pedido de la <b>Ref 51</b> 😊 Terminémoslo 👇</div>
+    </div>
+  </div>
+
+  <div class="escena">
+    <div class="titulo">5.3 Mensajes sin sentido / "jajaja" / stickers <span class="tag flag">IA (asistente v2)</span></div>
+    <div class="chat">
+      <div class="msj cli"><span class="quien">Cliente</span>Jajaja no sé q poner</div>
+      <div class="msj bot"><span class="quien">Bot</span><i>(IA)</i> Tranquilo 😊 dime qué número calzas (de la 35 a la 45) y seguimos con tu pedido.</div>
+    </div>
+  </div>
+
+  <div class="escena">
+    <div class="titulo">5.4 Nota de voz / video <span class="tag flag">BOT_FLUIDEZ_RECONDUCE</span></div>
+    <div class="chat">
+      <div class="accion">🎤 cliente manda nota de voz</div>
+      <div class="msj bot"><span class="quien">Bot</span>Por aquí te leo mejor 🙌 ¿Me lo escribes en un mensajito de texto? Así te ayudo de una 😊</div>
+    </div>
+  </div>
+
+  <div class="escena">
+    <div class="titulo">5.5 Se atasca en la talla (anti-bucle) <span class="tag flag">BOT_ANTIBUCLE</span></div>
+    <div class="cuando">Tras N vueltas sin avanzar, en vez de repetir la plantilla como robot → asesor humano. Desde la 2ª repetición ya va la variante breve con salidas.</div>
+    <div class="chat">
+      <div class="msj bot"><span class="quien">Bot</span>Sigo aquí 🙌 Solo necesito tu <b>talla</b> (35 a la 45) 👟. Si prefieres, escribe <b>catálogo</b> para ver otros modelos o <b>asesor</b> y te atiende una persona.</div>
+      <div class="accion">si sigue sin avanzar → handoff automático al 320</div>
+    </div>
+  </div>
+
+  <div class="escena">
+    <div class="titulo">5.6 Escribe demasiado rápido (anti-spam) <span class="tag ok">ACTIVO</span></div>
+    <div class="chat">
+      <div class="msj bot"><span class="quien">Bot</span>Me estás escribiendo muy rapidito 🙈 Dame un momentico y seguimos, ¿va?</div>
+    </div>
+  </div>
+
+  <div class="escena">
+    <div class="titulo">5.7 Bot pausado (atención manual) <span class="tag ok">ACTIVO</span></div>
+    <div class="chat">
+      <div class="msj bot"><span class="quien">Bot</span>¡Hola! 🙌 En este momento te estamos atendiendo en persona. Ya te escribimos por aquí en un momento, gracias por la paciencia.</div>
+    </div>
+  </div>
+
+  <div class="escena">
+    <div class="titulo">5.8 Error técnico <span class="tag ok">ACTIVO</span></div>
+    <div class="chat">
+      <div class="msj bot"><span class="quien">Bot</span>Ups, tuvimos un problemita técnico 🙈. Escríbeme <b>hola</b> en un momento y seguimos, o si es urgente te atendemos en el +57 320 225 0619.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 6. POST-VENTA ============ -->
+<section id="postventa">
+  <h2>6. Post-venta y mensajes que INICIA el bot</h2>
+  <div class="caja info"><b>Regla técnica:</b> todo mensaje que inicia el negocio (avisos, rescates, resumen) está sujeto a la ventana de 24h de WhatsApp — si el cliente no ha escrito en 24h, el texto libre NO llega (aunque n8n lo vea verde). Los avisos al dueño ya van por plantilla aprobada (<code>aviso_bt</code>); los rescates a CLIENTES fuera de ventana necesitarían plantilla propia.</div>
+
+  <div class="escena">
+    <div class="titulo">6.1 "¿Cómo va mi pedido?" <span class="tag ok">ACTIVO</span></div>
+    <div class="chat">
+      <div class="msj cli"><span class="quien">Cliente</span>Cómo va mi pedido?</div>
+      <div class="msj bot"><span class="quien">Bot</span>📦 Tu último pedido:
+
+<b>Referencia 51</b> · Talla 40 · $329.900
+Hecho el 20/07/2026
+
+Estado: <b>enviado</b>
+
+¡Va en camino! 🚚 Pronto te llega.</div>
+    </div>
+    <div class="nota">Estados y su explicación: por verificar → "estamos verificando tu pago" · pago_pendiente → "te enviamos un link de pago" · confirmado/verificado → "alistando tu envío 📦" · enviado → "va en camino 🚚" · entregado → "ya fue entregado 🎉" · cancelado → "quedó cancelado, si fue un error escríbenos".</div>
+  </div>
+
+  <div class="escena">
+    <div class="titulo">6.2 Guía de envío (la dispara la app) <span class="tag ok">ACTIVO</span></div>
+    <div class="chat">
+      <div class="msj bot"><span class="quien">Bot</span>📦 ¡Tu pedido va en camino!
+
+Transportadora: <b>Interrapidísimo</b>
+Guía: <b>240001234567</b>
+
+Cualquier cosa nos escribes por aquí 😊</div>
+    </div>
+  </div>
+
+  <div class="escena">
+    <div class="titulo">6.3 Carrito abandonado (1 solo recordatorio) <span class="tag ok">ACTIVO</span></div>
+    <div class="chat">
+      <div class="msj bot"><span class="quien">Bot</span>¡Hola Juan! 👟 Vi que dejaste tu pedido de la <b>Ref 51</b> talla 40 a medias. ¿Te ayudo a terminarlo? El total sería <b>$329.900</b>. Si ya no lo quieres, todo bien — escríbeme <b>cancelar</b> y listo.</div>
+    </div>
+  </div>
+
+  <div class="escena">
+    <div class="titulo">6.4 Seguimiento tras el link del catálogo (~2h después) <span class="tag ok">ACTIVO (CW1)</span></div>
+    <div class="cuando">El bot no sabe si compró en la web → PREGUNTA, no asume. OJO auditoría: el extractor del barrido NO ve estos mensajes (solo ejecuciones con mensaje entrante) — "cero seguimiento" no está probado.</div>
+    <div class="chat">
+      <div class="msj bot"><span class="quien">Bot</span>¡Hola Juan! 👟 ¿Pudiste hacer tu compra en la web? Si algo se te complicó o te quedó alguna duda, escríbeme por aquí y con gusto te ayudo a dejar tu pedido listo 😊
+https://varmancrew.com/#catalogo</div>
+    </div>
+  </div>
+
+  <div class="escena">
+    <div class="titulo">6.5 Reseña post-entrega (la dispara la app) <span class="tag ok">ACTIVO</span></div>
+    <div class="chat">
+      <div class="msj bot"><span class="quien">Bot</span>¡Gracias por tu compra, Juan! 🙌 Esperamos que tus Adidas EQT te encanten.
+
+¿Nos regalas una reseña? Nos ayuda un montón 🧡 → [link de reseñas]</div>
+    </div>
+  </div>
+
+  <div class="escena">
+    <div class="titulo">6.6 Aviso de stock <span class="tag ok">ACTIVO</span></div>
+    <div class="chat">
+      <div class="msj cli"><span class="quien">Cliente</span>Me avisan cuando llegue la 40 de la ref 05?</div>
+      <div class="msj bot"><span class="quien">Bot</span>¡Listo! 📝 Te anoto para avisarte cuando llegue la <b>Ref 05</b> en talla 40. Apenas la tengamos te escribimos por aquí 🙌</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 7. HUECOS ============ -->
+<section id="huecos">
+  <h2>7. Resumen de la auditoría: qué pulir (en orden)</h2>
+  <table>
+    <tr><th>#</th><th>Hueco / oportunidad</th><th>Plantilla o arreglo</th><th style="width:14%">Estado</th></tr>
+    <tr><td>1</td><td>Respuesta de TEXTO a "precio" sin cifra (≈20 leads de pauta enmudecieron ahí)</td><td>Toda respuesta a "precio" trae UNA CIFRA de la ref activa (BOT_REF_PAUTA ya cubre el caso pelado; verificar con tráfico post-18 jul)</td><td><span class="tag flag">VERIFICAR</span></td></tr>
+    <tr><td>2</td><td>Estados datos/pago secuestran al cliente (ignoran "asesor", "cancelar", "¿envíos a Cali?")</td><td>Escape universal: asesor / cancelar / catálogo / FAQ en CUALQUIER paso, sin perder el avance + arreglar textos truncados de listas</td><td><span class="tag hueco">BRIEF PEND.</span></td></tr>
+    <tr><td>3</td><td>Objeción contra entrega nacional (la más frecuente según el dueño)</td><td>Plantilla propuesta en 3.3: validar → razón honesta → 3 ganchos de confianza → cierre. Encaja en el mismo brief del escape/FAQ</td><td><span class="tag prop">PROPUESTA</span></td></tr>
+    <tr><td>4</td><td>Álbum de fotos = spam (9 respuestas idénticas + ~18 avisos)</td><td>Agrupar álbum + dedupe por message_id</td><td><span class="tag hueco">BRIEF PEND.</span></td></tr>
+    <tr><td>5</td><td>Promo 15% ofrecida y no aplicada · teléfono "33" aceptado · precios inconsistentes (Ref 30)</td><td>Validación de datos + punto único de verdad de precios</td><td><span class="tag hueco">PENDIENTE</span></td></tr>
+    <tr><td>6</td><td>Política de cambios/devoluciones sin definir en el prompt</td><td>El dueño define la política → se agrega al contexto de la IA (y como FAQ)</td><td><span class="tag hueco">DEFINIR</span></td></tr>
+    <tr><td>7</td><td>Bot dice "35 a la 45" pero la web ya topó en EU 44</td><td>Decisión del dueño: ¿alinear el bot a 44?</td><td><span class="tag hueco">DECISIÓN</span></td></tr>
+  </table>
+  <div class="caja info"><b>Regla de la casa para cualquier cambio:</b> se edita SOLO <code>textos.js</code> / <code>src/</code>, se regenera con el build, todo aditivo + detrás de flag + rollback en 1 paso, tests en verde y casos nuevos. El dueño despliega.</div>
+</section>
+
+<footer>VarMan Crew · Mapa de conversaciones del bot v6.9 · generado el 22 jul 2026 a partir de <code>bot_n8n\workflows\src\textos.js</code> — documento interno, no subir a los deploys</footer>
+</div>
+</body>
+</html>

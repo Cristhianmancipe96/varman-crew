@@ -1,0 +1,92 @@
+============================================================
+ BOT VarMan Crew — v10.3 "ELIGE MÉTODO DE PAGO"  (30-jul-2026)
+============================================================
+
+QUÉ CAMBIA: revisando las conversaciones de la semana, el dueño notó que
+fuera de Bogotá el bot NO preguntaba cómo quería pagar el cliente — asumía
+Wompi de una y solo pedía PERMISO para ese link ("¿te genero el link de
+pago?"). Nequi, Daviplata y Bre-B solo aparecían si el cliente se resistía
+primero ("no tengo tarjeta"). Ahora se pregunta con el MENÚ REAL desde el
+inicio (el mismo que ya usa el flujo clásico) y el cliente elige.
+
+De resto, TODO queda igual: el saludo, la ficha, la pregunta de la ciudad,
+el resto del diálogo — nada de eso se tocó.
+
+------------------------------------------------------------
+1) QUÉ HACE
+------------------------------------------------------------
+- Al cerrar el pedido (fuera de Bogotá, con Wompi configurado), en vez de
+  "¿te genero el link de pago?", el bot muestra los 4 métodos reales:
+  Nequi, Daviplata, Bre-B y Wompi (tarjeta/PSE) — el cliente toca el que
+  prefiera.
+- Si elige Wompi: SIGUE EXACTAMENTE igual que hoy (link ya, datos después).
+  Nada cambia ahí.
+- Si elige Nequi/Daviplata/Bre-B: el bot pide nombre y dirección ANTES de
+  mandar las instrucciones de pago (para no quedarse con un pedido pagado
+  y sin dirección) y, apenas los tiene, va derecho a las instrucciones de
+  ESE método — no le vuelve a preguntar el método dos veces.
+- NUEVO: en el momento en que el cliente ELIGE un método manual (Nequi/
+  Daviplata/Bre-B), te llega un aviso al 320 DE UNA — no hay que esperar a
+  que suba la foto del comprobante (que antes era el único momento en que
+  te enterabas, y si nunca la mandaba, no te enterabas de nada). Wompi y
+  contra entrega ya te avisaban solos desde antes; esto solo llenaba el
+  hueco de los métodos manuales.
+  El aviso: "💳 Fulano (+57...) eligió pagar por *Nequi* · modelo · ciudad".
+- Esto mismo (el aviso al elegir método) también quedó agregado en el menú
+  de pago CLÁSICO (Bogotá, o cualquier cliente que llegue a "elige tu
+  método" por el camino de siempre) — mismo flag, mismo aviso.
+
+------------------------------------------------------------
+2) FLAG NUEVO (.env de la VM)
+------------------------------------------------------------
+  BOT_ELIGE_PAGO=on     <- requiere BOT_MODO_CONVERSA=on y BOT_PAGO_PRIMERO=on
+                           (los mismos que ya deben estar prendidos para que
+                           exista el camino "fuera de Bogotá + Wompi" que se
+                           está corrigiendo). Sin ellos, este flag no hace
+                           nada distinto — pero de todas formas SIEMPRE que
+                           un cliente elija un método manual en el menú
+                           clásico (esté donde esté), va a avisarte al 320.
+
+Con el flag OFF (o ausente): todo byte-idéntico a como está corriendo hoy
+en la VM (asume Wompi, pide permiso, sin aviso adicional al elegir método).
+
+------------------------------------------------------------
+3) CÓMO DESPLEGAR (igual que siempre)
+------------------------------------------------------------
+1. Súbete el archivo del Escritorio:
+     bot-varman-PARA-SUBIR-v10.3-2026-07-30.json
+   a la VM.
+
+2. En la VM, dentro de ~/varman-bot:
+     mv bot-varman-PARA-SUBIR-v10.3-2026-07-30.json workflows/bot-varman.json
+     ls -l workflows/bot-varman.json      # debe pesar 1100322 bytes exactos
+
+3. Importa ese JSON en n8n.
+
+4. Agrega al .env de la VM (si no lo tenías ya):
+     BOT_ELIGE_PAGO=on
+
+5. Reinicia n8n:
+     docker compose up -d --force-recreate n8n
+
+6. Prueba desde tu WhatsApp (el 320), como cliente: pide un modelo, dale
+   una ciudad que NO sea Bogotá, di que sí lo quieres — debe salir el menú
+   de 4 métodos (no el texto de "¿te genero el link?"). Elige Nequi: debe
+   pedirte nombre+dirección y avisarte al 320 de una. Prueba también con
+   Wompi para confirmar que sigue igual que siempre.
+
+------------------------------------------------------------
+4) ROLLBACK (1 paso)
+------------------------------------------------------------
+  BOT_ELIGE_PAGO=off   en el .env  +  force-recreate.
+Todo vuelve a asumir Wompi y pedir permiso, como estaba antes de hoy.
+No toca ningún otro flag ni el resto del diálogo.
+
+------------------------------------------------------------
+5) POR QUÉ NO SE TOCÓ NADA MÁS
+------------------------------------------------------------
+El dueño pidió expresamente: "de resto quiero todo igual de como está
+ahora". Este cambio es quirúrgico — un solo punto de decisión (qué método
+de pago) y un aviso nuevo (cuándo se elige). El resto del cuaderno de
+ventas (contra entrega, video, objeciones) queda para otra ronda si se
+decide retomarlo.

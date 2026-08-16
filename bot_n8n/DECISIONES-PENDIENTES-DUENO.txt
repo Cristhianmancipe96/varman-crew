@@ -1,0 +1,68 @@
+========================================================================
+  DOS COSAS QUE NECESITAN TU DECISIÓN  (25-jul, tras el barrido)
+  Ninguna bloquea subir la v10: el bot ya está a salvo por defecto.
+========================================================================
+
+------------------------------------------------------------------------
+1) GARANTÍA, CAMBIOS DE TALLA, DEVOLUCIONES Y FACTURA
+------------------------------------------------------------------------
+QUÉ PASA HOY
+  Preguntas de todos los días que el bot NO tiene cómo responder:
+    · "¿Y si me quedan grandes, las puedo cambiar?"
+    · "¿Tienen garantía?"
+    · "¿Me dan factura?"
+    · "¿Tienen local? ¿Dónde las recojo?"
+  En el cuaderno del bot no hay ni una frase para esto: solo dice
+  "NO prometas cambios ni devoluciones". Antes no había nada que se lo
+  impidiera, así que el bot PODÍA inventarse una política y dejarte
+  comprometido con algo que tú no ofreces.
+
+LO QUE YA HICE (a salvo, sin inventar nada)
+  Un veto de código tumba cualquier frase donde el bot prometa cambios,
+  devoluciones, reembolsos o garantía. Si el cliente insiste, el bot no
+  promete: sigue la venta o lo pasa a un asesor.
+
+LO QUE FALTA (esto sí es tuyo)
+  Mándame UNA línea por tema, con tus palabras, y las meto como texto
+  aprobado. Ejemplos SOLO para que veas el formato — cámbialos por lo
+  que tú de verdad haces:
+
+    CAMBIO DE TALLA → "Si te queda grande o pequeña, la cambiamos por
+                       otra talla dentro de los primeros X días; el
+                       envío del cambio lo cubre ___."
+    GARANTÍA        → "Tienen garantía de X por defectos de fábrica."
+    FACTURA         → "Te enviamos ___ como soporte de tu compra."
+    LOCAL/RECOGIDA  → "Somos tienda virtual, no tenemos local. En Bogotá
+                       te lo llevamos y pagas al recibir."
+
+  Si prefieres NO ofrecer alguno, dilo así de simple ("no hacemos
+  cambios") y yo redacto la salida elegante que no tumbe la venta.
+
+------------------------------------------------------------------------
+2) LA FIRMA DE META EN EL WEBHOOK  (seguridad)
+------------------------------------------------------------------------
+QUÉ PASA HOY
+  La URL del webhook del bot (bot.varmancrew.com/webhook/whatsapp) acepta
+  cualquier POST que tenga la forma correcta, sin comprobar que venga de
+  verdad de Meta. Quien conozca o adivine esa URL podría inyectar
+  mensajes falsos: hacerse pasar por un cliente, o incluso por TU número
+  (el 320) y usar los comandos de dueño.
+
+  Riesgo real hoy: BAJO — hay que conocer la URL exacta y nadie la
+  publica. Pero es la puerta de entrada del bot, y arreglarlo es barato.
+
+QUÉ HACE FALTA DE TU LADO
+  El "App Secret" de tu app de Meta:
+    developers.facebook.com → tu app → Configuración → Básica →
+    "Clave secreta de la aplicación" → Mostrar → copiar.
+
+  Me lo pones en el .env de la VM (NO me lo mandes por chat):
+      META_APP_SECRET=xxxxxxxxxxxxxxxx
+
+  Cuando esté puesto, activo la verificación de firma. Mientras NO esté,
+  el bot sigue funcionando exactamente igual que hoy — la verificación
+  queda apagada sola, sin romper nada.
+
+------------------------------------------------------------------------
+  Respóndeme cuando puedas. Nada de esto frena el despliegue de la v10.
+------------------------------------------------------------------------
