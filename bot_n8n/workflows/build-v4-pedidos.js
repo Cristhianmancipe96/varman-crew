@@ -14,7 +14,7 @@ const src = (f) => fs.readFileSync(path.join(DIR, 'src', f), 'utf8');
 const SALIDA = path.join(DIR, 'bot-varman.json');
 // Versión: cada valor nuevo deja su propio respaldo en respaldo/ para rollback.
 // Subir SOLO cuando haya un cambio que quieras poder revertir por separado.
-const VERSION = '11.3';
+const VERSION = '11.4';
 
 const wf = {
   // OJO: el id NO se cambia — importar-workflows.sh de la VM activa por id
@@ -64,7 +64,7 @@ const wf = {
     },
     {
       parameters: {
-        jsCode: "// [BUZON-RELOJ] (v11.3) bundle interno del reloj: los mensajes que el\n// workflow VarmanBuzonReloj1 junto en el buzon entran por ESTE webhook (la\n// unica puerta del bot, como en la v11.0) con un token. Sin token valido se\n// ignora: el webhook es publico.\n{\n  const b0 = ($input.first() && $input.first().json) || {};\n  const body0 = b0.body || b0;\n  if (body0 && body0.interno_buzon === true) {\n    if (String(body0.token || '') !== String($env.WEBHOOK_VERIFY_TOKEN || '')) return [];\n    return (Array.isArray(body0.items) ? body0.items : []).map((j) => ({ json: j }));\n  }\n}\nconst out = [];\nfor (const item of $input.all()) {\n  const body = item.json.body || item.json;\n  for (const e of (body.entry || [])) {\n    for (const ch of (e.changes || [])) {\n      const v = ch.value || {};\n      const contacto = (v.contacts && v.contacts[0]) || {};\n      for (const m of (v.messages || [])) {\n        let texto = '';\n        let inter_id = '';\n        let imagen_id = '';\n        if (m.type === 'text') texto = (m.text && m.text.body) || '';\n        else if (m.type === 'image') imagen_id = (m.image && m.image.id) || '';\n        else if (m.type === 'interactive') {\n          const it = m.interactive || {};\n          if (it.type === 'list_reply') inter_id = (it.list_reply && it.list_reply.id) || '';\n          else if (it.type === 'button_reply') inter_id = (it.button_reply && it.button_reply.id) || '';\n        }\n        // Atribucion de pauta (v5): los webhooks de anuncios click-to-WhatsApp\n        // traen m.referral con el source_id del anuncio. Solo llega en el\n        // PRIMER mensaje; el Cerebro lo conserva en la sesion hasta el pedido.\n        let fuente = '';\n        // [FUENTE-DETALLE] detalle del referral: titulo del anuncio (headline),\n        // tipo (ad|post) y url. Se emiten SIEMPRE (campos inertes: sin referral\n        // van como strings vacios, nunca se inventa nada) — el Cerebro solo los\n        // usa cuando el flag BOT_FUENTE_DETALLE esta encendido.\n        let fuente_titulo = '';\n        let fuente_tipo = '';\n        let fuente_url = '';\n        if (m.referral) {\n          const r = m.referral;\n          fuente = 'ctwa:' + (r.source_id || r.ctwa_clid || r.source_url || 'anuncio');\n          fuente_titulo = r.headline || '';\n          fuente_tipo = r.source_type || '';\n          fuente_url = r.source_url || '';\n        }\n        out.push({ json: {\n          wa_id: m.from,\n          nombre: (contacto.profile && contacto.profile.name) || '',\n          tipo: m.type,\n          texto,\n          inter_id,\n          imagen_id,\n          fuente,\n          fuente_titulo,\n          fuente_tipo,\n          fuente_url,\n          message_id: m.id\n        }});\n      }\n      // [LOG-FALLOS] (flag BOT_LOG_FALLOS, 2026-07-18): statuses `failed` de\n      // Meta -> item especial que el Cerebro registra en botErrores. Un envio\n      // puede ser 'aceptado' (devuelve wamid, n8n en verde) y aun asi NO\n      // entregarse (ej. ventana de 24h cerrada, codigo 131047 — el caso real\n      // de los resumenes al 320). Con el flag OFF no se emite nada (identico a hoy).\n      if (/^(on|1|true|si|s[ií])$/i.test(String($env.BOT_LOG_FALLOS || '').trim())) {\n        for (const s of (v.statuses || [])) {\n          if (String(s.status) !== 'failed') continue;\n          const err = (s.errors && s.errors[0]) || {};\n          out.push({ json: {\n            tipo_evento: 'fallo_envio',\n            wa_id: '',\n            destinatario: s.recipient_id || '',\n            message_id: s.id || '',\n            error_code: String(err.code || ''),\n            error_title: String(err.title || (err.error_data && err.error_data.details) || '')\n          }});\n        }\n      }\n    }\n  }\n}\nreturn out;"
+        jsCode: "const out = [];\nfor (const item of $input.all()) {\n  const body = item.json.body || item.json;\n  for (const e of (body.entry || [])) {\n    for (const ch of (e.changes || [])) {\n      const v = ch.value || {};\n      const contacto = (v.contacts && v.contacts[0]) || {};\n      for (const m of (v.messages || [])) {\n        let texto = '';\n        let inter_id = '';\n        let imagen_id = '';\n        if (m.type === 'text') texto = (m.text && m.text.body) || '';\n        else if (m.type === 'image') imagen_id = (m.image && m.image.id) || '';\n        else if (m.type === 'interactive') {\n          const it = m.interactive || {};\n          if (it.type === 'list_reply') inter_id = (it.list_reply && it.list_reply.id) || '';\n          else if (it.type === 'button_reply') inter_id = (it.button_reply && it.button_reply.id) || '';\n        }\n        // Atribucion de pauta (v5): los webhooks de anuncios click-to-WhatsApp\n        // traen m.referral con el source_id del anuncio. Solo llega en el\n        // PRIMER mensaje; el Cerebro lo conserva en la sesion hasta el pedido.\n        let fuente = '';\n        // [FUENTE-DETALLE] detalle del referral: titulo del anuncio (headline),\n        // tipo (ad|post) y url. Se emiten SIEMPRE (campos inertes: sin referral\n        // van como strings vacios, nunca se inventa nada) — el Cerebro solo los\n        // usa cuando el flag BOT_FUENTE_DETALLE esta encendido.\n        let fuente_titulo = '';\n        let fuente_tipo = '';\n        let fuente_url = '';\n        if (m.referral) {\n          const r = m.referral;\n          fuente = 'ctwa:' + (r.source_id || r.ctwa_clid || r.source_url || 'anuncio');\n          fuente_titulo = r.headline || '';\n          fuente_tipo = r.source_type || '';\n          fuente_url = r.source_url || '';\n        }\n        out.push({ json: {\n          wa_id: m.from,\n          nombre: (contacto.profile && contacto.profile.name) || '',\n          tipo: m.type,\n          texto,\n          inter_id,\n          imagen_id,\n          fuente,\n          fuente_titulo,\n          fuente_tipo,\n          fuente_url,\n          message_id: m.id\n        }});\n      }\n      // [LOG-FALLOS] (flag BOT_LOG_FALLOS, 2026-07-18): statuses `failed` de\n      // Meta -> item especial que el Cerebro registra en botErrores. Un envio\n      // puede ser 'aceptado' (devuelve wamid, n8n en verde) y aun asi NO\n      // entregarse (ej. ventana de 24h cerrada, codigo 131047 — el caso real\n      // de los resumenes al 320). Con el flag OFF no se emite nada (identico a hoy).\n      if (/^(on|1|true|si|s[ií])$/i.test(String($env.BOT_LOG_FALLOS || '').trim())) {\n        for (const s of (v.statuses || [])) {\n          if (String(s.status) !== 'failed') continue;\n          const err = (s.errors && s.errors[0]) || {};\n          out.push({ json: {\n            tipo_evento: 'fallo_envio',\n            wa_id: '',\n            destinatario: s.recipient_id || '',\n            message_id: s.id || '',\n            error_code: String(err.code || ''),\n            error_title: String(err.title || (err.error_data && err.error_data.details) || '')\n          }});\n        }\n      }\n    }\n  }\n}\nreturn out;"
       },
       id: '40000000-0000-4000-8000-000000000005',
       name: 'Parsear mensaje',
@@ -72,24 +72,11 @@ const wf = {
       typeVersion: 2,
       position: [220, 260]
     },
-    {
-      // [BUZON] (flag BOT_BUZON, 16-ago-2026) Guarda el mensaje y termina la
-      // ejecucion, en vez de contestar de una. Con el flag OFF devuelve los
-      // items TAL CUAL: el nodo es transparente y el bot se comporta igual
-      // que hoy. Quien junta y responde es "Buzon recoger (cada minuto)".
-      parameters: { jsCode: src('buzon-guardar.js') },
-      id: '40000000-0000-4000-8000-000000000012',
-      name: 'Buzon guardar (BOT_BUZON)',
-      type: 'n8n-nodes-base.code',
-      typeVersion: 2,
-      position: [330, 120]
-    },
-    // [BUZON v11.3] El "Cada minuto" + "Buzon recoger" YA NO viven aqui.
-    // n8n guarda una copia del workflow COMPLETO (1,1 MB) por cada ejecucion:
-    // 1.440 ticks/dia dentro de este workflow engordaban la base sola (la
-    // leccion de los 10 GB de julio), y la doble puerta del Cerebro fue el bug
-    // del 16-ago. Ahora el reloj es el workflow APARTE VarmanBuzonReloj1 (ver
-    // wfReloj abajo), que entrega los mensajes juntados por el webhook normal.
+    // [v11.4 · 16-ago-2026, decision FINAL del dueno] El buzon/delay quedo
+    // DESCARTADO por completo ("eso siempre dana el bot"): fuera "Buzon
+    // guardar", "Cada minuto" y "Buzon recoger". Cableado identico a la v11.0
+    // que estaba probada en produccion. El codigo del buzon queda de museo en
+    // src/ y en workflows/respaldo/ (v11.1-v11.3) por si algun dia se pide.
     {
       parameters: {
         method: 'GET',
@@ -244,13 +231,8 @@ const wf = {
     'Webhook verificacion (GET)': { main: [[{ node: 'Verificar token', type: 'main', index: 0 }]] },
     'Verificar token': { main: [[{ node: 'Responder a Meta', type: 'main', index: 0 }]] },
     'Webhook mensajes (POST)': { main: [[{ node: 'Parsear mensaje', type: 'main', index: 0 }]] },
-    // [BUZON] el mensaje pasa por el buzon antes de llegar al catalogo. Con
-    // BOT_BUZON OFF el nodo devuelve los items tal cual y la cadena es
-    // exactamente la de siempre (Parsear -> catalogo -> Cerebro).
-    'Parsear mensaje': { main: [[{ node: 'Buzon guardar (BOT_BUZON)', type: 'main', index: 0 }]] },
-    'Buzon guardar (BOT_BUZON)': { main: [[{ node: 'Leer catalogo (Firestore)', type: 'main', index: 0 }]] },
-    // [BUZON v11.3] ya NO hay segunda entrada: los mensajes juntados entran
-    // por el webhook normal (POST interno del reloj) y pasan por Parsear.
+    // [v11.4] cadena directa, identica a la v11.0: Parsear -> catalogo -> Cerebro
+    'Parsear mensaje': { main: [[{ node: 'Leer catalogo (Firestore)', type: 'main', index: 0 }]] },
     'Leer catalogo (Firestore)': { main: [[{ node: 'Cerebro (sesion+pedido+Gemini)', type: 'main', index: 0 }]] },
     'Cerebro (sesion+pedido+Gemini)': { main: [[{ node: 'Enviar a WhatsApp', type: 'main', index: 0 }]] },
     // salida 0 = exito (no va a ningun lado), salida 1 = error -> log
@@ -272,50 +254,6 @@ const wf = {
   pinData: {}
 };
 
-// ============ [BUZON v11.3] EL RELOJ APARTE (workflow chiquito) ============
-// Un segundo workflow, MINÚSCULO (~KB contra 1,1 MB del bot), con el trigger
-// del minuto. Claves del diseño:
-//  - saveDataSuccessExecution 'none': los ticks exitosos NO se guardan en la
-//    base (adiós al engorde de 1.440 × 1,1 MB al día). Los que FALLAN sí se
-//    guardan, para verlos en la UI.
-//  - Entrega por el webhook normal del bot (POST interno con token): el
-//    workflow grande conserva UNA sola puerta, como en la v11.0 probada.
-//  - Va en workflows/ porque importar-workflows.sh importa todos los .json de
-//    ahí; OJO: el import lo desactiva igual que al bot → publicar AMBOS ids.
-const wfReloj = {
-  id: 'VarmanBuzonReloj1',
-  name: 'VarMan Buzon Reloj (junta mensajes 45s y los entrega al bot)',
-  active: false,
-  nodes: [
-    {
-      parameters: { rule: { interval: [{ field: 'minutes', minutesInterval: 1 }] } },
-      id: '41000000-0000-4000-8000-000000000001',
-      name: 'Cada minuto',
-      type: 'n8n-nodes-base.scheduleTrigger',
-      typeVersion: 1.2,
-      position: [0, 0]
-    },
-    {
-      parameters: { jsCode: src('buzon-reloj.js') },
-      id: '41000000-0000-4000-8000-000000000002',
-      name: 'Buzon reloj (junta y entrega)',
-      type: 'n8n-nodes-base.code',
-      typeVersion: 2,
-      position: [220, 0]
-    }
-  ],
-  connections: {
-    'Cada minuto': { main: [[{ node: 'Buzon reloj (junta y entrega)', type: 'main', index: 0 }]] }
-  },
-  settings: {
-    executionOrder: 'v1',
-    timezone: 'America/Bogota',
-    saveDataSuccessExecution: 'none',
-    saveDataErrorExecution: 'all'
-  },
-  pinData: {}
-};
-
 const json = JSON.stringify(wf, null, 2) + '\n';
 fs.writeFileSync(SALIDA, json, 'utf8');
 // respaldo versionado (vive en respaldo/, que el import NO toca) para rollback
@@ -323,12 +261,9 @@ const backup = path.join(DIR, 'respaldo', 'bot-varman-v' + VERSION + '.json');
 fs.writeFileSync(backup, json, 'utf8');
 console.log('OK ->', SALIDA, '(' + fs.statSync(SALIDA).size + ' bytes, ' + wf.nodes.length + ' nodos)');
 console.log('     respaldo v' + VERSION + ' ->', backup);
-
-const SALIDA_RELOJ = path.join(DIR, 'buzon-reloj.json');
-const jsonReloj = JSON.stringify(wfReloj, null, 2) + '\n';
-fs.writeFileSync(SALIDA_RELOJ, jsonReloj, 'utf8');
-fs.writeFileSync(path.join(DIR, 'respaldo', 'buzon-reloj-v' + VERSION + '.json'), jsonReloj, 'utf8');
-console.log('OK ->', SALIDA_RELOJ, '(' + fs.statSync(SALIDA_RELOJ).size + ' bytes, ' + wfReloj.nodes.length + ' nodos)');
+// [v11.4] el buzon-reloj.json ya NO se genera (delay descartado por el dueno).
+// Si quedo uno de la v11.3, se borra para que ningun import masivo lo agarre.
+try { fs.unlinkSync(path.join(DIR, 'buzon-reloj.json')); console.log('     (borrado workflows/buzon-reloj.json de la v11.3)'); } catch (e) {}
 
 // --- copia "PARA SUBIR" en el Escritorio (deploy manual del dueño) ---
 // El dueño sube el bot a la VM por el navegador (SSH de GCP). Problema
@@ -360,13 +295,10 @@ try {
     const destino = path.join(escritorio, 'bot-varman-PARA-SUBIR-v' + VERSION + '-' + hoy + '.json');
     fs.writeFileSync(destino, json, 'utf8');
     console.log('     >>> SUBE ESTE a la VM ->', destino);
-    // [BUZON v11.3] el reloj también se sube (borrar copias viejas primero)
+    // [v11.4] limpiar cualquier copia del reloj de la v11.3 (delay descartado)
     for (const f of fs.readdirSync(escritorio)) {
       if (/^buzon-reloj-PARA-SUBIR-.*\.json$/i.test(f)) fs.unlinkSync(path.join(escritorio, f));
     }
-    const destinoReloj = path.join(escritorio, 'buzon-reloj-PARA-SUBIR-v' + VERSION + '-' + hoy + '.json');
-    fs.writeFileSync(destinoReloj, jsonReloj, 'utf8');
-    console.log('     >>> Y ESTE (el reloj) ->', destinoReloj);
   }
 } catch (e) {
   console.log('     (aviso: no pude dejar la copia en el Escritorio — ' + e.message + ')');

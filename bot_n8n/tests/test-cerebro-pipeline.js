@@ -1149,35 +1149,33 @@ console.log('\n── P52 · Buzon reloj: junta, entrega por el webhook y vacía
   check('P52: con BOT_BUZON apagado no toca nada', cap3.total === 0, cap3.total);
 }
 
-console.log('\n── P53 · Parsear (del JSON construido): la puerta interna con token ──');
+// [v11.4] La "puerta interna con token" de Parsear se quitó junto con el buzón
+// (decisión final del dueño: sin delay). P53 queda como guarda de que el
+// Parsear del JSON construido: (a) parsea el formato real de Meta igual que
+// siempre y (b) YA NO trae la puerta interna ni el nodo del buzón.
+console.log('\n── P53 · Parsear (del JSON construido): limpio y parseando igual ──');
 {
   const codigoParsear = wf.nodes.find((n) => n.name === 'Parsear mensaje').parameters.jsCode;
   const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
-  const envP = Object.assign({}, ENV, { WEBHOOK_VERIFY_TOKEN: 'tokenwebhook_test' });
   const correrParsear = (bodyJson) => new AsyncFunction('$input', '$env', '$json', '$', 'require', codigoParsear)
-    .call({}, { all: () => [{ json: bodyJson }], first: () => ({ json: bodyJson }) }, envP, bodyJson, () => {}, require);
+    .call({}, { all: () => [{ json: bodyJson }], first: () => ({ json: bodyJson }) }, ENV, bodyJson, () => {}, require);
 
-  // (a) bundle del reloj con el token bueno → entra tal cual
-  const outA = await correrParsear({ body: { interno_buzon: true, token: 'tokenwebhook_test',
-    items: [{ wa_id: WA, texto: 'hola\ncuanto valen', buzon_juntados: 2, tipo: 'text' }] } });
-  check('P53: el bundle con token bueno entra al bot',
-    outA.length === 1 && outA[0].json.wa_id === WA && outA[0].json.buzon_juntados === 2,
-    JSON.stringify(outA).slice(0, 140));
-
-  // (b) token malo → se ignora (el webhook es público)
-  const outB = await correrParsear({ body: { interno_buzon: true, token: 'NO_ES',
-    items: [{ wa_id: WA, texto: 'inyectado' }] } });
-  check('P53: sin el token se ignora por completo',
-    Array.isArray(outB) && outB.length === 0, JSON.stringify(outB).slice(0, 120));
-
-  // (c) el formato normal de Meta sigue parseando IGUAL que siempre
   const outC = await correrParsear({ body: { entry: [{ changes: [{ value: {
     contacts: [{ profile: { name: 'Cliente' } }],
     messages: [{ from: WA, id: 'wamid.X1', type: 'text', text: { body: 'hola' } }]
   } }] }] } });
-  check('P53: el mensaje real de Meta sigue igual (nada viejo se rompe)',
+  check('P53: el mensaje real de Meta parsea igual que siempre',
     outC.length === 1 && outC[0].json.wa_id === WA && outC[0].json.texto === 'hola',
     JSON.stringify(outC).slice(0, 140));
+
+  check('P53: el build quedó SIN la puerta interna del buzón',
+    codigoParsear.indexOf('interno_buzon') < 0, 'aparece interno_buzon en Parsear');
+  check('P53: el build quedó SIN ninguna caja del buzón',
+    !wf.nodes.some((n) => /buzon|Cada minuto/i.test(n.name)),
+    wf.nodes.map((n) => n.name).join(' | '));
+  check('P53: y Parsear conecta DIRECTO al catálogo (cableado v11.0)',
+    JSON.stringify(wf.connections['Parsear mensaje']).indexOf('Leer catalogo') >= 0,
+    JSON.stringify(wf.connections['Parsear mensaje']));
 }
 
 // ============================================================================
