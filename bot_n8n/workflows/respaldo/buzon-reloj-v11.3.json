@@ -1,0 +1,60 @@
+{
+  "id": "VarmanBuzonReloj1",
+  "name": "VarMan Buzon Reloj (junta mensajes 45s y los entrega al bot)",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "41000000-0000-4000-8000-000000000001",
+      "name": "Cada minuto",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============ BUZÓN v11.3 · el RELOJ APARTE (workflow VarmanBuzonReloj1) ============\n// (decisión del dueño, 16-ago-2026 tarde: \"parte de la que ya servía\")\n//\n// POR QUÉ EXISTE ESTE ARCHIVO — la lección de la v11.1/v11.2:\n// El \"Cada minuto\" vivía DENTRO del workflow grande (1,1 MB) y n8n guarda una\n// copia del workflow completo en la base POR CADA ejecución: 1.440 ticks/día\n// × 1,1 MB = la base engordando sola (fue lo que la llevó a 10 GB en julio).\n// Además el Cerebro quedó con DOS puertas de entrada, y esa dualidad fue el\n// bug que lo tumbó el 16-ago.\n//\n// EL DISEÑO NUEVO: este código vive en un workflow APARTE y CHIQUITO (~KB),\n// configurado para NO guardar sus ejecuciones exitosas. Junta los mensajes\n// maduros igual que siempre y se los entrega al bot POR EL WEBHOOK DE SIEMPRE\n// (POST interno a 127.0.0.1:5678/webhook/whatsapp con un token). Así el\n// workflow grande conserva UNA sola puerta (Parsear mensaje), exactamente el\n// camino de la v11.0 que estaba probado en producción.\n//\n// La ventana sigue igual: se abre con el PRIMER mensaje (BOT_BUZON_SEGUNDOS,\n// 45 por defecto); el cliente espera 45-105 s reales porque esto corre cada\n// minuto. Con BOT_BUZON OFF devuelve [] sin tocar Firestore: inerte.\n//\n// Cada cliente maduro va en SU PROPIO POST (una ejecución del bot por\n// conversación, como los mensajes normales de Meta): así no se mezclan\n// clientes en una misma ejecución del Cerebro.\nconst H = this.helpers;\nconst crypto = require('crypto');\nconst FS_BASE = 'https://firestore.googleapis.com/v1/projects/varman-crew/databases/(default)/documents';\n\nconst FLAG_BUZON = /^(on|1|true|si|s[ií])$/i.test(String($env.BOT_BUZON || '').trim());\nif (!FLAG_BUZON) return [];\n\nconst VENTANA_MS = Math.max(5, parseInt($env.BOT_BUZON_SEGUNDOS, 10) || 45) * 1000;\n// Un buzón más viejo que esto quedó huérfano (algo murió a mitad de turno):\n// se procesa igual en vez de dejar al cliente esperando para siempre.\nconst HUERFANO_MS = 15 * 60 * 1000;\n// Tope de mensajes por turno (un álbum de 9 fotos no revienta el prompt).\nconst MAX_MSGS = 20;\n\nfunction b64url(buf) {\n  return Buffer.from(buf).toString('base64').replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '');\n}\nasync function tokenAdmin() {\n  const sa = JSON.parse(Buffer.from($env.FIREBASE_SA_B64, 'base64').toString('utf8'));\n  const now = Math.floor(Date.now() / 1000);\n  const header = b64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));\n  const claims = b64url(JSON.stringify({\n    iss: sa.client_email,\n    scope: 'https://www.googleapis.com/auth/datastore',\n    aud: 'https://oauth2.googleapis.com/token',\n    iat: now, exp: now + 3600\n  }));\n  const signer = crypto.createSign('RSA-SHA256');\n  signer.update(header + '.' + claims);\n  const jwt = header + '.' + claims + '.' + b64url(signer.sign(sa.private_key));\n  const r = await H.httpRequest({\n    method: 'POST', url: 'https://oauth2.googleapis.com/token',\n    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },\n    body: 'grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=' + jwt,\n    timeout: 15000, json: true\n  });\n  return r.access_token;\n}\nfunction unwrap(v) {\n  if (v == null) return null;\n  if ('integerValue' in v) return parseInt(v.integerValue, 10);\n  if ('booleanValue' in v) return v.booleanValue;\n  if ('stringValue' in v) return v.stringValue;\n  return null;\n}\nasync function borrar(tok, docId) {\n  try {\n    await H.httpRequest({ method: 'DELETE',\n      url: FS_BASE + '/tiendas/varman/botBuzon/' + encodeURIComponent(docId),\n      headers: { Authorization: 'Bearer ' + tok }, timeout: 10000 });\n  } catch (e) { /* si no se borra, el siguiente turno lo vuelve a intentar */ }\n}\n// La entrega al bot: POST interno al webhook de SIEMPRE. Lleva el mismo token\n// de verificación del webhook para que \"Parsear mensaje\" sepa que es nuestro.\n// Un reintento y ya: si tampoco entra, los docs siguen en el buzón (no se han\n// borrado) y el minuto siguiente lo vuelve a intentar completo.\nasync function entregar(base) {\n  const cuerpo = {\n    interno_buzon: true,\n    token: String($env.WEBHOOK_VERIFY_TOKEN || ''),\n    items: [base]\n  };\n  for (let intento = 1; intento <= 2; intento++) {\n    try {\n      await H.httpRequest({\n        method: 'POST', url: 'http://127.0.0.1:5678/webhook/whatsapp',\n        headers: { 'Content-Type': 'application/json' },\n        body: cuerpo, json: true, timeout: 30000\n      });\n      return true;\n    } catch (e) { if (intento === 2) return false; }\n  }\n  return false;\n}\n\nlet tok;\ntry { tok = await tokenAdmin(); } catch (e) { return []; }\n\n// ---- leer el buzón entero (es chico por definición: solo lo que no maduró) ----\nconst docs = [];\ntry {\n  let pageToken = '';\n  do {\n    const url = FS_BASE + '/tiendas/varman/botBuzon?pageSize=300'\n      + (pageToken ? '&pageToken=' + encodeURIComponent(pageToken) : '');\n    const r = await H.httpRequest({ method: 'GET', url,\n      headers: { Authorization: 'Bearer ' + tok }, json: true, timeout: 20000 });\n    for (const d of (r.documents || [])) {\n      const f = d.fields || {};\n      docs.push({\n        _id: d.name.split('/').pop(),\n        wa: unwrap(f.wa) || '',\n        recibidoAt: unwrap(f.recibidoAt) || '',\n        payload: unwrap(f.payload) || ''\n      });\n    }\n    pageToken = r.nextPageToken || '';\n  } while (pageToken);\n} catch (e) { return []; }\n\nif (!docs.length) return [];\n\n// ---- agrupar por cliente ----\nconst porCliente = {};\nfor (const d of docs) {\n  if (!d.wa) { await borrar(tok, d._id); continue; }   // basura: fuera\n  (porCliente[d.wa] = porCliente[d.wa] || []).push(d);\n}\n\nconst ahora = Date.now();\nlet entregados = 0;\n\nfor (const wa in porCliente) {\n  const grupo = porCliente[wa].sort((a, b) => String(a.recibidoAt).localeCompare(String(b.recibidoAt)));\n  const primero = Date.parse(grupo[0].recibidoAt) || ahora;\n  const edad = ahora - primero;\n\n  // Todavía dentro de la ventana: se deja madurar, se revisa al minuto siguiente.\n  if (edad < VENTANA_MS && edad < HUERFANO_MS) continue;\n\n  // ---- reconstruir los mensajes ----\n  const msgs = [];\n  for (const d of grupo.slice(0, MAX_MSGS)) {\n    try { msgs.push(JSON.parse(d.payload)); } catch (e) { /* payload roto: se ignora */ }\n  }\n  if (!msgs.length) { for (const d of grupo) await borrar(tok, d._id); continue; }\n\n  // ---- juntarlos en UN solo item con la forma de \"Parsear mensaje\" ----\n  // Base: el ÚLTIMO mensaje (el estado más reciente del cliente).\n  const base = Object.assign({}, msgs[msgs.length - 1]);\n\n  // El referral de Meta (de qué anuncio viene) SOLO llega en el primer mensaje:\n  // se rescata del primero que lo traiga o se pierde la atribución de la pauta.\n  for (const m of msgs) {\n    if (!base.fuente && m.fuente) {\n      base.fuente = m.fuente;\n      base.fuente_titulo = m.fuente_titulo || base.fuente_titulo || '';\n      base.fuente_tipo = m.fuente_tipo || base.fuente_tipo || '';\n      base.fuente_url = m.fuente_url || base.fuente_url || '';\n    }\n    if (!base.nombre && m.nombre) base.nombre = m.nombre;\n  }\n\n  // Textos: todos, en orden, uno por línea. El Cerebro los lee como un solo\n  // mensaje del cliente y responde a todo junto.\n  const textos = msgs.map((m) => String(m.texto || '').trim()).filter(Boolean);\n  base.texto = textos.join('\\n');\n\n  // Fotos: el Cerebro solo puede mirar UNA por turno. Se usa la PRIMERA que\n  // mandó y, si mandó más, se le dice al Cerebro cuántas.\n  const fotos = msgs.map((m) => String(m.imagen_id || '')).filter(Boolean);\n  if (fotos.length) {\n    base.imagen_id = fotos[0];\n    base.tipo = 'image';\n    if (fotos.length > 1) {\n      base.texto = (base.texto ? base.texto + '\\n' : '')\n        + '[el cliente envió ' + fotos.length + ' fotos en este rato]';\n    }\n  } else if (textos.length) {\n    base.tipo = 'text';\n    base.imagen_id = '';\n  }\n\n  // Botón o lista: gana el último que haya tocado.\n  const inters = msgs.map((m) => String(m.inter_id || '')).filter(Boolean);\n  base.inter_id = inters.length ? inters[inters.length - 1] : '';\n\n  // Marca de agua: cuántos mensajes se juntaron. También es la señal con la\n  // que \"Buzon guardar\" deja pasar el bundle derecho (no lo vuelve a guardar).\n  base.buzon_juntados = msgs.length;\n\n  // ---- entregar POR EL WEBHOOK y solo entonces vaciar el buzón ----\n  // Orden a propósito: si la entrega falla, los docs se quedan y el minuto\n  // siguiente reintenta. Perder el mensaje es peor que un reintento.\n  const ok = await entregar(base);\n  if (ok) {\n    for (const d of grupo) await borrar(tok, d._id);\n    entregados++;\n  }\n}\n\nreturn [{ json: { entregados } }];\n"
+      },
+      "id": "41000000-0000-4000-8000-000000000002",
+      "name": "Buzon reloj (junta y entrega)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Cada minuto": {
+      "main": [
+        [
+          {
+            "node": "Buzon reloj (junta y entrega)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Bogota",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "all"
+  },
+  "pinData": {}
+}

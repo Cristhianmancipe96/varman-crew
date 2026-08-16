@@ -1,0 +1,122 @@
+============================================================
+ SUBIR EL BOT — v11.3 "RELOJ APARTE"        16-ago-2026
+============================================================
+
+QUE TRAE
+  El buzon de 45 s, pero SIN los dos problemas de la v11.1/v11.2:
+  - El "Cada minuto" ya NO vive dentro del workflow grande. n8n
+    guarda una copia del workflow COMPLETO (1,1 MB) por cada
+    ejecucion: 1.440 ticks/dia engordaban la base sola (la
+    leccion de los 10 GB de julio). Ahora el reloj es un workflow
+    APARTE de 10 KB que ni siquiera guarda sus ticks exitosos.
+  - El Cerebro vuelve a tener UNA sola puerta (Parsear mensaje),
+    exactamente el camino de la v11.0 que estaba probado. El
+    reloj entrega los mensajes juntados por el webhook normal,
+    con el mismo token del webhook (sin token se ignora).
+
+  SON DOS ARCHIVOS (los dos del Escritorio):
+    bot-varman-PARA-SUBIR-v11.3-2026-08-16.json   -> 1149783 bytes · 18 nodos
+    buzon-reloj-PARA-SUBIR-v11.3-2026-08-16.json  ->   10072 bytes ·  2 nodos
+
+  Pruebas offline: 113 PASS / 2 FAIL (P4 y P39, viejos conocidos
+  y a proposito). $0 de Gemini.
+
+  Flag: BOT_BUZON en el .env. Apagado = el bot se comporta
+  EXACTO como la v11.0 (responde de una) y el reloj queda inerte.
+
+------------------------------------------------------------
+PASO 0 — Solo empezar cuando el bot este tranquilo
+------------------------------------------------------------
+curl "http://127.0.0.1:5678/webhook/whatsapp?hub.mode=subscribe&hub.verify_token=NO_ES&hub.challenge=X"
+Tiene que decir "token invalido" y rapido. Si esta lento o no
+contesta, la VM sigue digiriendo cola: esperar, no importar.
+
+------------------------------------------------------------
+PASO 1 — Subir LOS DOS archivos
+------------------------------------------------------------
+SSH del navegador -> engranaje -> Subir archivo (uno por uno):
+   bot-varman-PARA-SUBIR-v11.3-2026-08-16.json
+   buzon-reloj-PARA-SUBIR-v11.3-2026-08-16.json
+⚠ PERMITIR VENTANAS EMERGENTES o falla EN SILENCIO.
+Quedan en ~ (la carpeta personal), NO en workflows/.
+
+------------------------------------------------------------
+PASO 2 — Respaldar el que esta vivo (FUERA de workflows/)
+------------------------------------------------------------
+sudo cp /home/varmansneakersandclothes/varman-bot/workflows/bot-varman.json ~/bot-varman-ANTES-DE-v11.3.json.bak
+
+------------------------------------------------------------
+PASO 3 — Ponerlos en su sitio y VERIFICAR
+------------------------------------------------------------
+D=/home/varmansneakersandclothes/varman-bot
+sudo cp ~/bot-varman-PARA-SUBIR-v11.3-2026-08-16.json $D/workflows/bot-varman.json
+sudo cp ~/buzon-reloj-PARA-SUBIR-v11.3-2026-08-16.json $D/workflows/buzon-reloj.json
+sudo stat -c%s $D/workflows/bot-varman.json $D/workflows/buzon-reloj.json
+
+Tiene que decir EXACTAMENTE:  1149783  y  10072
+Y el marcador de la version nueva (tiene que dar 1 o mas):
+sudo grep -c "BUZON-RELOJ" $D/workflows/bot-varman.json
+
+------------------------------------------------------------
+PASO 4 — .env (revisar, casi seguro ya esta asi)
+------------------------------------------------------------
+sudo cp $D/.env $D/.env.bak-antes-v11.3
+   BOT_BUZON=off              <- se enciende DESPUES de verificar
+   BOT_BUZON_SEGUNDOS=45
+   (WEBHOOK_VERIFY_TOKEN ya existe: es el del webhook de Meta)
+⛔ PROHIBIDAS (lista negra, ya costaron caidas):
+   N8N_CONCURRENCY_PRODUCTION_LIMIT   N8N_RUNNERS_ENABLED=true
+
+------------------------------------------------------------
+PASO 5 — Parar, importar, PUBLICAR LOS DOS, arrancar
+------------------------------------------------------------
+sudo sh -c "cd $D && docker compose stop n8n"
+sudo sh -c "cd $D && docker compose run --rm --no-deps -u node n8n import:workflow --input=/workflows/bot-varman.json"
+sudo sh -c "cd $D && docker compose run --rm --no-deps -u node n8n import:workflow --input=/workflows/buzon-reloj.json"
+
+🔴 EL IMPORT DESACTIVA los workflows. Publicar AMBOS:
+sudo sh -c "cd $D && docker compose run --rm --entrypoint n8n n8n publish:workflow --id=VarmanBotV4Ped01"
+sudo sh -c "cd $D && docker compose run --rm --entrypoint n8n n8n publish:workflow --id=VarmanBuzonReloj1"
+
+sudo sh -c "cd $D && docker compose up -d"     # recrear, NO restart
+
+------------------------------------------------------------
+PASO 6 — Verificar (paciencia: hoy el arranque tardo ~30 min)
+------------------------------------------------------------
+curl "http://127.0.0.1:5678/webhook/whatsapp?hub.mode=subscribe&hub.verify_token=NO_ES&hub.challenge=X"
+   "token invalido" = ACTIVO · "Cannot GET"/404 = falta publish
+   o sigue arrancando · timeout = arrancando, ESPERAR
+
+La secuencia normal de un arranque lento (NO es fallo):
+   base tarda ~2 min → "Issue on initial workflow activation"
+   → n8n REINTENTA SOLO → "Activation ... was successful!"
+Mirar: sudo docker logs varman-n8n --tail 20
+
+Variables dentro del contenedor:
+   sudo docker exec varman-n8n env | grep -E "BOT_BUZON|CONCURRENCY"
+
+------------------------------------------------------------
+PASO 7 — Encender el buzon (cuando el paso 6 este en verde)
+------------------------------------------------------------
+sudo sed -i 's/^BOT_BUZON=off/BOT_BUZON=on/' $D/.env
+sudo sh -c "cd $D && docker compose up -d"
+(recrear NO desactiva los workflows; no hay que republicar)
+
+------------------------------------------------------------
+PASO 8 — La prueba, desde un numero que NO sea el 320
+------------------------------------------------------------
+Tres mensajes seguidos, rapido:  hola / [foto] / cuanto vale?
+BIEN -> UNA sola respuesta a todo, en 45-105 segundos.
+(La espera es A PROPOSITO: el buzon junta. No esta caido.)
+
+------------------------------------------------------------
+SI ALGO SALE MAL
+------------------------------------------------------------
+Apagar el buzon (el bot queda como la v11.0, responde de una):
+  sudo sed -i 's/^BOT_BUZON=on/BOT_BUZON=off/' $D/.env
+  sudo sh -c "cd $D && docker compose up -d"
+
+Volver al workflow anterior completo:
+  sudo cp ~/bot-varman-ANTES-DE-v11.3.json.bak $D/workflows/bot-varman.json
+  sudo rm $D/workflows/buzon-reloj.json
+  y repetir el PASO 5 (solo el import y publish del bot).

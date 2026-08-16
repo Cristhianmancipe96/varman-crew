@@ -1055,6 +1055,132 @@ console.log('\n── P50 · Mensaje que llega por el buzón (BOT_BUZON=on) ─�
 }
 
 // ============================================================================
+//  P51-P53 · BUZÓN v11.3 — EL RELOJ APARTE
+// ----------------------------------------------------------------------------
+//  La lección del 16-ago: el "Cada minuto" dentro del workflow grande engordaba
+//  la base (una copia de 1,1 MB por tick) y la doble puerta del Cerebro fue el
+//  bug que lo tumbó. El reloj ahora es un workflow aparte que entrega por el
+//  webhook normal. Estas pruebas ejercitan las TRES piezas del viaje:
+//  guardar (pasa el bundle derecho) → reloj (junta y entrega con token) →
+//  Parsear (la puerta interna reconoce el bundle y rechaza al que no trae token).
+// ============================================================================
+console.log('\n── P51 · Buzon guardar: el bundle del reloj pasa derecho ──');
+{
+  const codigoGuardar = fs.readFileSync(path.join(DIR, 'workflows', 'src', 'buzon-guardar.js'), 'utf8');
+  const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
+  const llamadas = [];
+  const http = async (opts) => {
+    llamadas.push({ metodo: String(opts.method || 'GET').toUpperCase(), url: String(opts.url || '') });
+    if (String(opts.url).indexOf('oauth2.googleapis.com') >= 0) return { access_token: 'FAKE' };
+    return {};
+  };
+  const envB = Object.assign({}, ENV, { BOT_BUZON: 'on' });
+  const correrGuardar = (items) => new AsyncFunction('$input', '$env', '$json', '$', 'require', codigoGuardar)
+    .call({ helpers: { httpRequest: http } }, { all: () => items }, envB, {}, () => {}, require);
+
+  // (a) el bundle que entrega el reloj (trae buzon_juntados) NO se re-guarda
+  llamadas.length = 0;
+  const outA = await correrGuardar([{ json: { wa_id: WA, texto: 'hola\ncuanto valen', buzon_juntados: 2, message_id: 'wamid.B1' } }]);
+  check('P51: el bundle pasa derecho al Cerebro (sin bucle infinito)',
+    Array.isArray(outA) && outA.length === 1 && outA[0].json.buzon_juntados === 2,
+    JSON.stringify(outA).slice(0, 120));
+  check('P51: y NO se escribe en el buzon',
+    !llamadas.some((c) => c.url.indexOf('botBuzon') >= 0), llamadas);
+
+  // (b) el mensaje normal del cliente SÍ se guarda y la ejecución termina ahí
+  llamadas.length = 0;
+  const outB = await correrGuardar([{ json: { wa_id: WA, texto: 'hola', message_id: 'wamid.N1', tipo: 'text' } }]);
+  check('P51: el mensaje normal SÍ va al buzon',
+    llamadas.some((c) => c.metodo === 'POST' && c.url.indexOf('botBuzon') >= 0), llamadas);
+  check('P51: y no sigue derecho (la ejecución muere aquí)',
+    Array.isArray(outB) && outB.length === 0, JSON.stringify(outB).slice(0, 120));
+}
+
+console.log('\n── P52 · Buzon reloj: junta, entrega por el webhook y vacía ──');
+{
+  const codigoReloj = fs.readFileSync(path.join(DIR, 'workflows', 'src', 'buzon-reloj.js'), 'utf8');
+  const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
+  const envR = Object.assign({}, ENV, { BOT_BUZON: 'on', BOT_BUZON_SEGUNDOS: '45', WEBHOOK_VERIFY_TOKEN: 'tokenwebhook_test' });
+  const correrReloj = (docsFS, capturas) => new AsyncFunction('$input', '$env', '$json', '$', 'require', codigoReloj)
+    .call({ helpers: { httpRequest: async (opts) => {
+      const url = String(opts.url || ''); const met = String(opts.method || 'GET').toUpperCase();
+      capturas.total++;
+      if (url.indexOf('oauth2') >= 0) return { access_token: 'FAKE' };
+      if (met === 'GET' && url.indexOf('botBuzon') >= 0) return { documents: docsFS };
+      if (met === 'DELETE') { capturas.borrados.push(url); return {}; }
+      if (met === 'POST' && url.indexOf('/webhook/whatsapp') >= 0) { capturas.posts.push(opts.body); return {}; }
+      return {};
+    } } }, { all: () => [] }, envR, {}, () => {}, require);
+  const doc = (id, haceMs, payload) => ({
+    name: 'projects/varman-crew/databases/(default)/documents/tiendas/varman/botBuzon/' + id,
+    fields: { wa: { stringValue: WA },
+      recibidoAt: { stringValue: new Date(Date.now() - haceMs).toISOString() },
+      payload: { stringValue: JSON.stringify(payload) } }
+  });
+
+  // (a) dos mensajes maduros del mismo cliente → UN POST con todo junto
+  const cap = { posts: [], borrados: [], total: 0 };
+  await correrReloj([
+    doc(WA + '__m1', 120000, { wa_id: WA, tipo: 'text', texto: 'hola', message_id: 'm1' }),
+    doc(WA + '__m2', 110000, { wa_id: WA, tipo: 'text', texto: 'cuanto valen las EQT', message_id: 'm2' })
+  ], cap);
+  check('P52: UN solo POST al webhook del bot', cap.posts.length === 1, cap.posts.length);
+  const b = cap.posts[0] || {};
+  check('P52: el POST lleva interno_buzon + el token del webhook',
+    b.interno_buzon === true && b.token === 'tokenwebhook_test',
+    JSON.stringify(b).slice(0, 120));
+  const it0 = (b.items && b.items[0]) || {};
+  check('P52: los textos van juntos y en orden', it0.texto === 'hola\ncuanto valen las EQT', it0.texto);
+  check('P52: marca buzon_juntados=2 (la señal del pase derecho)', it0.buzon_juntados === 2, it0.buzon_juntados);
+  check('P52: y vacía el buzon DESPUÉS de entregar', cap.borrados.length === 2, cap.borrados.length);
+
+  // (b) mensaje aún dentro de la ventana → no se entrega ni se borra
+  const cap2 = { posts: [], borrados: [], total: 0 };
+  await correrReloj([doc(WA + '__m3', 10000, { wa_id: WA, tipo: 'text', texto: 'hola', message_id: 'm3' })], cap2);
+  check('P52: lo inmaduro se deja madurar (ni POST ni borrado)',
+    cap2.posts.length === 0 && cap2.borrados.length === 0,
+    { posts: cap2.posts.length, borrados: cap2.borrados.length });
+
+  // (c) flag apagado → inerte total, ni una llamada a Firestore
+  const cap3 = { posts: [], borrados: [], total: 0 };
+  await new AsyncFunction('$input', '$env', '$json', '$', 'require', codigoReloj)
+    .call({ helpers: { httpRequest: async () => { cap3.total++; return {}; } } },
+      { all: () => [] }, Object.assign({}, ENV, { BOT_BUZON: '' }), {}, () => {}, require);
+  check('P52: con BOT_BUZON apagado no toca nada', cap3.total === 0, cap3.total);
+}
+
+console.log('\n── P53 · Parsear (del JSON construido): la puerta interna con token ──');
+{
+  const codigoParsear = wf.nodes.find((n) => n.name === 'Parsear mensaje').parameters.jsCode;
+  const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
+  const envP = Object.assign({}, ENV, { WEBHOOK_VERIFY_TOKEN: 'tokenwebhook_test' });
+  const correrParsear = (bodyJson) => new AsyncFunction('$input', '$env', '$json', '$', 'require', codigoParsear)
+    .call({}, { all: () => [{ json: bodyJson }], first: () => ({ json: bodyJson }) }, envP, bodyJson, () => {}, require);
+
+  // (a) bundle del reloj con el token bueno → entra tal cual
+  const outA = await correrParsear({ body: { interno_buzon: true, token: 'tokenwebhook_test',
+    items: [{ wa_id: WA, texto: 'hola\ncuanto valen', buzon_juntados: 2, tipo: 'text' }] } });
+  check('P53: el bundle con token bueno entra al bot',
+    outA.length === 1 && outA[0].json.wa_id === WA && outA[0].json.buzon_juntados === 2,
+    JSON.stringify(outA).slice(0, 140));
+
+  // (b) token malo → se ignora (el webhook es público)
+  const outB = await correrParsear({ body: { interno_buzon: true, token: 'NO_ES',
+    items: [{ wa_id: WA, texto: 'inyectado' }] } });
+  check('P53: sin el token se ignora por completo',
+    Array.isArray(outB) && outB.length === 0, JSON.stringify(outB).slice(0, 120));
+
+  // (c) el formato normal de Meta sigue parseando IGUAL que siempre
+  const outC = await correrParsear({ body: { entry: [{ changes: [{ value: {
+    contacts: [{ profile: { name: 'Cliente' } }],
+    messages: [{ from: WA, id: 'wamid.X1', type: 'text', text: { body: 'hola' } }]
+  } }] }] } });
+  check('P53: el mensaje real de Meta sigue igual (nada viejo se rompe)',
+    outC.length === 1 && outC[0].json.wa_id === WA && outC[0].json.texto === 'hola',
+    JSON.stringify(outC).slice(0, 140));
+}
+
+// ============================================================================
 //  MEDIDOR DE COSTO — qué pesa un turno de verdad (sin gastar un peso)
 // ----------------------------------------------------------------------------
 //  El saldo prepagado se agotó el 25-jul sin que nadie tuviera este número.

@@ -56,11 +56,15 @@ async function tokenAdmin() {
 }
 
 const items = $input.all();
-// Los items SIN wa_id no son mensajes de cliente: son los avisos de envío
-// fallido que emite "Parsear mensaje" con el flag BOT_LOG_FALLOS. Esos siguen
-// derecho al Cerebro, que los registra en botErrores. Nunca al buzón.
-const pasanDerecho = items.filter((it) => !((it.json || {}).wa_id));
-const deCliente = items.filter((it) => !!((it.json || {}).wa_id));
+// Pasan derecho al Cerebro, SIN tocar el buzón:
+//  - items SIN wa_id: los avisos de envío fallido que emite "Parsear mensaje"
+//    con BOT_LOG_FALLOS. El Cerebro los registra en botErrores.
+//  - items CON buzon_juntados: son los paquetes YA JUNTADOS que entrega el
+//    reloj (v11.3) por el webhook. Volver a guardarlos armaría un bucle
+//    infinito: guardar → madurar → entregar → guardar → ...
+const esBundle = (it) => Number(((it.json || {}).buzon_juntados) || 0) > 0;
+const pasanDerecho = items.filter((it) => !((it.json || {}).wa_id) || esBundle(it));
+const deCliente = items.filter((it) => !!((it.json || {}).wa_id) && !esBundle(it));
 
 if (!deCliente.length) return pasanDerecho;
 
