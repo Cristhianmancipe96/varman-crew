@@ -1030,6 +1030,30 @@ console.log('\n── P50 · Mensaje que llega por el buzón (BOT_BUZON=on) ─�
     err && String(err.message).slice(0, 160));
 }
 
+// --- P50d: el aviso de envío fallido (BOT_LOG_FALLOS) sigue pasando ----------
+// "Parsear mensaje" emite los statuses `failed` de Meta con wa_id VACÍO y
+// "Buzon guardar" los deja pasar derecho al Cerebro, que los registra en
+// botErrores. El lector de entrada NO puede exigir wa_id: los tumbaría con
+// [BUZON-ENTRADA] y se perdería la visibilidad de los envíos no entregados
+// (el agujero de los ~18 leads silenciados).
+{
+  limpiar();
+  guionGemini = [{ texto: 'no debería llegar aquí' }];
+  let err = null; let t = null;
+  try {
+    t = await turno('', { wa_id: '', tipo_evento: 'fallo_envio',
+      destinatario: '573001112233', error_code: 131047,
+      error_title: 'Re-engagement message', message_id: 'wamid.FALLO1' });
+  } catch (e) { err = e; }
+  check('P50d: el fallo de envío NO tumba el Cerebro', err === null,
+    err && String(err.message).slice(0, 160));
+  check('P50d: sin mandarle nada a ningún cliente', t !== null && t.cli.length === 0,
+    t && t.cliTxt.slice(0, 120));
+  const enBotErrores = t !== null && [...store.keys()].some((k) => String(k).indexOf('botErrores') >= 0);
+  check('P50d: y queda registrado en botErrores', enBotErrores,
+    t && [...store.keys()].join(' | ').slice(0, 200));
+}
+
 // ============================================================================
 //  MEDIDOR DE COSTO — qué pesa un turno de verdad (sin gastar un peso)
 // ----------------------------------------------------------------------------

@@ -840,11 +840,17 @@ function instruccionesPago(to, met, total, plantillaTexto) {
 // $('Parsear mensaje') LANZA ("hasn't been executed"): el Cerebro moría antes
 // de contestar y el cliente se quedaba esperando sin respuesta. Por eso no se
 // asume cuál nodo corrió: se prueban los dos.
+// OJO: aquí NO se exige wa_id. "Parsear mensaje" también emite los avisos de
+// envío fallido de Meta (BOT_LOG_FALLOS) con wa_id VACÍO, y "Buzon guardar"
+// los deja pasar derecho al Cerebro para que los registre en botErrores.
+// Exigir wa_id los tumbaría con este error en vez de registrarlos. Basta con
+// quedarse con el nodo que SÍ corrió: solo uno corre por ejecución (webhook
+// y trigger del minuto son ejecuciones separadas).
 function leerMensajeDelCliente() {
   for (const nodo of ['Parsear mensaje', 'Buzon recoger (cada minuto)']) {
     try {
       const j = $(nodo).item.json;
-      if (j && j.wa_id) return j;
+      if (j) return j;
     } catch (e) { /* ese nodo no corrió en este turno: se prueba el otro */ }
   }
   // Si ninguno corrió es un bug de cableado, no un mensaje raro del cliente:
