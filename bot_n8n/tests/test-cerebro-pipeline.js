@@ -186,14 +186,26 @@ function msj(over) {
 async function turno(texto, over) {
   enviados = [];
   costoTurno = { llamadas: 0, chars: 0 };
-  const parsed = msj(Object.assign({ texto }, over || {}));
+  const opts = Object.assign({}, over || {});
+  // [BUZON] Por qué nodo entra el mensaje en ESTE turno. Con el buzón encendido
+  // no entra por "Parsear mensaje" sino por "Buzon recoger (cada minuto)".
+  const nodoEntrada = opts.__nodoEntrada || 'Parsear mensaje';
+  delete opts.__nodoEntrada;
+  const parsed = msj(Object.assign({ texto }, opts));
   const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
   const fn = new AsyncFunction('$input', '$env', '$json', '$', 'require', codigoCerebro);
+  // El stub de $() TIENE que imitar a n8n: si el nodo no corrió en este turno,
+  // LANZA. Antes devolvía el mismo item para cualquier nombre, y por eso el
+  // arnés no vio el bug del 16-ago (el Cerebro moría en el camino del buzón).
+  const $stub = (nombre) => {
+    if (nombre !== nodoEntrada) throw new Error("Node '" + nombre + "' hasn't been executed");
+    return { item: { json: parsed } };
+  };
   const out = await fn.call(
     { helpers: { httpRequest: httpMock } },
     { all: () => [], first: () => ({ json: {} }) },
     ENV, catalogoFixture,
-    () => ({ item: { json: parsed } }),
+    $stub,
     require
   );
   // el nodo DEVUELVE los mensajes ([{json: payload}]); `enviados` solo recoge lo
@@ -972,6 +984,50 @@ console.log('\n── P49 · "las blancas" no trae blancas de todo el catálogo 
     .filter((m) => familia && String((m.image && m.image.caption) || '').toLowerCase().indexOf(familia) < 0);
   check('P49: no manda fotos de otras referencias por el color',
     ajeno.length === 0, { ajeno: ajeno.length, txt: t.cliTxt.slice(0, 200) });
+}
+
+// --- P50: el mensaje que entra POR EL BUZÓN también se contesta -------------
+// El bug del 16-ago en vivo: con BOT_BUZON=on el turno no entra por "Parsear
+// mensaje" sino por "Buzon recoger (cada minuto)". El Cerebro leía el mensaje
+// con $('Parsear mensaje'), que en ese camino LANZA, y moría antes de
+// contestar: el cliente esperaba los 45 s y no recibía nada.
+console.log('\n── P50 · Mensaje que llega por el buzón (BOT_BUZON=on) ──');
+{
+  limpiar();
+  guionGemini = [{ texto: 'Buenas, bienvenido a VarMan Crew. ¿En qué ciudad estás?' }];
+  const t = await turno('Hola quiero info de\nlas Adidas EQT',
+    { __nodoEntrada: 'Buzon recoger (cada minuto)', buzon_juntados: 2 });
+  check('P50: el cliente SÍ recibe respuesta por el camino del buzón',
+    t.cli.length > 0, { recibidos: t.cli.length, txt: t.cliTxt.slice(0, 200) });
+  check('P50: y es una respuesta de verdad, no vacía',
+    t.cliTxt.trim().length > 10, t.cliTxt.slice(0, 200));
+}
+
+// --- P50b: el camino de siempre sigue igual (el buzón apagado no cambió nada)
+{
+  limpiar();
+  guionGemini = [{ texto: 'Buenas, bienvenido a VarMan Crew. ¿En qué ciudad estás?' }];
+  const t = await turno('Hola quiero info de las Adidas EQT');
+  check('P50b: el webhook normal sigue contestando igual',
+    t.cli.length > 0 && t.cliTxt.trim().length > 10, { recibidos: t.cli.length });
+}
+
+// --- P50c: CONTROL NEGATIVO -------------------------------------------------
+// Sin esto, P50 podría estar pasando por la puerta de siempre y no probar nada.
+// Si NINGÚN nodo de entrada corrió, el Cerebro tiene que morir con un mensaje
+// que se entienda — no con el "Cannot assign to read only property 'name'" de
+// n8n, que fue el que costó la tarde del 16-ago.
+{
+  limpiar();
+  guionGemini = [{ texto: 'no debería llegar aquí' }];
+  let err = null;
+  try { await turno('hola', { __nodoEntrada: 'Nodo Que No Existe' }); }
+  catch (e) { err = e; }
+  check('P50c: sin nodo de entrada falla, y el stub de $() sí lanza como n8n',
+    err !== null, { err: err && String(err.message).slice(0, 120) });
+  check('P50c: el error dice qué pasó, en cristiano',
+    err !== null && /BUZON-ENTRADA/.test(String(err.message)),
+    err && String(err.message).slice(0, 160));
 }
 
 // ============================================================================

@@ -1,0 +1,158 @@
+============================================================
+ SUBIR EL BOT — v11.1 "BUZÓN"            16-ago-2026
+ (ya desplegado ese día; esto queda como el procedimiento
+  bueno para la PRÓXIMA vez)
+============================================================
+
+QUÉ TRAE
+  El buzón de mensajes: el bot espera 45 s a que el cliente
+  termine de escribir y contesta a todo en UN solo mensaje.
+  Antes cada mensaje arrancaba su propia ejecución en paralelo
+  y el bot contestaba atropellado (25 de 113 chats del barrido
+  de julio recibieron UNA respuesta a 5 o 6 mensajes).
+
+  Archivo: bot-varman-PARA-SUBIR-v11.1-2026-08-16.json
+  Tamaño EXACTO: 1155878 bytes · 20 nodos
+
+  Lo que decide si el buzón actúa es el flag BOT_BUZON del
+  .env, no el archivo. Con el flag apagado el bot se comporta
+  EXACTAMENTE como antes.
+
+------------------------------------------------------------
+ 🔴 LO QUE SE NOS OLVIDÓ EL 16-AGO Y TUMBÓ EL BOT
+------------------------------------------------------------
+  EL IMPORT DESACTIVA EL WORKFLOW. Si no se republica, el
+  webhook queda en 404 y el bot NO RESPONDE A NADIE.
+
+  Y ojo: importar-workflows.sh dice "[OK] Activo" SIN haberlo
+  activado. Usa "update:workflow --active=true", que en n8n
+  2.28.6 está obsoleto: acepta el comando, avisa, devuelve 0
+  y no hace nada.
+
+  El comando que SÍ funciona (n8n parado):
+    cd ~/varman-bot && docker compose run --rm \
+      --entrypoint n8n n8n publish:workflow --id=VarmanBotV4Ped01
+
+  Ya no hace falta el botón Publish del navegador.
+
+------------------------------------------------------------
+PASO 1 — Subir el archivo
+------------------------------------------------------------
+SSH de la VM -> engranaje -> Subir archivo -> del Escritorio:
+   bot-varman-PARA-SUBIR-v11.1-2026-08-16.json
+Espera la notificación verde. Queda en ~.
+
+------------------------------------------------------------
+PASO 2 — Respaldar el que está vivo (FUERA de workflows/)
+------------------------------------------------------------
+sudo cp /home/varmansneakersandclothes/varman-bot/workflows/bot-varman.json \
+        ~/bot-varman-ANTES-DE-v11.1.json.bak
+
+Los respaldos JAMÁS dentro de workflows/: el import toma TODOS
+los .json de esa carpeta.
+
+------------------------------------------------------------
+PASO 3 — Ponerlo en su sitio y VERIFICAR EL TAMAÑO
+------------------------------------------------------------
+D=/home/varmansneakersandclothes/varman-bot
+sudo cp ~/bot-varman-PARA-SUBIR-v11.1-2026-08-16.json $D/workflows/bot-varman.json
+sudo stat -c%s $D/workflows/bot-varman.json
+
+Tiene que decir EXACTAMENTE 1155878.
+Si dice otra cosa, el archivo no se movió y vas a importar el
+viejo: el import sale en verde y el bot no cambia. Pasó 2 veces.
+
+------------------------------------------------------------
+PASO 4 — Variables del .env
+------------------------------------------------------------
+sudo cp $D/.env $D/.env.bak-antes-v11.1
+
+Añadir (o confirmar):
+   BOT_BUZON=off              <- se enciende DESPUÉS de verificar
+   BOT_BUZON_SEGUNDOS=45
+   N8N_CONCURRENCY_PRODUCTION_LIMIT=3
+
+------------------------------------------------------------
+PASO 5 — Parar n8n, importar, PUBLICAR, arrancar
+------------------------------------------------------------
+sudo sh -c "cd $D && docker compose stop n8n"
+sudo sh -c "cd $D && bash importar-workflows.sh"          # importa
+sudo sh -c "cd $D && docker compose stop n8n"             # por si quedó arriba
+sudo sh -c "cd $D && docker compose run --rm --entrypoint n8n n8n publish:workflow --id=VarmanBotV4Ped01"
+sudo sh -c "cd $D && docker compose up -d"                # recrear, NO restart
+
+'docker restart' NO relee el .env. Tiene que ser 'up -d'.
+
+------------------------------------------------------------
+PASO 6 — LA VERIFICACIÓN QUE DE VERDAD SIRVE
+------------------------------------------------------------
+No necesita el token: se manda uno falso a propósito.
+
+curl "http://127.0.0.1:5678/webhook/whatsapp?hub.mode=subscribe&hub.verify_token=NO_ES&hub.challenge=X"
+
+   "token invalido"              -> ACTIVO, el bot recibe
+   "Cannot GET"                  -> INACTIVO, falta el publish
+   "503 Database is not ready"   -> arrancando, ESPERAR
+   timeout                       -> arrancando, ESPERAR
+
+⚠️ ESPERAR HASTA 8 MINUTOS antes de dar alarma. Recién
+arrancado, n8n contesta "Cannot GET" aunque esté todo bien.
+Esa espera corta fue la que me hizo dar una falsa alarma.
+
+Confirmar también las variables DENTRO del contenedor:
+   sudo docker exec varman-n8n env | grep -E "BOT_BUZON|CONCURRENCY"
+Leer el .env no prueba que llegaron al proceso.
+
+------------------------------------------------------------
+PASO 7 — Encender el buzón
+------------------------------------------------------------
+sudo sed -i 's/^BOT_BUZON=off/BOT_BUZON=on/' $D/.env
+sudo sh -c "cd $D && docker compose up -d"
+
+Repetir el PASO 6. Recrear el contenedor NO desactiva el
+workflow (eso solo pasa al importar), así que no hay que
+volver a publicar.
+
+------------------------------------------------------------
+PASO 8 — La prueba, desde un número que NO sea el 320
+------------------------------------------------------------
+Escribirle al bot (304) tres mensajes seguidos, rápido:
+   hola
+   [foto de un tenis]
+   cuánto vale?
+
+BIEN  -> UNA sola respuesta que atiende las tres cosas.
+MAL   -> tres respuestas atropelladas.
+
+La respuesta tarda entre 45 y 105 s: el que revisa el buzón
+corre cada minuto. No es que esté caído.
+
+Desde el 320 el bot te trata como dueño y no pasas por el
+camino del cliente.
+
+------------------------------------------------------------
+SI ALGO SALE MAL
+------------------------------------------------------------
+Apagar el buzón (el bot vuelve exacto a antes):
+  sudo sed -i 's/^BOT_BUZON=on/BOT_BUZON=off/' $D/.env
+  sudo sh -c "cd $D && docker compose up -d"
+
+Volver al workflow anterior:
+  sudo cp ~/bot-varman-ANTES-DE-v11.1.json.bak $D/workflows/bot-varman.json
+  sudo sh -c "cd $D && docker compose stop n8n"
+  sudo sh -c "cd $D && bash importar-workflows.sh"
+  sudo sh -c "cd $D && docker compose run --rm --entrypoint n8n n8n publish:workflow --id=VarmanBotV4Ped01"
+  sudo sh -c "cd $D && docker compose up -d"
+  ...y repetir el PASO 6.
+
+------------------------------------------------------------
+NOTAS DE LA VM (cuestan tiempo si se olvidan)
+------------------------------------------------------------
+- El usuario 'andre' NO puede entrar a la carpeta del bot: el
+  cd, los comodines y los redirects '>' van DENTRO de sudo sh -c.
+- La base tarda ~155 s en recuperarse al arrancar. La espera de
+  150 s de importar-workflows.sh NO alcanza: falla por 5 s y,
+  con set -e, se salta los pasos finales.
+- NUNCA 'n8n list:workflow': levanta un segundo n8n completo y
+  tumba la VM (media hora caído el 15-ago).
+- Los scripts usados el 16-ago quedaron en bot_n8n/despliegue/.

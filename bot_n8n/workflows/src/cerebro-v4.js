@@ -833,7 +833,25 @@ function instruccionesPago(to, met, total, plantillaTexto) {
 }
 
 // ---------- flujo principal ----------
-const parsed = $('Parsear mensaje').item.json;
+// [BUZON-ENTRADA] (16-ago-2026) El mensaje del cliente llega por DOS caminos:
+//   webhook normal -> "Parsear mensaje" -> ... -> Cerebro
+//   buzón (cada min) -> "Buzon recoger (cada minuto)" -> ... -> Cerebro
+// En el camino del buzón, "Parsear mensaje" NO se ejecutó en ese turno, y
+// $('Parsear mensaje') LANZA ("hasn't been executed"): el Cerebro moría antes
+// de contestar y el cliente se quedaba esperando sin respuesta. Por eso no se
+// asume cuál nodo corrió: se prueban los dos.
+function leerMensajeDelCliente() {
+  for (const nodo of ['Parsear mensaje', 'Buzon recoger (cada minuto)']) {
+    try {
+      const j = $(nodo).item.json;
+      if (j && j.wa_id) return j;
+    } catch (e) { /* ese nodo no corrió en este turno: se prueba el otro */ }
+  }
+  // Si ninguno corrió es un bug de cableado, no un mensaje raro del cliente:
+  // que se vea claro en el log en vez del error críptico de n8n.
+  throw new Error('[BUZON-ENTRADA] no llegó el mensaje del cliente: ni "Parsear mensaje" ni "Buzon recoger (cada minuto)" se ejecutaron en este turno');
+}
+const parsed = leerMensajeDelCliente();
 const catalogo = parseCatalogo($json);
 const to = parsed.wa_id;
 const sel = (parsed.inter_id || '').trim();
