@@ -1,0 +1,107 @@
+SUBIR EL BOT v12.0 (cerebro nuevo: el bot califica, tu cierras)
+================================================================
+Esta version NO toca el .env — cero variables nuevas.
+Cambia UN solo nodo (el Cerebro) y quita dos relojes del
+dibujo: el de "Cada hora" y el de "Cada 5 min". Por eso el
+archivo pesa la MITAD que el de ayer (621 KB contra 1,1 MB):
+salio todo el codigo de cobrar, registrar pedidos y mandar
+links, que ahora hace el asesor.
+
+Lo que vas a notar cuando este arriba:
+  - El bot NO le escribe a nadie por su cuenta. Nunca mas.
+  - Cuando alguien te lo pase, te llega UN aviso con que
+    quiere, su duda, el "ojo con" y los ultimos mensajes.
+  - Si el cliente manda 5 mensajes seguidos, responde UNA
+    vez a todos juntos (sin ninguna espera).
+
+Paso 1 — Subir el archivo
+En la ventana de SSH, boton engranaje (arriba a la derecha)
+→ Upload file → elige bot-varman-PARA-SUBIR-v12.0-2026-08-17.json
+desde tu Escritorio.
+
+Espera la notificacion verde de que termino antes de seguir.
+Si mueves el archivo antes de que acabe, subes un JSON
+cortado. Y permite las ventanas emergentes o la subida falla
+en silencio.
+
+Paso 2 — Respaldar el que esta vivo
+cd ~/varman-bot && cp workflows/bot-varman.json ~/bot-varman-ANTES-DE-v12.0.json
+
+OJO: el respaldo va en ~ (tu carpeta), NO en workflows/. El
+import agarra TODOS los .json de workflows/ y un respaldo ahi
+dentro casi pisa el bot nuevo el 3 de agosto.
+
+Paso 3 — Poner el nuevo en su sitio
+mv ~/bot-varman-PARA-SUBIR-v12.0-2026-08-17.json ~/varman-bot/workflows/bot-varman.json
+
+Paso 4 — Verificar que moviste el NUEVO (no es opcional)
+ls -l ~/varman-bot/workflows/bot-varman.json
+
+Tiene que pesar EXACTAMENTE 621262. Si pesa otra cosa, el mv
+no se hizo y vas a importar el viejo: el import sale en verde
+y el bot no cambia. Paso 2 veces el 25 de julio.
+
+Y confirma que quedo sin los relojes (tiene que dar 1, que es
+el de las 3:15 de la manana):
+grep -c '"type": "n8n-nodes-base.scheduleTrigger"' ~/varman-bot/workflows/bot-varman.json
+
+Paso 5 — Parar n8n
+cd ~/varman-bot && docker compose stop n8n
+
+Si n8n esta corriendo, el import se cuelga peleando el lock
+de SQLite (te paso el 23 de julio, 15 minutos colgado).
+
+Paso 6 — Importar
+cd ~/varman-bot && docker compose run --rm --no-deps -u node n8n import:workflow --input=/workflows/bot-varman.json
+
+Paso 7 — Publicar POR COMANDO (ya no es el boton de la UI)
+cd ~/varman-bot && docker compose run --rm --entrypoint n8n n8n publish:workflow --id=VarmanBotV4Ped01
+
+El import desactiva el workflow; sin este paso el webhook
+queda en 404 y el bot no responde a nadie. Es el paso que
+tumbo el bot el 16 de agosto.
+
+Paso 8 — Arrancar n8n
+cd ~/varman-bot && docker compose start n8n
+
+(start basta porque el .env no cambio; up -d solo hace falta
+cuando se tocan variables)
+
+Paso 9 — Verificar el webhook (LA prueba; ten paciencia)
+curl -s -m 25 "http://127.0.0.1:5678/webhook/whatsapp?hub.mode=subscribe&hub.verify_token=NO_ES&hub.challenge=X" ; echo
+
+  "token invalido"  → ACTIVO, el bot recibe. Listo.
+  vacio / timeout   → arrancando. Ayer tardo 15-30 min.
+  "Cannot GET"/404  → recien arrancado es normal; si sigue
+                      a los 10 min, falta el Paso 7.
+
+REGLA DE AYER: si a los 15-20 minutos no responde y en
+docker logs varman-n8n --tail 5 no se ve avance, un reinicio
+limpio lo destraba:
+docker restart varman-n8n
+
+Paso 10 — El sello final (cuando el paso 9 este en verde)
+cd ~/varman-bot && ./verificar-salud.sh
+
+Debe salir todo OK. Si el webhook sale en AVISO pero el paso
+9 dio "token invalido", esta ocupado despachando la cola de
+Meta: reintenta en 20 min.
+
+Paso 11 — La prueba de verdad, desde un TERCER numero
+(no desde el 320: desde ahi el bot te trata como dueno)
+  1. mancipiola
+  2. Hola
+  3. Manda DOS mensajes seguidos rapido, por ejemplo:
+     "quiero unas nike"  y enseguida  "en talla 39"
+     → tiene que contestar UNA sola vez, a las dos cosas.
+  4. Escribe "si la quiero"
+     → a tu 320 te debe llegar el aviso con Quiere / Ciudad /
+       Su duda / Ojo / wa.me y los ultimos mensajes.
+
+Si algo sale mal
+Volver al bot anterior:
+cd ~/varman-bot && cp ~/bot-varman-ANTES-DE-v12.0.json workflows/bot-varman.json && docker compose stop n8n && docker compose run --rm --no-deps -u node n8n import:workflow --input=/workflows/bot-varman.json && docker compose run --rm --entrypoint n8n n8n publish:workflow --id=VarmanBotV4Ped01 && docker compose start n8n
+
+Y si solo quieres apagar lo de juntar mensajes (dejando todo
+lo demas), sin volver atras:
+cd ~/varman-bot && echo "BOT_JUNTAR=off" >> .env && docker compose up -d
