@@ -14,7 +14,7 @@ const src = (f) => fs.readFileSync(path.join(DIR, 'src', f), 'utf8');
 const SALIDA = path.join(DIR, 'bot-varman.json');
 // Versión: cada valor nuevo deja su propio respaldo en respaldo/ para rollback.
 // Subir SOLO cuando haya un cambio que quieras poder revertir por separado.
-const VERSION = '11.4';
+const VERSION = '12.0';
 
 const wf = {
   // OJO: el id NO se cambia — importar-workflows.sh de la VM activa por id
@@ -166,47 +166,6 @@ const wf = {
       position: [220, 560]
     },
     {
-      // v5 backlog 10-12: trigger HORARIO para carrito abandonado y para las
-      // notificaciones que deja la app (reseña post-entrega, guía de envío)
-      parameters: {
-        rule: { interval: [{ field: 'hours', hoursInterval: 1 }] }
-      },
-      id: '40000000-0000-4000-8000-00000000000c',
-      name: 'Cada hora',
-      type: 'n8n-nodes-base.scheduleTrigger',
-      typeVersion: 1.2,
-      position: [0, 760]
-    },
-    {
-      parameters: { jsCode: src('textos.js') + '\n' + src('notificaciones.js') },
-      id: '40000000-0000-4000-8000-00000000000d',
-      name: 'Recordatorios y avisos (cada hora)',
-      type: 'n8n-nodes-base.code',
-      typeVersion: 2,
-      position: [220, 760]
-    },
-    {
-      // v7 MODO-CONVERSA: trigger cada 5 min para el rescate de los ~3 minutos
-      // de silencio. Con BOT_MODO_CONVERSA apagado el código devuelve [] sin
-      // tocar Firestore (el nodo existe pero queda inerte: cero mensajes).
-      parameters: {
-        rule: { interval: [{ field: 'minutes', minutesInterval: 5 }] }
-      },
-      id: '40000000-0000-4000-8000-000000000010',
-      name: 'Cada 5 min',
-      type: 'n8n-nodes-base.scheduleTrigger',
-      typeVersion: 1.2,
-      position: [0, 1160]
-    },
-    {
-      parameters: { jsCode: src('textos.js') + '\n' + src('rescate-conversa.js') },
-      id: '40000000-0000-4000-8000-000000000011',
-      name: 'Rescate conversa (cada 5 min)',
-      type: 'n8n-nodes-base.code',
-      typeVersion: 2,
-      position: [220, 1160]
-    },
-    {
       // v6 Wompi: webhook de confirmación de pago. onReceived → responde 200
       // de inmediato (Wompi solo necesita un 2xx). El código verifica la firma.
       parameters: { httpMethod: 'POST', path: 'wompi', responseMode: 'onReceived', options: {} },
@@ -240,12 +199,11 @@ const wf = {
     'Cada dia 3:15am': { main: [[{ node: 'Limpiar sesiones caducadas', type: 'main', index: 0 }]] },
     // v5: el barrido devuelve el resumen diario (payload de mensaje) → al 320
     'Limpiar sesiones caducadas': { main: [[{ node: 'Enviar a WhatsApp', type: 'main', index: 0 }]] },
-    // v5 backlog 10-12: recordatorios y avisos → al cliente
-    'Cada hora': { main: [[{ node: 'Recordatorios y avisos (cada hora)', type: 'main', index: 0 }]] },
-    'Recordatorios y avisos (cada hora)': { main: [[{ node: 'Enviar a WhatsApp', type: 'main', index: 0 }]] },
-    // v7 modo conversa: rescate a los ~3 min de silencio → al cliente
-    'Cada 5 min': { main: [[{ node: 'Rescate conversa (cada 5 min)', type: 'main', index: 0 }]] },
-    'Rescate conversa (cada 5 min)': { main: [[{ node: 'Enviar a WhatsApp', type: 'main', index: 0 }]] },
+    // [v12.0 · 17-ago-2026, decisión del dueño] el bot NO manda NADA solo:
+    // fuera "Cada hora"+"Recordatorios" (carrito abandonado, reseñas, guías) y
+    // fuera "Cada 5 min"+"Rescate conversa" (catálogo a los 3 min, retome 3 h).
+    // Bonus: menos ejecuciones guardadas = menos peso en el disco de la VM.
+    // El de las 3:15am SE QUEDA: limpia la base y arma el resumen diario al 320.
     // v6 Wompi: webhook → procesa (verifica firma + confirma pedido) → avisa al 320
     'Wompi webhook (POST)': { main: [[{ node: 'Wompi webhook (procesa)', type: 'main', index: 0 }]] },
     'Wompi webhook (procesa)': { main: [[{ node: 'Enviar a WhatsApp', type: 'main', index: 0 }]] }

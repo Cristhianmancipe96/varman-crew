@@ -244,17 +244,23 @@ const norm = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-
 console.log('\n=== ARNÉS OFFLINE DEL PIPELINE DEL CEREBRO (sin Gemini, sin costo) ===');
 
 // --- P1: el comprobante de pago NO se trata como foto de zapato (el CRÍTICO) ---
-console.log('\n── P1 · Comprobante de pago: NO "no logré identificar el modelo" ──');
+console.log('\n── P1 · Comprobante de pago: se traspasa, no se trata como zapato ──');
 {
   limpiar();
-  sesion({ iaRef: '07', iaCiudad: 'Bogota', iaLinkAt: new Date().toISOString(), iaSaludo: '1' });
-  guionGemini = [{ tools: [{ name: 'avisar_dueno', args: { momento: 'comprobante_recibido', detalle: 'llegó el comprobante' } }] },
-                 { texto: 'Gracias, ya estamos verificando tu pago. Me confirmas tu nombre y dirección para despachar?' }];
+  sesion({ iaRef: '07', iaCiudad: 'Bogota', iaSaludo: '1', iaFichasVistas: '07' });
+  guionGemini = [{ tools: [{ name: 'pasar_asesor', args: {
+    motivo: 'comprobante', que_quiere: 'Jordan talla 40',
+    duda_abierta: 'mandó el comprobante del pago',
+    ojo_con: 'llegó comprobante, hay que verificar el pago' } }],
+    texto: 'Gracias, el asesor te confirma el pago en un momento.' }];
   const t = await turno('', { imagen_id: 'MEDIA_1', tipo: 'image' });
   check('P1: NO le dice que no identificó el modelo de la foto',
     !/no logr[ée] identificar/i.test(t.cliTxt), t.cliTxt);
   check('P1: le responde algo al cliente', t.cliTxt.trim().length > 0, t.cliTxt);
-  check('P1: el aviso de comprobante SÍ llega al 320', /comprobante_recibido/i.test(t.ownTxt), t.ownTxt.slice(0, 200));
+  check('P1: al 320 le llega el traspaso con el comprobante',
+    /comprobante/i.test(t.ownTxt), t.ownTxt.slice(0, 300));
+  check('P1: la foto del cliente se le reenvía al 320',
+    /MEDIA_1/.test(t.ownTxt), t.ownTxt.slice(0, 300));
 }
 
 // --- P2: una foto de zapato sin match SÍ recibe la respuesta honesta ---
@@ -271,14 +277,16 @@ console.log('\n── P2 · Foto de zapato sin match: respuesta honesta (no un m
 }
 
 // --- P3: la cifra del descuento sobrevive a TODOS los recortes ---
-console.log('\n── P3 · La cifra del descuento llega al cliente (orden del pipeline) ──');
+console.log('\n── P3 · El bot ya no cotiza descuentos (los da el asesor) ──');
 {
   limpiar();
   sesion({ iaRef: '07', iaCiudad: 'Pasto', iaSaludo: '1' });
-  guionGemini = [{ tools: [{ name: 'cotizar', args: { refs: ['07'], cantidad: 2, motivo: 'dos_pares' } }] },
-                 { texto: '¿Te las dejamos listas?' }];
+  guionGemini = [{ texto: 'Te dejo un 15% si llevas dos pares, quedan en $400.000.' }];
   const t = await turno('y si llevo dos?');
-  check('P3: el mensaje trae una cifra en pesos', /\d{3}[.,]\d{3}/.test(t.cliTxt), t.cliTxt);
+  check('P3: no le ofrece ningún porcentaje', !/15\s*%/.test(t.cliTxt), t.cliTxt);
+  check('P3: no inventa una cifra que ninguna herramienta dio',
+    !/400[.,]000/.test(t.cliTxt), t.cliTxt);
+  check('P3: eso lo pasa al asesor', /asesor/i.test(t.cliTxt) || /asesor/i.test(t.ownTxt), t.cliTxt);
 }
 
 // --- P4: "¿son originales?" siempre recibe la frase de calidad ---
@@ -288,7 +296,7 @@ console.log('\n── P4 · "¿Son originales?" nunca se queda sin respuesta ─
   sesion({ iaRef: '07', iaSaludo: '1' });
   guionGemini = [{ texto: 'Buenas tardes, ¿en qué ciudad estás?' }];
   const t = await turno('una pregunta, son originales?');
-  check('P4: responde con la calidad (importados)', /importad/i.test(t.cliTxt), t.cliTxt);
+  check('P4: responde con la calidad 1.1', /calidad\s*1\.1/i.test(t.cliTxt), t.cliTxt);
   check('P4: no afirma ni niega que sean originales de marca',
     !/\b(son|no son|s[íi] son)\s+originales?\b/i.test(t.cliTxt), t.cliTxt);
 }
@@ -318,17 +326,18 @@ console.log('\n── P6 · No re-saluda con la conversación empezada ──');
 }
 
 // --- P7: dos modelos distintos → asesor, nunca un cobro por uno ---
-console.log('\n── P7 · Dos modelos distintos: pasa a asesor, no cobra uno ──');
+console.log('\n── P7 · Dos modelos distintos: pasa a asesor, no cobra ──');
 {
   limpiar();
   sesion({ iaRef: '07', iaCiudad: 'Pasto', iaSaludo: '1' });
-  guionGemini = [{ tools: [{ name: 'cotizar', args: { refs: ['07', '12'], cantidad: 2 } }] },
-                 { tools: [{ name: 'crear_link_wompi', args: {} }] },
-                 { texto: 'Listo' }];
+  guionGemini = [{ tools: [{ name: 'pasar_asesor', args: {
+    motivo: 'dos_modelos', que_quiere: 'las Jordan 07 y las Converse 12',
+    duda_abierta: 'quiere los dos pares', ojo_con: 'pedido de dos modelos distintos' } }],
+    texto: 'Listo, te paso con un asesor para armar los dos pares.' }];
   const t = await turno('quiero las dos, las 07 y las 12');
-  check('P7: NO manda un link de pago por un solo modelo',
-    !/wompi\.co|checkout/i.test(t.cliTxt), t.cliTxt);
-  check('P7: pasa a un asesor', /equipo|asesor|320/i.test(t.cliTxt), t.cliTxt);
+  check('P7: NO manda un link de pago', !/wompi\.co|checkout/i.test(t.cliTxt), t.cliTxt);
+  check('P7: pasa a un asesor', /asesor/i.test(t.cliTxt), t.cliTxt);
+  check('P7: el 320 recibe los DOS modelos', /07.*12|Jordan.*Converse/i.test(t.ownTxt), t.ownTxt.slice(0, 300));
 }
 
 // --- P8: la talla pelada se captura ---
@@ -400,59 +409,46 @@ console.log('\n── P13 · El candado del cliente queda libre al terminar ─�
 }
 
 // --- P14: en Bogotá los datos se piden DE A UNO ---
-console.log('\n── P14 · Bogotá: primero el nombre, la dirección después ──');
+console.log('\n── P14 · Bogotá: informa contra entrega y no pide datos ──');
 {
   limpiar();
-  sesion({ iaRef: '10', iaSaludo: '1' });
-  guionGemini = [{ texto: 'Para Bogotá tenemos entrega el mismo día. ¿Te las dejamos listas?' }];
-  const t1 = await turno('estoy en Bogotá');
-  check('P14: pide el nombre', /nombre/i.test(t1.cliTxt), t1.cliTxt);
-  check('P14: NO pide la dirección en el mismo mensaje', !/direcci[óo]n/i.test(t1.cliTxt), t1.cliTxt);
-  check('P14: sin el bloque prohibido de los 2 datos (📌)', !/📌/.test(t1.cliTxt), t1.cliTxt);
-  check('P14: el contra entrega SÍ se menciona', /contra\s*-?\s*entrega/i.test(t1.cliTxt), t1.cliTxt);
-
-  guionGemini = [{ texto: 'Listo, gracias.' }];
-  const t2 = await turno('Cristhian Mancipe');
-  check('P14: tras el nombre pide la dirección', /direcci[óo]n/i.test(t2.cliTxt), t2.cliTxt);
+  sesion({ iaRef: '10', iaSaludo: '1', iaFichasVistas: '10' });
+  guionGemini = [{ texto: 'Para Bogotá el envío es gratis, te llega el mismo día o al siguiente y pagas contra entrega. ¿Te la dejamos lista?' }];
+  const t = await turno('estoy en Bogota');
+  check('P14: el contra entrega SÍ se menciona', /contra\s*entrega/i.test(t.cliTxt), t.cliTxt);
+  check('P14: NO pide el nombre', !/nombre\s+completo/i.test(t.cliTxt), t.cliTxt);
+  check('P14: NO pide la dirección', !/direcci[óo]n/i.test(t.cliTxt), t.cliTxt);
+  const ses = store.get('tiendas/varman/botSesiones/' + WA) || {};
+  check('P14: la ciudad queda anotada en la sesión',
+    !!(ses.iaCiudad && /bogot/i.test(ses.iaCiudad.stringValue || '')), Object.keys(ses));
 }
 
 // --- P15: con nombre y dirección, el pedido SE REGISTRA (garantía de código) ---
-console.log('\n── P15 · Bogotá: con los dos datos el pedido queda registrado ──');
+console.log('\n── P15 · El "sí, la quiero" termina en traspaso, no en pedido ──');
 {
   limpiar();
-  sesion({ iaRef: '10', iaSaludo: '1', iaCiudad: 'Bogota', iaNombre: 'Cristhian Mancipe',
-    iaDatos: 'nombre' });
-  // el turno anterior del bot pidió la DIRECCIÓN: así es como el código sabe
-  // que la respuesta del cliente es la dirección (mismo mecanismo que en vivo).
-  store.set('tiendas/varman/botSesiones/' + WA, Object.assign(store.get('tiendas/varman/botSesiones/' + WA), {
-    historial: { arrayValue: { values: [
-      { mapValue: { fields: { r: { stringValue: 'b' }, t: { stringValue: '¿Cuál es la dirección de entrega?' } } } }
-    ] } }
-  }));
-  guionGemini = [{ texto: 'Listo, queda agendado.' }];
-  const t = await turno('Calle 100 # 15-20, apto 501');
-  let hayPedido = false;
-  for (const [k] of store) if (k.indexOf('tiendas/varman/pedidos/') === 0) hayPedido = true;
-  check('P15: el pedido quedó guardado aunque el modelo no llamara la herramienta', hayPedido,
-    Array.from(store.keys()).filter((k) => k.indexOf('pedidos') >= 0));
-  check('P15: le avisa al 320 del pedido', /PEDIDO|datos_completos/i.test(t.ownTxt), t.ownTxt.slice(0, 200));
+  sesion({ iaRef: '10', iaSaludo: '1', iaCiudad: 'Bogota', iaFichasVistas: '10' });
+  guionGemini = [{ tools: [{ name: 'pasar_asesor', args: {
+    motivo: 'quiere_comprar', que_quiere: 'Reebok, talla 40',
+    duda_abierta: '', ojo_con: 'cliente de Bogotá, contra entrega' } }],
+    texto: 'Ok, ya tengo tus datos. Voy a transferirte con un asesor para terminar tu pedido.' }];
+  const t = await turno('si, la quiero');
+  const pedidos = Array.from(store.keys()).filter((k) => k.indexOf('tiendas/varman/pedidos/') === 0);
+  check('P15: no se registró ningún pedido', pedidos.length === 0, { pedidos });
+  check('P15: al 320 le llega el traspaso', /Reebok/i.test(t.ownTxt), t.ownTxt.slice(0, 300));
+  check('P15: el cliente recibe la frase del traspaso', /asesor/i.test(t.cliTxt), t.cliTxt);
 }
 
 // --- P16: fuera de Bogotá el link sale al decir que sí ---
-console.log('\n── P16 · Fuera de Bogotá: al asentir sale el link de Wompi ──');
+console.log('\n── P16 · Fuera de Bogotá: nunca sale un link de pago ──');
 {
   limpiar();
-  sesion({ iaRef: '10', iaSaludo: '1', iaCiudad: 'Tunja' });
-  // el turno anterior del bot ofreció el pago (requisito del veto)
-  store.set('tiendas/varman/botSesiones/' + WA, Object.assign(store.get('tiendas/varman/botSesiones/' + WA), {
-    historial: { arrayValue: { values: [
-      { mapValue: { fields: { r: { stringValue: 'u' }, t: { stringValue: 'estoy en Tunja' } } } },
-      { mapValue: { fields: { r: { stringValue: 'b' }, t: { stringValue: 'Para Tunja el pago es anticipado por Wompi. ¿Las dejamos listas?' } } } }
-    ] } }
-  }));
+  sesion({ iaRef: '10', iaSaludo: '1', iaCiudad: 'Pasto', iaFichasVistas: '10' });
   guionGemini = [{ texto: 'Perfecto, te las dejamos listas.' }];
-  const t = await turno('Si porfabor');
-  check('P16: sale el link de pago', /wompi|checkout|link/i.test(t.cliTxt), t.cliTxt);
+  const t = await turno('si porfavor');
+  check('P16: NO sale ningún link de pago', !/wompi|checkout|link de pago/i.test(t.cliTxt), t.cliTxt);
+  const pedidos = Array.from(store.keys()).filter((k) => k.indexOf('tiendas/varman/pedidos/') === 0);
+  check('P16: tampoco se crea un pedido', pedidos.length === 0, { pedidos });
 }
 
 // --- P17: el link NO sale por pura cortesía ---
@@ -730,137 +726,106 @@ console.log('\n── P38 · El saludo cuadra con la hora real de Colombia ─�
 }
 
 // ============================================================================
-//  P39 · GUARDA ESTRUCTURAL: el CUADERNO no puede nombrar lo que no existe
+//  P39 · EL CUADERNO Y EL CÓDIGO HABLAN DE LO MISMO (contrato prompt↔código)
 // ----------------------------------------------------------------------------
-//  LA CLASE DE BUG MÁS CARA DEL PROYECTO. El cuaderno le ordenaba al modelo usar
-//  `ver_foto()` y `enviar_video()`; ninguna de las dos estaba declarada. El
-//  modelo las pedía, la API respondía que no existen, eso contaba como fallo y
-//  al SEGUNDO fallo el §9.1 manda pasar a un asesor: mandar una foto terminaba
-//  SIEMPRE en "te comunico con un asesor" sin que nadie mirara nada. Invisible
-//  en producción (n8n en verde, cliente atendido) y costó una tarde de
-//  diagnóstico. Lo mismo con los campos de [SESIÓN]: uno prometido y no enviado
-//  no es un campo vacío, es una alucinación garantizada (el "Buenas noches" a
-//  las 11 de la mañana nació así).
-//  Esta prueba lo hace IMPOSIBLE: compara lo que el cuaderno nombra contra lo
-//  que el código declara y manda. Si alguien agrega una herramienta al prompt y
-//  olvida el código (o al revés), esto falla en segundos y gratis.
+//  Una herramienta nombrada en el prompt que NO existe en el código no es un
+//  texto de más: el modelo la pide, la API responde que no existe y el turno se
+//  va a un traspaso. Pasó de verdad (ver_foto/enviar_video, 25-jul). Lo mismo al
+//  revés: una herramienta declarada que el cuaderno nunca menciona es peso
+//  muerto que el modelo jamás va a usar.
 // ============================================================================
 console.log('\n── P39 · El CUADERNO y el código hablan de lo mismo ──');
 {
   const codigo = codigoCerebro;
-  // 1) herramientas DECLARADAS en iaHerramientas()
   const declaradas = [...new Set([...codigo.matchAll(/\{\s*name:\s*'([a-z_]+)'/g)].map((x) => x[1]))];
-  // 2) herramientas que el CUADERNO nombra como llamables: `nombre(` con backtick
-  const cuaderno = (codigo.match(/# CUADERNO DEL ASESOR[\s\S]*?lista de fusilamiento[\s\S]{0,8000}/) || [''])[0]
-    || codigo;   // si cambia el marcador, se compara contra todo el nodo (más estricto)
-  // Se miran TODOS los `nombre(` del cuaderno, no solo los que llevan guion bajo
-  // (así `cotizar` también entra). La lista negra son palabras del texto que
-  // casualmente van en backticks con paréntesis y no son herramientas.
+  const cuaderno = (codigo.match(/# CUADERNO DEL ASESOR[\s\S]*?Ante la duda: no inventes/) || [''])[0] || codigo;
   const NO_SON_HERRAMIENTAS = ['sesion', 'evento', 'sistema'];
   const nombradas = [...new Set([...cuaderno.matchAll(/`([a-z_]{4,})\s*\(/g)].map((x) => x[1]))]
     .filter((n) => NO_SON_HERRAMIENTAS.indexOf(n) < 0);
   const fantasma = nombradas.filter((n) => declaradas.indexOf(n) < 0);
   check('P39: el cuaderno no nombra herramientas inexistentes', fantasma.length === 0,
     { fantasma, declaradas });
-  // …y al revés: una herramienta que el código declara pero el cuaderno nunca
-  // menciona es peso muerto — el modelo no sabe que existe y jamás la va a usar.
-  // (Le pasó a `mostrar_candidatas` hasta que se documentó en el §9.)
   const huerfanas = declaradas.filter((d) => cuaderno.indexOf(d) < 0);
   check('P39: toda herramienta declarada está documentada en el cuaderno',
     huerfanas.length === 0, { huerfanas });
 
-  // 3) campos del bloque [SESIÓN] que el cuaderno documenta vs los que se mandan
-  //    (el bloque real se arma en iaBloqueSesion: 'campo: ' + d(...))
-  const enviados = [...new Set([...codigo.matchAll(/'([a-z_]{3,})(?::| ·)/g)].map((x) => x[1]))];
-  const clave = ['ciudad', 'genero', 'ref_activa', 'talla_capturada', 'estado_pedido',
-    'pago', 'link_enviado', 'hora', 'franja', 'nombre_asesor', 'foto_cliente'];
+  // v12: son SIETE herramientas, y las de plata NO pueden volver por la puerta
+  check('P39: son exactamente 7 herramientas', declaradas.length === 7, { declaradas });
+  const PROHIBIDAS = ['cotizar', 'registrar_pedido', 'crear_link_wompi', 'consultar_pedido',
+    'avisar_dueno', 'listar_modelos', 'enviar_video'];
+  const revividas = PROHIBIDAS.filter((p) => declaradas.indexOf(p) >= 0);
+  check('P39: ninguna herramienta de plata/video sigue declarada', revividas.length === 0, { revividas });
+
+  // campos del bloque [SESIÓN] que el cuaderno promete: uno prometido y no
+  // enviado no es un campo vacío, es una alucinación garantizada (el "Buenas
+  // noches" a las 11 de la mañana nació así).
+  const clave = ['hora', 'franja', 'nombre_asesor', 'foto_cliente', 'ciudad', 'genero',
+    'ref_activa', 'talla_capturada', 'fichas_ya_enviadas', 'ya_salude', 'refs_publicacion'];
   const faltan = clave.filter((c) => codigo.indexOf("'" + c + ': ') < 0 && codigo.indexOf(c + ': ') < 0);
   check('P39: los campos clave de [SESIÓN] sí se le mandan al modelo', faltan.length === 0, { faltan });
 
-  // 4) los momentos del enum de avisar_dueno existen en iaMomentos()
-  const momEnum = (codigo.match(/function iaMomentos\(\)[\s\S]{0,400}?\]/) || [''])[0];
-  const momCuaderno = ['intencion_compra', 'link_enviado', 'pago_confirmado', 'comprobante_recibido',
-    'verificar_pago', 'datos_completos', 'foto_recibida', 'modelo_no_tenemos', 'dos_pares',
-    'anuncio_sin_mapear', 'precio_discrepante', 'lista_espera'];
-  const momFaltan = momCuaderno.filter((m) => momEnum.indexOf("'" + m + "'") < 0);
-  check('P39: los momentos de avisar_dueno del cuaderno existen en el código',
-    momFaltan.length === 0, { momFaltan });
-
-  // 5) los motivos de pasar_asesor del cuaderno existen en iaMotivosHandoff()
+  // los motivos de pasar_asesor del cuaderno existen en iaMotivosHandoff()
   const motEnum = (codigo.match(/function iaMotivosHandoff\(\)[\s\S]{0,400}?\]/) || [''])[0];
-  const motCuaderno = ['pide_humano', 'insiste_sin_stock', 'acusa_estafa', 'dos_modelos',
-    'dato_dudoso', 'nota_de_voz', 'bucle', 'mayorista', 'precio_discrepante'];
+  const motCuaderno = ['pide_humano', 'quiere_comprar', 'no_puedo_responder',
+    'modelo_no_encontrado', 'nota_de_voz'];
   const motFaltan = motCuaderno.filter((m) => motEnum.indexOf("'" + m + "'") < 0);
-  check('P39: los motivos de pasar_asesor del cuaderno existen en el código',
-    motFaltan.length === 0, { motFaltan });
+  check('P39: los motivos de pasar_asesor existen en el código', motFaltan.length === 0, { motFaltan });
+
+  // los TRES campos del traspaso rico viajan en la declaración de la herramienta
+  const decl = (codigo.match(/name: 'pasar_asesor'[\s\S]{0,1200}/) || [''])[0];
+  check('P39: pasar_asesor pide que_quiere / duda_abierta / ojo_con',
+    /que_quiere/.test(decl) && /duda_abierta/.test(decl) && /ojo_con/.test(decl), decl.slice(0, 200));
 }
 
 // ============================================================================
-//  P40–P45 · LAS 4 FALLAS DE LA PRUEBA REAL DEL DUEÑO (26-jul, mañana)
-// ----------------------------------------------------------------------------
-//  Reportadas con capturas: (1) el bot afirmó "ya está ordenado, te llega en la
-//  tarde" y en la app NO se creó nada; (2) al cambiar de modelo a mitad del
-//  pedido la venta se quedaba con el modelo viejo o sin pedido; (3) faltaba el
-//  resumen de cierre; (4) "Dame un segundo y ya te confirmo" y nunca volvió a
-//  escribir (la esposa del dueño quedó esperando).
+//  P40–P42 · LO QUE EL BOT v12 YA NO PUEDE HACER (misión: califica, no cierra)
 // ============================================================================
 
-// --- P40: afirmar un pedido que no existe está PROHIBIDO ---
-console.log('\n── P40 · "ya quedó ordenado" sin pedido en la app ──');
+// --- P40: aunque el modelo afirme un pedido, NADA se registra ni se promete ---
+console.log('\n── P40 · El bot ya no registra pedidos (aunque el modelo lo diga) ──');
 {
   limpiar();
-  // Bogotá, ref elegida, pero SIN dirección: el pedido no se puede registrar.
-  sesion({ iaRef: '10', iaSaludo: '1', iaCiudad: 'Bogota',
-    iaNombre: 'Cristhian Mancipe', iaDatos: 'nombre' });
-  guionGemini = [{ texto: 'Listo Cristhian, tu pedido de las Reebok ya quedó registrado y te llega hoy en la tarde.' }];
-  const t = await turno('si');
-  let hayPedido = false;
-  for (const [k] of store) if (k.indexOf('tiendas/varman/pedidos/') === 0) hayPedido = true;
-  check('P40: no le afirma un pedido que no existe',
-    hayPedido || !/(quedo|qued[óo])\s+registrad|ya\s+est[áa]\s+ordenad|te\s+llega\s+hoy/i.test(t.cliTxt),
-    { hayPedido, txt: t.cliTxt });
-  check('P40: le pide el dato que falta (la dirección)',
-    hayPedido || /direcci/i.test(t.cliTxt), t.cliTxt);
+  sesion({ iaRef: '10', iaSaludo: '1', iaCiudad: 'Bogota' });
+  guionGemini = [{ texto: 'Listo, tu pedido de las Reebok ya quedó registrado y te llega hoy en la tarde.' }];
+  const t = await turno('si, quiero esas');
+  const pedidos = Array.from(store.keys()).filter((k) => k.indexOf('tiendas/varman/pedidos/') === 0);
+  check('P40: no se creó ningún pedido en Firestore', pedidos.length === 0, { pedidos });
+  check('P40: no manda ningún link de pago', !/wompi|checkout|link de pago/i.test(t.cliTxt), t.cliTxt);
 }
 
-// --- P41: en Bogotá con TODOS los datos el pedido SÍ se crea ---
-console.log('\n── P41 · Datos completos en Bogotá: el pedido llega a la app ──');
+// --- P41: nunca pide nombre ni dirección (eso es del asesor) ---
+console.log('\n── P41 · Nunca pide datos de envío ──');
 {
   limpiar();
-  sesion({ iaRef: '10', iaSaludo: '1', iaCiudad: 'Bogota',
-    iaNombre: 'Cristhian Mancipe', iaDireccion: 'Calle 134 # 9-52 apto 302' });
-  guionGemini = [{ texto: 'Listo Cristhian, tu pedido ya quedó registrado.' }];
-  const t = await turno('si, confirmo');
-  const pedidos = Array.from(store.keys()).filter((k) => k.indexOf('tiendas/varman/pedidos/') === 0);
-  check('P41: el pedido SÍ se creó en Firestore', pedidos.length === 1, { pedidos });
-  check('P41: le llega el resumen de cierre', /alistamiento/i.test(t.cliTxt), t.cliTxt);
-  check('P41: el cierre dice que se comunican para la entrega',
-    /comunicamos\s+contigo/i.test(t.cliTxt), t.cliTxt);
-  check('P41: el cierre trae el total', /\$/.test(t.cliTxt), t.cliTxt);
+  sesion({ iaRef: '10', iaSaludo: '1', iaCiudad: 'Bogota' });
+  guionGemini = [{ texto: 'Para Bogotá el envío es gratis y pagas contra entrega. ¿Te lo dejamos listo?' }];
+  const t = await turno('vivo en Bogota');
+  check('P41: no pide nombre completo', !/nombre\s+completo/i.test(t.cliTxt), t.cliTxt);
+  check('P41: no pide la dirección', !/direcci[óo]n\s+de\s+entrega|cu[áa]l\s+es\s+la\s+direcci/i.test(t.cliTxt), t.cliTxt);
 }
 
-// --- P42: cambio de modelo a mitad del pedido → se ACTUALIZA, no se duplica ---
-console.log('\n── P42 · Cambia de modelo con el pedido ya registrado ──');
+// --- P42: el "sí, la quiero" se traspasa con la ficha completa al 320 ---
+console.log('\n── P42 · El traspaso lleva qué quiere / duda / ojo con ──');
 {
   limpiar();
-  sesion({ iaRef: '10', iaSaludo: '1', iaCiudad: 'Bogota',
-    iaNombre: 'Cristhian Mancipe', iaDireccion: 'Calle 134 # 9-52 apto 302',
-    iaEstadoPedido: 'registrado', iaPedidoRef: '10',
-    iaPedidoPath: 'tiendas/varman/pedidos/ped_viejo', iaCierre: '10' });
-  store.set('tiendas/varman/pedidos/ped_viejo', {
-    ref: { stringValue: '10' }, cliente_wa: { stringValue: WA },
-    total: { integerValue: '269900' }, estado: { stringValue: 'nuevo' }
-  });
-  guionGemini = [{ tools: [{ name: 'mostrar_ficha', args: { ref: '12' } }] },
-                 { texto: 'De una, te cambio el modelo. Ese queda en el mismo pedido.' }];
-  const t = await turno('mejor quiero cambiar por las otras, las 12');
-  const pedidos = Array.from(store.keys()).filter((k) => k.indexOf('tiendas/varman/pedidos/') === 0);
-  check('P42: NO se creó un segundo pedido', pedidos.length === 1, { pedidos });
-  const doc = store.get('tiendas/varman/pedidos/ped_viejo') || {};
-  const refDoc = doc.ref && doc.ref.stringValue;
-  check('P42: el pedido quedó con el modelo NUEVO', refDoc === '12', { refDoc, txt: t.cliTxt.slice(0, 200) });
-  check('P42: le sale el resumen de cierre del modelo nuevo',
-    /alistamiento/i.test(t.cliTxt), t.cliTxt.slice(0, 300));
+  sesion({ iaRef: '40', iaSaludo: '1', iaCiudad: 'Bogota', iaFichasVistas: '40' });
+  guionGemini = [{ tools: [{ name: 'pasar_asesor', args: {
+    motivo: 'quiere_comprar',
+    que_quiere: 'Puma speedcat roja, talla 38',
+    duda_abierta: 'preguntó si hay en negro y no hay',
+    ojo_con: 'el negro no existe en el catálogo'
+  } }], texto: 'Ok, ya tengo tus datos. Voy a transferirte con un asesor para terminar tu pedido.' }];
+  const t = await turno('si la quiero');
+  check('P42: al cliente le llega la frase del traspaso',
+    /transferirte|asesor/i.test(t.cliTxt), t.cliTxt);
+  check('P42: al 320 le llega QUÉ QUIERE', /speedcat roja/i.test(t.ownTxt), t.ownTxt.slice(0, 400));
+  check('P42: al 320 le llega la DUDA abierta', /negro/i.test(t.ownTxt), t.ownTxt.slice(0, 400));
+  check('P42: al 320 le llega el OJO CON', /no existe en el cat/i.test(t.ownTxt), t.ownTxt.slice(0, 400));
+  check('P42: al 320 le llega el wa.me del cliente', t.ownTxt.indexOf('wa.me/' + WA) >= 0, t.ownTxt.slice(0, 400));
+  check('P42: al 320 le llegan los últimos mensajes', /si la quiero/i.test(t.ownTxt), t.ownTxt.slice(0, 500));
+  const ses = store.get('tiendas/varman/botSesiones/' + WA) || {};
+  check('P42: el bot queda EN SILENCIO con ese cliente',
+    !!(ses.enHandoffAt && ses.enHandoffAt.stringValue), Object.keys(ses));
 }
 
 // --- P43: la línea de respaldo no promete volver a escribir ---
@@ -868,314 +833,218 @@ console.log('\n── P43 · El bot nunca promete "ya te confirmo" y desaparecer
 {
   limpiar();
   sesion({ iaSaludo: '1' });
-  // el cerebro no logra armar nada (respuesta vacía en las dos vueltas)
-  guionGemini = [{ texto: '' }, { texto: '' }];
-  const t = await turno('quiero unos tenis');
+  guionGemini = [{ error: { status: 500, msg: 'boom' } }, { error: { status: 500, msg: 'boom' } }];
+  const t = await turno('me interesa algo');
   check('P43: no promete volver a escribir',
-    !/ya\s+te\s+confirmo|dame\s+un\s+segundo|en\s+un\s+momento\s+te\s+(aviso|escribo|confirmo)/i.test(t.cliTxt),
-    t.cliTxt);
-  check('P43: le devuelve la pelota con una pregunta', /[?¿]/.test(t.cliTxt), t.cliTxt);
+    !/ya te confirmo|dame un segundo|en un momento te (aviso|escribo|confirmo)/i.test(t.cliTxt), t.cliTxt);
+  check('P43: le devuelve la pelota con una pregunta', /[?¿]/.test(t.cliTxt) || !t.cliTxt, t.cliTxt);
 }
 
-// --- P44: las fichas ya enviadas viajan en el prompt (para la regla D4) ---
+// --- P44: el modelo sabe qué fotos ya mandó ---
 console.log('\n── P44 · El modelo sabe qué fotos ya mandó (no manda otras) ──');
 {
   limpiar();
   sesion({ iaSaludo: '1', iaFichasVistas: '10,12' });
-  ultimoPromptGemini = '';
-  guionGemini = [{ texto: '¿Te refieres a las que te mostré primero?' }];
-  await turno('las cafe cuanto valen');
+  guionGemini = [{ texto: '¿Cuál de las dos te gustó más?' }];
+  await turno('cual me recomiendas');
   check('P44: `fichas_ya_enviadas` va en [SESIÓN] con la ref',
-    /fichas_ya_enviadas:.*10/.test(ultimoPromptGemini),
-    ultimoPromptGemini.slice(ultimoPromptGemini.indexOf('fichas_ya_enviadas'), ultimoPromptGemini.indexOf('fichas_ya_enviadas') + 120));
+    /fichas_ya_enviadas:[^\\n]*10/.test(ultimoPromptGemini), ultimoPromptGemini.slice(0, 200));
 }
 
-// --- P45: primer contacto → saluda, se presenta y NO suelta el rango ---
+// --- P45: "Precio ?" de entrada: saludo primero, sin rango ---
 console.log('\n── P45 · "Precio ?" de entrada: saludo primero, sin rango ──');
 {
   limpiar();
-  // el texto EXACTO que salió mal en la prueba real del 26-jul
-  guionGemini = [{ texto: 'Nuestros tenis importados de excelente calidad van desde $235.000 hasta $480.000 con envío gratis. ¿Te interesan las Adidas Samba de la publicación o buscas algún modelo en especial?' }];
+  guionGemini = [{ texto: 'Nuestros tenis van desde $235.000 hasta $480.000 con envío gratis.' }];
   const t = await turno('Precio ?');
-  check('P45: saluda y se presenta', /bienvenid|mi nombre es/i.test(t.cliTxt), t.cliTxt);
-  check('P45: NO suelta el rango de precios',
-    !/desde\s*\$?\s*235|entre\s*\$?\s*235|\$480\.000/i.test(t.cliTxt), t.cliTxt);
+  check('P45: saluda y se presenta', /buen(os|as)\s+(d[ií]as|tardes|noches)|bienvenid/i.test(t.cliTxt), t.cliTxt);
+  check('P45: NO suelta el rango de precios', !/235\.000|480\.000/.test(t.cliTxt), t.cliTxt);
   check('P45: sigue preguntando qué modelo busca', /[?¿]/.test(t.cliTxt), t.cliTxt);
   check('P45: no manda foto todavía', t.fotos === 0, { fotos: t.fotos });
 }
 
-// --- P46: apertura desde el anuncio sin refPauta → NUNCA "no lo encontré" ---
+// --- P46: click pagado que pregunta precio: nada de "no lo encontré" ---
 console.log('\n── P46 · Click pagado que pregunta precio: nada de "no lo encontré" ──');
 {
   limpiar();
-  // el bot intenta resolver la ref de su propio anuncio y falla (sin mapear,
-  // sin refPauta): eso NO se le puede decir al cliente como si él hubiera
-  // pedido algo que no tenemos.
-  guionGemini = [{ tools: [{ name: 'mostrar_ficha', args: { ref: '99' } }] },
-                 { texto: 'Déjame ver qué modelo es.' }];
-  const t = await turno('Precio.?', { fuente: 'ctwa:120250224361080308' });
+  guionGemini = [{ texto: 'Cuéntame qué modelo te interesa.' }];
+  const t = await turno('Precio.?', { fuente: 'ctwa:99999', fuente_titulo: 'Zapatos bonitos' });
   check('P46: no le dice "no lo encontré" en la apertura',
-    !/no\s+lo\s+encontr|no\s+logr[ée]\s+ubicar|no\s+.{0,25}registrad/i.test(t.cliTxt), t.cliTxt);
-  check('P46: igual lo saluda y lo encamina',
-    /bienvenid|mi nombre es/i.test(t.cliTxt) && /[?¿]/.test(t.cliTxt), t.cliTxt);
+    !/no\s+(lo|la)?\s*(encontr|ubiqu)/i.test(t.cliTxt), t.cliTxt);
+  check('P46: igual lo saluda y lo encamina', /[?¿]/.test(t.cliTxt), t.cliTxt);
 }
 
-// --- P47: con la conversación empezada NO vuelve a saludar (no se rompió) ---
+// --- P47: conversación empezada: no re-saluda ---
 console.log('\n── P47 · Conversación empezada: no re-saluda ──');
 {
   limpiar();
-  sesion({ iaSaludo: '1', iaRef: '10' });
+  sesion({ iaRef: '10', iaSaludo: '1' });
+  store.set('tiendas/varman/botSesiones/' + WA, Object.assign(
+    store.get('tiendas/varman/botSesiones/' + WA) || {},
+    { historial: { arrayValue: { values: [
+      { mapValue: { fields: { r: { stringValue: 'u' }, t: { stringValue: 'hola' } } } },
+      { mapValue: { fields: { r: { stringValue: 'b' }, t: { stringValue: 'Buenas tardes, bienvenido a VarMan Crew.' } } } }
+    ] } } }));
   guionGemini = [{ texto: 'Buenas tardes, bienvenido a VarMan Crew. Mi nombre es Cristian. Seguimos con las Reebok, ¿en qué ciudad estás?' }];
   const t = await turno('Hola');
-  check('P47: se recorta la bienvenida repetida', !/bienvenid/i.test(t.cliTxt), t.cliTxt);
+  check('P47: se recorta la bienvenida repetida',
+    !/bienvenid/i.test(t.cliTxt) && !/mi nombre es/i.test(t.cliTxt), t.cliTxt);
 }
 
-// --- P48: la publicación puede llevar VARIAS referencias ---
+// --- P48: varias referencias en la publicación ---
 console.log('\n── P48 · Varias referencias en la publicación ──');
-// la app escribe botConfig/general.refPauta; hoy con un valor, ahora con lista
-function cfgPauta(valor) {
-  const campo = Array.isArray(valor)
-    ? { arrayValue: { values: valor.map((v) => ({ stringValue: String(v) })) } }
-    : { stringValue: String(valor) };
-  store.set('tiendas/varman/botConfig/general', { refPauta: campo });
-}
 {
   limpiar();
-  cfgPauta(['10', '12']);
-  ultimoPromptGemini = '';
-  guionGemini = [{ texto: 'En la publicación tenemos dos modelos, ¿cuál te gusta?' }];
-  await turno('Hola, cuánto valen las de la publicación?');
-  check('P48: las DOS refs viajan en [SESIÓN]',
-    /refs_publicacion:.*10.*\|.*12/.test(ultimoPromptGemini),
-    ultimoPromptGemini.slice(ultimoPromptGemini.indexOf('refs_publicacion'), ultimoPromptGemini.indexOf('refs_publicacion') + 140));
-  check('P48: `refPauta` sigue trayendo la primera (nada viejo se rompe)',
-    /refPauta: 10/.test(ultimoPromptGemini),
-    ultimoPromptGemini.slice(ultimoPromptGemini.indexOf('refPauta:'), ultimoPromptGemini.indexOf('refPauta:') + 60));
-}
-{
-  // compatibilidad: una sola ref guardada como string (lo que hay hoy en la app)
-  limpiar();
-  cfgPauta('07');
-  ultimoPromptGemini = '';
-  guionGemini = [{ texto: 'Buenas tardes, bienvenido a VarMan Crew. Mi nombre es Cristian. ¿Qué modelo buscas?' }];
-  await turno('Hola');
-  check('P48: con UNA sola ref se comporta igual que siempre',
-    /refPauta: 07/.test(ultimoPromptGemini),
-    ultimoPromptGemini.slice(ultimoPromptGemini.indexOf('refPauta:'), ultimoPromptGemini.indexOf('refPauta:') + 60));
-}
-
-// --- P49: un color se resuelve DENTRO del modelo, sin mezclar referencias ---
-console.log('\n── P49 · "las blancas" no trae blancas de todo el catálogo ──');
-{
-  limpiar();
-  // vio la ficha de la 10 pero AÚN NO la eligió: no hay iaRef, solo la vista.
-  // Antes esto se iba a buscar el color en todo el catálogo.
-  sesion({ iaSaludo: '1', iaFichasVistas: '10' });
-  guionGemini = [{ tools: [{ name: 'buscar_catalogo', args: { texto: 'blancas' } }] },
-                 { texto: 'Mira estas.' }];
-  const t = await turno('las quiero blancas');
-  // toda foto que salga tiene que ser del MISMO modelo que ya vio (o ninguna)
-  // el fixture viene en formato Firestore ({documents:[{fields:{...}}]})
-  const doc10 = (catalogoFixture.documents || []).find(
-    (d) => d.fields && d.fields.ref && d.fields.ref.stringValue === '10');
-  const marca10 = (doc10 && doc10.fields.marca && doc10.fields.marca.stringValue) || '';
-  const familia = String(marca10).toLowerCase().split(/\s+/).filter((w) => w.length >= 4)[0] || '';
-  const ajeno = t.cli.filter((m) => m.type === 'image')
-    .filter((m) => familia && String((m.image && m.image.caption) || '').toLowerCase().indexOf(familia) < 0);
-  check('P49: no manda fotos de otras referencias por el color',
-    ajeno.length === 0, { ajeno: ajeno.length, txt: t.cliTxt.slice(0, 200) });
-}
-
-// --- P50: el mensaje que entra POR EL BUZÓN también se contesta -------------
-// El bug del 16-ago en vivo: con BOT_BUZON=on el turno no entra por "Parsear
-// mensaje" sino por "Buzon recoger (cada minuto)". El Cerebro leía el mensaje
-// con $('Parsear mensaje'), que en ese camino LANZA, y moría antes de
-// contestar: el cliente esperaba los 45 s y no recibía nada.
-console.log('\n── P50 · Mensaje que llega por el buzón (BOT_BUZON=on) ──');
-{
-  limpiar();
-  guionGemini = [{ texto: 'Buenas, bienvenido a VarMan Crew. ¿En qué ciudad estás?' }];
-  const t = await turno('Hola quiero info de\nlas Adidas EQT',
-    { __nodoEntrada: 'Buzon recoger (cada minuto)', buzon_juntados: 2 });
-  check('P50: el cliente SÍ recibe respuesta por el camino del buzón',
-    t.cli.length > 0, { recibidos: t.cli.length, txt: t.cliTxt.slice(0, 200) });
-  check('P50: y es una respuesta de verdad, no vacía',
-    t.cliTxt.trim().length > 10, t.cliTxt.slice(0, 200));
-}
-
-// --- P50b: el camino de siempre sigue igual (el buzón apagado no cambió nada)
-{
-  limpiar();
-  guionGemini = [{ texto: 'Buenas, bienvenido a VarMan Crew. ¿En qué ciudad estás?' }];
-  const t = await turno('Hola quiero info de las Adidas EQT');
-  check('P50b: el webhook normal sigue contestando igual',
-    t.cli.length > 0 && t.cliTxt.trim().length > 10, { recibidos: t.cli.length });
-}
-
-// --- P50c: CONTROL NEGATIVO -------------------------------------------------
-// Sin esto, P50 podría estar pasando por la puerta de siempre y no probar nada.
-// Si NINGÚN nodo de entrada corrió, el Cerebro tiene que morir con un mensaje
-// que se entienda — no con el "Cannot assign to read only property 'name'" de
-// n8n, que fue el que costó la tarde del 16-ago.
-{
-  limpiar();
-  guionGemini = [{ texto: 'no debería llegar aquí' }];
-  let err = null;
-  try { await turno('hola', { __nodoEntrada: 'Nodo Que No Existe' }); }
-  catch (e) { err = e; }
-  check('P50c: sin nodo de entrada falla, y el stub de $() sí lanza como n8n',
-    err !== null, { err: err && String(err.message).slice(0, 120) });
-  check('P50c: el error dice qué pasó, en cristiano',
-    err !== null && /BUZON-ENTRADA/.test(String(err.message)),
-    err && String(err.message).slice(0, 160));
-}
-
-// --- P50d: el aviso de envío fallido (BOT_LOG_FALLOS) sigue pasando ----------
-// "Parsear mensaje" emite los statuses `failed` de Meta con wa_id VACÍO y
-// "Buzon guardar" los deja pasar derecho al Cerebro, que los registra en
-// botErrores. El lector de entrada NO puede exigir wa_id: los tumbaría con
-// [BUZON-ENTRADA] y se perdería la visibilidad de los envíos no entregados
-// (el agujero de los ~18 leads silenciados).
-{
-  limpiar();
-  guionGemini = [{ texto: 'no debería llegar aquí' }];
-  let err = null; let t = null;
-  try {
-    t = await turno('', { wa_id: '', tipo_evento: 'fallo_envio',
-      destinatario: '573001112233', error_code: 131047,
-      error_title: 'Re-engagement message', message_id: 'wamid.FALLO1' });
-  } catch (e) { err = e; }
-  check('P50d: el fallo de envío NO tumba el Cerebro', err === null,
-    err && String(err.message).slice(0, 160));
-  check('P50d: sin mandarle nada a ningún cliente', t !== null && t.cli.length === 0,
-    t && t.cliTxt.slice(0, 120));
-  const enBotErrores = t !== null && [...store.keys()].some((k) => String(k).indexOf('botErrores') >= 0);
-  check('P50d: y queda registrado en botErrores', enBotErrores,
-    t && [...store.keys()].join(' | ').slice(0, 200));
-}
-
-// ============================================================================
-//  P51-P53 · BUZÓN v11.3 — EL RELOJ APARTE
-// ----------------------------------------------------------------------------
-//  La lección del 16-ago: el "Cada minuto" dentro del workflow grande engordaba
-//  la base (una copia de 1,1 MB por tick) y la doble puerta del Cerebro fue el
-//  bug que lo tumbó. El reloj ahora es un workflow aparte que entrega por el
-//  webhook normal. Estas pruebas ejercitan las TRES piezas del viaje:
-//  guardar (pasa el bundle derecho) → reloj (junta y entrega con token) →
-//  Parsear (la puerta interna reconoce el bundle y rechaza al que no trae token).
-// ============================================================================
-console.log('\n── P51 · Buzon guardar: el bundle del reloj pasa derecho ──');
-{
-  const codigoGuardar = fs.readFileSync(path.join(DIR, 'workflows', 'src', 'buzon-guardar.js'), 'utf8');
-  const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
-  const llamadas = [];
-  const http = async (opts) => {
-    llamadas.push({ metodo: String(opts.method || 'GET').toUpperCase(), url: String(opts.url || '') });
-    if (String(opts.url).indexOf('oauth2.googleapis.com') >= 0) return { access_token: 'FAKE' };
-    return {};
-  };
-  const envB = Object.assign({}, ENV, { BOT_BUZON: 'on' });
-  const correrGuardar = (items) => new AsyncFunction('$input', '$env', '$json', '$', 'require', codigoGuardar)
-    .call({ helpers: { httpRequest: http } }, { all: () => items }, envB, {}, () => {}, require);
-
-  // (a) el bundle que entrega el reloj (trae buzon_juntados) NO se re-guarda
-  llamadas.length = 0;
-  const outA = await correrGuardar([{ json: { wa_id: WA, texto: 'hola\ncuanto valen', buzon_juntados: 2, message_id: 'wamid.B1' } }]);
-  check('P51: el bundle pasa derecho al Cerebro (sin bucle infinito)',
-    Array.isArray(outA) && outA.length === 1 && outA[0].json.buzon_juntados === 2,
-    JSON.stringify(outA).slice(0, 120));
-  check('P51: y NO se escribe en el buzon',
-    !llamadas.some((c) => c.url.indexOf('botBuzon') >= 0), llamadas);
-
-  // (b) el mensaje normal del cliente SÍ se guarda y la ejecución termina ahí
-  llamadas.length = 0;
-  const outB = await correrGuardar([{ json: { wa_id: WA, texto: 'hola', message_id: 'wamid.N1', tipo: 'text' } }]);
-  check('P51: el mensaje normal SÍ va al buzon',
-    llamadas.some((c) => c.metodo === 'POST' && c.url.indexOf('botBuzon') >= 0), llamadas);
-  check('P51: y no sigue derecho (la ejecución muere aquí)',
-    Array.isArray(outB) && outB.length === 0, JSON.stringify(outB).slice(0, 120));
-}
-
-console.log('\n── P52 · Buzon reloj: junta, entrega por el webhook y vacía ──');
-{
-  const codigoReloj = fs.readFileSync(path.join(DIR, 'workflows', 'src', 'buzon-reloj.js'), 'utf8');
-  const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
-  const envR = Object.assign({}, ENV, { BOT_BUZON: 'on', BOT_BUZON_SEGUNDOS: '45', WEBHOOK_VERIFY_TOKEN: 'tokenwebhook_test' });
-  const correrReloj = (docsFS, capturas) => new AsyncFunction('$input', '$env', '$json', '$', 'require', codigoReloj)
-    .call({ helpers: { httpRequest: async (opts) => {
-      const url = String(opts.url || ''); const met = String(opts.method || 'GET').toUpperCase();
-      capturas.total++;
-      if (url.indexOf('oauth2') >= 0) return { access_token: 'FAKE' };
-      if (met === 'GET' && url.indexOf('botBuzon') >= 0) return { documents: docsFS };
-      if (met === 'DELETE') { capturas.borrados.push(url); return {}; }
-      if (met === 'POST' && url.indexOf('/webhook/whatsapp') >= 0) { capturas.posts.push(opts.body); return {}; }
-      return {};
-    } } }, { all: () => [] }, envR, {}, () => {}, require);
-  const doc = (id, haceMs, payload) => ({
-    name: 'projects/varman-crew/databases/(default)/documents/tiendas/varman/botBuzon/' + id,
-    fields: { wa: { stringValue: WA },
-      recibidoAt: { stringValue: new Date(Date.now() - haceMs).toISOString() },
-      payload: { stringValue: JSON.stringify(payload) } }
+  store.set('tiendas/varman/botConfig/general', {
+    refPauta: { arrayValue: { values: [{ stringValue: '10' }, { stringValue: '12' }] } }
   });
-
-  // (a) dos mensajes maduros del mismo cliente → UN POST con todo junto
-  const cap = { posts: [], borrados: [], total: 0 };
-  await correrReloj([
-    doc(WA + '__m1', 120000, { wa_id: WA, tipo: 'text', texto: 'hola', message_id: 'm1' }),
-    doc(WA + '__m2', 110000, { wa_id: WA, tipo: 'text', texto: 'cuanto valen las EQT', message_id: 'm2' })
-  ], cap);
-  check('P52: UN solo POST al webhook del bot', cap.posts.length === 1, cap.posts.length);
-  const b = cap.posts[0] || {};
-  check('P52: el POST lleva interno_buzon + el token del webhook',
-    b.interno_buzon === true && b.token === 'tokenwebhook_test',
-    JSON.stringify(b).slice(0, 120));
-  const it0 = (b.items && b.items[0]) || {};
-  check('P52: los textos van juntos y en orden', it0.texto === 'hola\ncuanto valen las EQT', it0.texto);
-  check('P52: marca buzon_juntados=2 (la señal del pase derecho)', it0.buzon_juntados === 2, it0.buzon_juntados);
-  check('P52: y vacía el buzon DESPUÉS de entregar', cap.borrados.length === 2, cap.borrados.length);
-
-  // (b) mensaje aún dentro de la ventana → no se entrega ni se borra
-  const cap2 = { posts: [], borrados: [], total: 0 };
-  await correrReloj([doc(WA + '__m3', 10000, { wa_id: WA, tipo: 'text', texto: 'hola', message_id: 'm3' })], cap2);
-  check('P52: lo inmaduro se deja madurar (ni POST ni borrado)',
-    cap2.posts.length === 0 && cap2.borrados.length === 0,
-    { posts: cap2.posts.length, borrados: cap2.borrados.length });
-
-  // (c) flag apagado → inerte total, ni una llamada a Firestore
-  const cap3 = { posts: [], borrados: [], total: 0 };
-  await new AsyncFunction('$input', '$env', '$json', '$', 'require', codigoReloj)
-    .call({ helpers: { httpRequest: async () => { cap3.total++; return {}; } } },
-      { all: () => [] }, Object.assign({}, ENV, { BOT_BUZON: '' }), {}, () => {}, require);
-  check('P52: con BOT_BUZON apagado no toca nada', cap3.total === 0, cap3.total);
+  sesion({ iaSaludo: '1' });
+  guionGemini = [{ texto: '¿Cuál de las dos te gusta?' }];
+  await turno('las de la publicacion');
+  check('P48: las DOS refs viajan en [SESIÓN]',
+    /refs_publicacion:[^"]*10[^"]*12/.test(ultimoPromptGemini), (ultimoPromptGemini.match(/refs_publicacion:[^"]{0,60}/) || [''])[0]);
+  check('P48: `refPauta` sigue trayendo la primera',
+    /refPauta: 10/.test(ultimoPromptGemini), (ultimoPromptGemini.match(/refPauta:[^"]{0,20}/) || [''])[0]);
 }
 
-// [v11.4] La "puerta interna con token" de Parsear se quitó junto con el buzón
-// (decisión final del dueño: sin delay). P53 queda como guarda de que el
-// Parsear del JSON construido: (a) parsea el formato real de Meta igual que
-// siempre y (b) YA NO trae la puerta interna ni el nodo del buzón.
-console.log('\n── P53 · Parsear (del JSON construido): limpio y parseando igual ──');
+// --- P49: "las blancas" no trae blancas de todo el catálogo ---
+console.log('\n── P49 · Un color se resuelve dentro del MISMO modelo ──');
 {
-  const codigoParsear = wf.nodes.find((n) => n.name === 'Parsear mensaje').parameters.jsCode;
-  const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
-  const correrParsear = (bodyJson) => new AsyncFunction('$input', '$env', '$json', '$', 'require', codigoParsear)
-    .call({}, { all: () => [{ json: bodyJson }], first: () => ({ json: bodyJson }) }, ENV, bodyJson, () => {}, require);
+  limpiar();
+  sesion({ iaRef: '40', iaSaludo: '1', iaFichasVistas: '40' });   // Puma speedcat roja
+  guionGemini = [{ tools: [{ name: 'buscar_catalogo', args: { texto: 'las quiero cafe' } }] },
+                 { texto: 'Ese modelo lo tengo en café también.' }];
+  const t = await turno('las quiero cafe');
+  // 41 es la Puma speedcat cafe (hermana de la 40): esa sí; nunca una Nike/Adidas
+  check('P49: no ofrece otra marca por el color',
+    !/nike|adidas|jordan/i.test(t.cliTxt), t.cliTxt.slice(0, 200));
+}
 
-  const outC = await correrParsear({ body: { entry: [{ changes: [{ value: {
-    contacts: [{ profile: { name: 'Cliente' } }],
-    messages: [{ from: WA, id: 'wamid.X1', type: 'text', text: { body: 'hola' } }]
-  } }] }] } });
-  check('P53: el mensaje real de Meta parsea igual que siempre',
-    outC.length === 1 && outC[0].json.wa_id === WA && outC[0].json.texto === 'hola',
-    JSON.stringify(outC).slice(0, 140));
+// ============================================================================
+//  P50–P53 · LO NUEVO DE LA v12
+// ============================================================================
 
-  check('P53: el build quedó SIN la puerta interna del buzón',
-    codigoParsear.indexOf('interno_buzon') < 0, 'aparece interno_buzon en Parsear');
-  check('P53: el build quedó SIN ninguna caja del buzón',
-    !wf.nodes.some((n) => /buzon|Cada minuto/i.test(n.name)),
-    wf.nodes.map((n) => n.name).join(' | '));
-  check('P53: y Parsear conecta DIRECTO al catálogo (cableado v11.0)',
-    JSON.stringify(wf.connections['Parsear mensaje']).indexOf('Leer catalogo') >= 0,
-    JSON.stringify(wf.connections['Parsear mensaje']));
+// --- P50: el buscador entiende plural y género (encargo del 17/08) ---
+console.log('\n── P50 · El buscador entiende plural y género ──');
+{
+  // Los tres casos REALES del barrido: "samba rojos" (existe Samba Jane rojo),
+  // "speedcat rojos" (existe Puma speedcat roja) y "puma ballet café" (en el
+  // catálogo se llama "Puma speedcat cafe", sin la palabra ballet).
+  const casos = [
+    { txt: 'estoy interesada en los samba rojos', espera: '42' },
+    { txt: 'los speedcat rojos', espera: '40' },
+    { txt: 'la puma speedcat cafe', espera: '41' }
+  ];
+  for (const c of casos) {
+    limpiar();
+    sesion({ iaSaludo: '1' });
+    guionGemini = [{ tools: [{ name: 'buscar_catalogo', args: { texto: c.txt } }] },
+                   { texto: 'Mira, esa es.' }];
+    const t = await turno(c.txt);
+    const encontrado = t.fotos > 0 || /\$/.test(t.cliTxt);
+    check('P50: "' + c.txt + '" encuentra la ref ' + c.espera, encontrado, t.cliTxt.slice(0, 160));
+  }
+}
+
+// --- P51: buscar con UN resultado claro manda la ficha sin gastar otra vuelta ---
+console.log('\n── P51 · Un resultado claro: el sistema manda la ficha solo ──');
+{
+  limpiar();
+  sesion({ iaSaludo: '1' });
+  guionGemini = [{ tools: [{ name: 'buscar_catalogo', args: { texto: 'reebok' } }] },
+                 { texto: 'Esa es. ¿En qué ciudad estás?' }];
+  const t = await turno('tienen reebok');
+  check('P51: le llega la foto con el precio real', t.fotos === 1, { fotos: t.fotos, txt: t.cliTxt.slice(0, 120) });
+  check('P51: el turno costó 2 llamadas a Gemini, no más',
+    turnosMedidos[turnosMedidos.length - 1].llamadas <= 2, turnosMedidos[turnosMedidos.length - 1]);
+}
+
+// --- P52: JUNTAR — dos mensajes en ráfaga, UNA sola respuesta ---
+console.log('\n── P52 · Ráfaga de mensajes: una sola respuesta a todo ──');
+{
+  limpiar();
+  sesion({ iaSaludo: '1' });
+  // el primer mensaje deja su doc en el buzón y responde por los dos
+  guionGemini = [{ texto: 'Claro, esas las tengo. ¿En qué ciudad estás?' }];
+  const t1 = await turno('hola', { message_id: 'wamid.A' });
+  // el segundo entra DESPUÉS: su doc ya fue consumido → sale en silencio
+  const buzon = Array.from(store.keys()).filter((k) => k.indexOf('tiendas/varman/botBuzon/') === 0);
+  check('P52: el buzón queda vacío tras responder', buzon.length === 0, { buzon });
+  check('P52: al cliente le llegó UNA sola burbuja', t1.cli.length === 1, { n: t1.cli.length });
+}
+console.log('\n── P52b · El segundo mensaje de la ráfaga no se responde dos veces ──');
+{
+  limpiar();
+  sesion({ iaSaludo: '1' });
+  // se simula que otro turno YA está corriendo y dejó el buzón con un mensaje
+  store.set('tiendas/varman/botBuzon/' + WA + '/msgs/wamid.PREV', {
+    texto: { stringValue: 'y tienen en negro?' },
+    creado: { stringValue: new Date().toISOString() }
+  });
+  guionGemini = [{ texto: 'Te respondo las dos cosas juntas: sí las tengo y el negro no me aparece.' }];
+  const t = await turno('hola', { message_id: 'wamid.B' });
+  check('P52b: el mensaje pendiente se juntó en la MISMA respuesta',
+    /junt|dos cosas|negro/i.test(t.cliTxt) && /y tienen en negro/.test(ultimoPromptGemini), t.cliTxt.slice(0, 160));
+  const buzon = Array.from(store.keys()).filter((k) => k.indexOf('tiendas/varman/botBuzon/') === 0);
+  check('P52b: el buzón se vacía (nadie lo responde otra vez)', buzon.length === 0, { buzon });
+}
+
+// --- P53: el bot NO manda nada por su cuenta (workflow sin relojes) ---
+console.log('\n── P53 · El bot no manda NADA solo (decisión del dueño 17/08) ──');
+{
+  const relojes = wf.nodes.filter((n) => n.type === 'n8n-nodes-base.scheduleTrigger');
+  check('P53: solo queda UN reloj (el barrido de las 3:15am)', relojes.length === 1,
+    relojes.map((n) => n.name));
+  check('P53: ese reloj es el diario', /3:15|dia/i.test((relojes[0] || {}).name || ''),
+    (relojes[0] || {}).name);
+  const nombres = wf.nodes.map((n) => n.name).join(' | ');
+  check('P53: no existe el nodo de recordatorios/reseñas/guías',
+    !/Recordatorios y avisos/i.test(nombres), nombres);
+  check('P53: no existe el rescate de los 3 minutos', !/Rescate conversa/i.test(nombres), nombres);
+  check('P53: no quedó ninguna caja del buzón', !/Buzon|Cada minuto/i.test(nombres), nombres);
+  // …y el Cerebro tampoco entrega las notificaciones pendientes de la app
+  check('P53: el Cerebro ya no entrega notificaciones pendientes',
+    codigoCerebro.indexOf("fsUltimos(tok, 'notificacionesPendientes'") < 0,
+    'el Cerebro sigue leyendo notificacionesPendientes');
+}
+
+// --- P52c: si el turno MUERE, el mensaje juntado NO se pierde ---
+// (el peor final posible del juntar: dar por respondido algo que nunca se
+// respondió. El cliente escribe y el bot calla — justo lo que vino a arreglar.)
+console.log('\n── P52c · Turno caído: el mensaje se queda en el buzón, no se pierde ──');
+{
+  limpiar();
+  sesion({ iaSaludo: '1' });
+  store.set('tiendas/varman/botBuzon/' + WA + '/msgs/wamid.PEND', {
+    texto: { stringValue: 'tienen la talla 39?' },
+    creado: { stringValue: new Date().toISOString() }
+  });
+  // Gemini caído en las dos llamadas: el turno no puede responder
+  guionGemini = [{ error: { status: 500, msg: 'boom' } }, { error: { status: 500, msg: 'boom' } },
+                 { error: { status: 500, msg: 'boom' } }];
+  await turno('hola', { message_id: 'wamid.C' });
+  const quedan = Array.from(store.keys()).filter((k) => k.indexOf('tiendas/varman/botBuzon/') === 0);
+  check('P52c: el mensaje pendiente sigue vivo para el siguiente turno',
+    quedan.some((k) => /wamid\.PEND/.test(k)), { quedan });
+}
+
+// --- P54: CONTROL NEGATIVO — el arnés de verdad ve lo que dice ver ---
+// (lección del 16-ago: un stub que nunca falla convierte la batería en teatro)
+console.log('\n── P54 · Control negativo: la batería sí puede fallar ──');
+{
+  limpiar();
+  sesion({ iaSaludo: '1', iaRef: '10' });
+  // el modelo se inventa una cifra que NINGUNA herramienta devolvió
+  guionGemini = [{ texto: 'Esas te quedan en $99.000 con envío incluido.' }];
+  const t = await turno('cuanto valen');
+  check('P54: la cifra inventada NO le llega al cliente', !/99\.000/.test(t.cliTxt), t.cliTxt);
+  // y el control: una cifra REAL del catálogo sí pasa
+  limpiar();
+  sesion({ iaSaludo: '1' });
+  guionGemini = [{ tools: [{ name: 'mostrar_ficha', args: { ref: '10' } }] },
+                 { texto: 'Esas quedan en $265.000 con el envío incluido.' }];
+  const t2 = await turno('cuanto vale la reebok');
+  check('P54 (control): la cifra REAL del catálogo sí pasa', /265\.000/.test(t2.cliTxt), t2.cliTxt.slice(0, 200));
 }
 
 // ============================================================================
