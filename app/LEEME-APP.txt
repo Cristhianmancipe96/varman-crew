@@ -46,6 +46,132 @@ CÓMO SE ACTUALIZA LA APP EN INTERNET (2 minutos):
   En el celular: cerrar y volver a abrir la app (o F5) para ver lo nuevo.
 
 ----------------------------------------------------------
+HECHO EL 2026-08-31 (CANTIDAD EDITABLE + PDF DEL INVENTARIO):
+  - ESCRIBIR LA CANTIDAD: en la ficha del modelo (tocar la tarjeta
+    en Inventario), el NÚMERO de pares de cada talla ahora es un
+    botón. Se toca, se escribe cuántos hay de verdad y listo.
+    Antes solo estaban el − y el + de a uno —26 toques para bajar
+    de 28 a 2— o el formulario completo de Editar producto, a tres
+    toques y con la referencia y el costo expuestos al lado.
+    · Sirve igual para la fila SIN TALLA: es el caso de "hay 28
+      sueltos y conté 26".
+    · Enter o el botón naranja guardan. Escape cancela.
+    · Cerrar la ficha con el número escrito TAMBIÉN guarda: si no,
+      alguien vuelve a contar creyendo que se perdió.
+    · Deja aviso con el antes y el después ("Talla 40: 3 → 8 (+5)"),
+      para que un dedazo se vea en el momento.
+    · Un número negativo se rechaza con aviso en vez de dejar la
+      fila en cero. El cero escrito a propósito sí pasa.
+    · OJO: esto NO deja acta como el Día de inventario. Para un
+      conteo completo sigue sirviendo esa herramienta, que guarda
+      el cuadre y quién lo cerró.
+  - ASOCIAR TALLA TAMBIÉN DESDE LA FICHA: el botón "🏷 Asociar
+    talla · N sin talla" estaba solo en la tarjeta de la lista;
+    ahora sale también dentro de la ficha, debajo de la fila "—".
+    Quien entra a cuadrar cantidades ya no lo volvía a ver.
+  - PDF DEL INVENTARIO: al lado de Excel hay un botón PDF que baja
+    TODO el inventario como hoja carta lista para imprimir o
+    mandar por WhatsApp. Una fila por talla, ordenado por
+    referencia y talla (el orden de las cajas), con total de pares
+    y espacio para firmar "Contó" y "Revisó".
+    · Los SOCIOS ven costo y valor a costo; el vendedor ve el
+      precio de venta. Un PDF se reenvía: por eso el costo no va
+      en la hoja de todos. (El botón de Excel SÍ exporta los
+      costos para cualquiera — quedó pendiente decidir si se
+      cambia.)
+    · Sin librerías: usa el mismo generador de PDF que ya arma el
+      documento de las bodegas del Búnker.
+    · Probado con 80 referencias / 542 filas / 1.768 pares: 13
+      hojas numeradas, 199 KB, ningún texto montado con nombres
+      largos ni con valores de 8 cifras.
+  - Probado con la app real en el navegador a 375px, en modo local
+    sin Firebase: escribir cantidad, Enter, Escape, campo vacío,
+    negativo, cerrar la ficha con el campo abierto, reabrir sin
+    campos colgados, el −/+ de siempre, y repartir 23 de 28 pares
+    en tallas (sumando sobre una talla que ya existía, sin
+    duplicar la fila y sin perder un solo par). Sin errores de
+    consola y sin desbordes horizontales.
+  - Respaldo del archivo anterior en ..\_ARCHIVO-NO-SUBIR
+    app.jsx.ANTES-EDITAR-CANTIDAD-2026-08-31.bak
+
+----------------------------------------------------------
+HECHO EL 2026-08-27 (DÍA DE INVENTARIO + qué se vendió cada día):
+  - DÍA DE INVENTARIO: botón nuevo en la pestaña Inventario. Abre
+    una sesión de conteo físico que vive en Firestore (colección
+    `conteos`) y la ve todo el equipo al instante. Se cuenta por
+    referencia, escribiendo los pares de cada talla; hay buscador
+    por nombre o código, las ya contadas se esconden del filtro
+    "Por contar" y llevan el rótulo CONTADO, y un atajo marca de
+    una las tallas que están igual al sistema.
+    · La sesión queda ABIERTA hasta que se cierre: se puede contar
+      por partes, apagar la app y seguir mañana.
+    · Al cerrar avisa QUÉ referencias faltan por contar (las que no
+      se cuenten NO se tocan: sin contar no es lo mismo que cero).
+    · Después muestra el CUADRE — faltantes y sobrantes en pares y
+      en plata a costo — y NADA se ajusta hasta que se aprueba.
+    · Lo vendido MIENTRAS se contaba no sale como faltante: cada
+      talla guarda el stock que decía el sistema en el momento de
+      contarla (`base`) y el cierre descuenta lo que se movió
+      después. Las ventas solo guardan la fecha, no la hora, así
+      que sin ese dato un par vendido el mismo día se acusaría
+      como perdido.
+    · Queda un ACTA por conteo (fecha, quién cerró, diferencias),
+      con historial y exportación a Excel.
+    · OJO: exige pegar las reglas nuevas (colección `conteos`) en
+      la consola de Firebase. Si no, la app avisa en ROJO y lo
+      contado se queda solo en ese celular.
+  - ASOCIAR TALLA (pares sueltos en bodega): las referencias que
+    entraron sin talla (del Excel viejo o de una carga rápida)
+    muestran en su tarjeta un botón "🏷 Asociar talla · N sin
+    talla", justo debajo del chip "—" donde se ve el problema.
+    Abre una hoja con las tallas 36–45 (más las que ese modelo ya
+    tenga, y un campo para agregar otra: 35, 44.5…), un contador
+    en vivo "repartidos X de N" que se pone rojo si te pasas, y el
+    botón bloqueado hasta que cuadre.
+    · Se puede repartir SOLO UNA PARTE: lo que no asignes sigue
+      sin talla y se termina otro día.
+    · Si la talla ya existe en bodega, se SUMA a esa fila; no se
+      duplica la referencia.
+    · Si no queda nada suelto, la primera talla nueva REUTILIZA la
+      fila original (mismo id). Así las ventas viejas que apuntan
+      a ese producto siguen enlazadas; si se borrara, anular una
+      de esas ventas ya no repondría el stock.
+    · Costo, precio, modelo, color y la foto se heredan solos (la
+      foto va por referencia base: VRM033 y VRM033-38 comparten).
+    Probado: 19 pares repartidos en 38/39/40 (fila original
+    reutilizada, venta vieja intacta), reparto parcial 4 de 5
+    sumando sobre una talla existente, y el tope al pasarse.
+  - ARREGLO DE PLATA (salió al revisar la pantalla de arriba):
+    el cruce del 18-ago guardaba en las ventas de VarMan el precio
+    al que REVENDIÓ el local (`venta`), no el precio de VarMan
+    (`compra`, que es lo que el local le paga a la bodega). Eso
+    inflaba la caja de VarMan con el margen de Andrés: ventas,
+    ganancia bruta, saldo corrido y Stats. Ahora el reflejo guarda
+    `compra` y deja `ventaLocal` como dato. Las ventas ya
+    registradas se corrigen desde un aviso rojo en la Caja, que
+    dice cuántas son y en cuánto cambia el saldo: lo aplica el
+    socio, no corre solo. El aviso desaparece cuando ya no queda
+    nada por corregir. Comprobado: la deuda que el Búnker le
+    muestra a la bodega VARMAN y el ingreso de la Caja de VarMan
+    ahora dan el mismo número.
+  - CAJA — QUÉ SE VENDIÓ ESE DÍA: en el estado de cuenta, el
+    renglón "INGRESO POR VENTAS" ahora se abre y muestra las
+    referencias vendidas ese día (referencia, modelo, color, talla,
+    el precio de la BODEGA y lo que dejó cada par) más el total de
+    pares y la ganancia del día. La referencia sale del
+    producto enlazado por `productoId`; las ventas viejas que no lo
+    traen muestran lo que la venta tenga escrito, sin inventar
+    código. Los renglones de gasto se comportan igual que siempre.
+  - Probado con la app real corriendo en el navegador a 375px, en
+    modo local sin Firebase: conteo por partes sobreviviendo a un
+    F5, venta entrando a mitad de conteo, cierre con referencias
+    sin contar, cuadre, ajuste aplicado y acta. Sin errores de
+    consola y sin desbordes horizontales.
+  - Respaldo del archivo anterior en ..\_ARCHIVO-NO-SUBIR    app.jsx.ANTES-CONTEO-2026-08-27.bak — está FUERA de app\ a
+    propósito: el deploy sube la carpeta entera y esa copia no
+    pinta nada en internet.
+
+----------------------------------------------------------
 HECHO EL 2026-07-06 (Agente 2 — pestaña Pedidos):
   - Nueva pestaña "Pedidos" en la barra de abajo, visible para
     socios Y vendedor (a diferencia de la Caja). Los pedidos que

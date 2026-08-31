@@ -306,16 +306,26 @@ const CATS_INGRESO = [
 // COMPRA de lo que se vendió; la diferencia con el precio de venta es la
 // utilidad del local. Los pagos que le hace a cada bodega bajan esa deuda.
 //
-// REGLA DURA: este módulo NO toca inventario, ventas, caja ni pedidos de
-// VarMan Crew. Las ventas de la bodega "VARMAN" en el local ya las descuenta
-// el vendedor en la pestaña Ventas; cruzarlas aquí descontaría el stock DOS
-// veces. Aquí VARMAN es simplemente una bodega más y el módulo dice cuánto
-// le debe el local.
+// [2026-08-18] REGLA ANTERIOR (hasta hoy): este módulo NO tocaba inventario
+// ni ventas de VarMan Crew, porque el vendedor ya descontaba el stock en la
+// pestaña Ventas tradicional — cruzarlo aquí lo habría restado DOS veces.
+// CAMBIÓ por decisión del dueño: la pestaña Ventas tradicional se retiró de
+// la navegación (para no confundir al vendedor entre dos pantallas) y TODA
+// venta física de VarMan se registra ahora aquí, en Búnker, eligiendo la
+// bodega VARMAN. Por eso ahora SÍ cruza — ver registrarVentaVarman() y
+// guardarVenta() más abajo — pero SOLO para esa bodega puntual: las otras 7
+// bodegas del local siguen sin tocar nada de VarMan, igual que siempre.
 //
 // SOLO estos correos ven la pestaña. Igual que con la Caja, esconder el botón
 // no protege nada: la protección real son las reglas de Firestore
 // (colecciones bunkerVentas / bunkerProveedores / bunkerPagos / bunkerGastos).
-const SOCIOS_BUNKER = ["andresvargasm91@gmail.com", "c.mancipe.96@gmail.com"];
+// [2026-08-18] Se agregó la cuenta del vendedor (varmansneakersandclothes@,
+// la misma de esEquipo()): con Ventas tradicional retirada, toda venta física
+// de VarMan se registra aquí (bodega VARMAN), así que el vendedor necesita
+// verlo. Ojo: da acceso COMPLETO a Búnker, incluidos costos y deudas de las
+// otras 7 bodegas del local de Andrés (no solo lo de VarMan) — no hay forma
+// de dar acceso parcial con las reglas actuales.
+const SOCIOS_BUNKER = ["andresvargasm91@gmail.com", "c.mancipe.96@gmail.com", "varmansneakersandclothes@gmail.com"];
 
 const BUNKER_KEY = "varman-bunker-v1";
 
@@ -367,6 +377,38 @@ const bkSlug = (s) =>
 // Firebase). Si algún día hay que re-sembrar, cargar desde un archivo local
 // NO desplegado, no volver a quemarlos aquí.
 const GASTOS_INICIALES = [];
+
+// ---------- DÍA DE INVENTARIO (conteo físico contra el sistema) ----------
+// Hasta hoy contar la bodega era exportar el Excel y cuadrar a mano: no quedaba
+// registro de qué se contó, ni de quién lo hizo, ni de qué se ajustó. Ahora es
+// una sesión que vive en la nube (colección `conteos`), la ve todo el equipo y
+// al cerrarla deja un acta.
+//
+// Decisiones del dueño (27-ago-2026):
+//  - Cualquiera del equipo cuenta Y cierra (por eso el acta guarda el nombre).
+//  - La sesión queda ABIERTA hasta que se cierre: se puede contar por partes.
+//  - Al cerrar, la app MUESTRA las diferencias y él aprueba; nada se ajusta solo.
+//  - Lo que se venda mientras se cuenta NO es faltante (ver `base` aquí abajo).
+//
+// Por qué cada talla guarda `base` (lo que decía el sistema cuando se contó):
+// es lo único que permite separar las dos cosas al cerrar —
+//    diferencia real    = contado − base          (sobra o falta de verdad)
+//    movido después     = base − stock de ahora   (ventas durante el conteo)
+//    stock que se pone  = contado − movido después
+// Sin `base` habría que confiar en la hora de cada venta, y las ventas solo
+// guardan la FECHA, no la hora: un par vendido el mismo día se leería como
+// faltante y el conteo acusaría a alguien de algo que no pasó.
+const CONTEOS_KEY = "varman-conteos-v1";
+const CONTEO_COL = "conteos";
+
+// Una talla SIN CONTAR no es una talla en cero: la que nadie tocó no se ajusta.
+// Por eso el conteo guarda un MAPA con solo lo contado, no una lista completa.
+const conteoEntry = (n, base, email) => ({
+  n: Math.max(0, Math.round(Number(n) || 0)),
+  base: Math.max(0, Math.round(Number(base) || 0)),
+  ts: new Date().toISOString(),
+  por: email || "",
+});
 
 // ---------- Fotos del catálogo ----------
 // [FOTO-POR-REF 2026-07-30] Una foto por REFERENCIA (se ve igual en todas las
@@ -759,6 +801,9 @@ function VarmanApp() {
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
   const [lowOnly, setLowOnly] = useState(false); // ver solo tallas por agotarse
+  // La pantalla de conteo vive DENTRO de la pestaña Inventario (no es una
+  // pestaña más: la barra de abajo ya no aguanta otro botón en 375px).
+  const [verConteo, setVerConteo] = useState(false);
   const [fotos, setFotos] = useState({}); // { "modelo|color": dataURL }
   const [gastos, setGastos] = useState([]); // caja de los socios (gastos + compras)
   // Local Búnker (libro aparte, ver SOCIOS_BUNKER). Cuatro listas planas.
@@ -775,6 +820,23 @@ function VarmanApp() {
   // solo dentro de la pestaña Pedidos) para que el contador "N nuevos" de la
   // navegación tampoco los cuente. Ver ocultarPedido/mostrarPedido en Pedidos.
   const [ocultosPedidos, setOcultosPedidos] = useState({});
+
+  // Día de inventario: las sesiones de conteo físico (ver CONTEO_COL arriba).
+  // Es una lista y no un solo objeto porque queda el historial de los conteos
+  // cerrados, no únicamente el que esté abierto ahora.
+  const [conteos, setConteos] = useState([]);
+  // Espejo del estado en una referencia. NO es un adorno: al marcar de una las
+  // tallas de una referencia se llama a contarTalla varias veces EN EL MISMO
+  // instante, y todas verían la misma copia vieja de `conteos` — se guardaría
+  // solo la última talla y las demás se perderían en silencio. Salió en la
+  // prueba con el navegador: 4 tallas digitadas, 1 sola guardada.
+  const conteosRef = useRef([]);
+  const aplicarConteos = (next) => { conteosRef.current = next; setConteos(next); };
+  // Por qué el conteo no está guardando. Misma lección del Búnker (12-ago): sin
+  // esto, que Firestore rechace la escritura se ve EXACTAMENTE igual que
+  // guardar bien — se cuenta media bodega y no queda nada. Estando sin internet
+  // NO se enciende: ahí Firestore encola la escritura y la sube después.
+  const [cntError, setCntError] = useState("");
 
   // ---------- Sesión (login del equipo) ----------
   const [user, setUser] = useState(null);
@@ -903,7 +965,7 @@ function VarmanApp() {
   useEffect(() => {
     // Con login activo, esperar a tener sesión antes de cargar/sincronizar
     if (auth && !user) return;
-    let unsubP, unsubS, unsubM, unsubF, unsubG, unsubPed, unsubOcultos, localData = null;
+    let unsubP, unsubS, unsubM, unsubF, unsubG, unsubPed, unsubOcultos, unsubCnt, localData = null;
     let unsubBk = []; // suscripciones del Local Búnker (una por colección)
     (async () => {
       // 1) Cache local: muestra algo al instante y sirve de respaldo offline
@@ -923,6 +985,15 @@ function VarmanApp() {
         if (f) setFotos(f);
       } catch (e) {
         /* sin fotos aún */
+      }
+
+      // Día de inventario: respaldo local para que un conteo a medias siga ahí
+      // aunque se cierre la app o se caiga el internet en plena bodega.
+      try {
+        const rawC = await store.get(CONTEOS_KEY);
+        if (rawC) aplicarConteos(JSON.parse(rawC) || []);
+      } catch (e) {
+        /* nunca se ha contado */
       }
 
       // Local Búnker: respaldo local (para verlo sin internet en el local)
@@ -1033,6 +1104,17 @@ function VarmanApp() {
         setOcultosPedidos(m);
       }, (err) => console.warn("Firestore pedidosOcultos:", err && err.message));
 
+      // Día de inventario: lo ve TODO el equipo (decisión del dueño: cualquiera
+      // cuenta y cierra). Se acepta el snapshot vacío a propósito — si no, un
+      // conteo borrado se quedaría pegado en la pantalla para siempre.
+      unsubCnt = colRef(CONTEO_COL).onSnapshot((snap) => {
+        aplicarConteos(snap.docs.map((d) => d.data()));
+        setCntError("");
+      }, (err) => {
+        console.warn("Firestore conteos:", err && err.message);
+        setCntError((err && err.code) || "error");
+      });
+
       // 4) Sembrar la nube la PRIMERA vez, en segundo plano (idempotente: usa el
       //    id como nombre del documento, así re-subir nunca duplica).
       const seedIfEmpty = async (name, items) => {
@@ -1067,7 +1149,7 @@ function VarmanApp() {
         } catch (e) { console.warn("Error subiendo datos iniciales:", e && e.message); }
       })();
     })();
-    return () => { unsubP && unsubP(); unsubS && unsubS(); unsubM && unsubM(); unsubF && unsubF(); unsubG && unsubG(); unsubPed && unsubPed(); unsubOcultos && unsubOcultos(); unsubBk.forEach((u) => u && u()); };
+    return () => { unsubP && unsubP(); unsubS && unsubS(); unsubM && unsubM(); unsubF && unsubF(); unsubG && unsubG(); unsubPed && unsubPed(); unsubOcultos && unsubOcultos(); unsubCnt && unsubCnt(); unsubBk.forEach((u) => u && u()); };
   }, [user]);
 
   // Asignar / quitar foto a un grupo modelo+color.
@@ -1132,6 +1214,117 @@ function VarmanApp() {
         auto: !!g.auto,
       },
     ]);
+  };
+
+  // Repara las ventas que quedaron guardadas con el precio del local (ver
+  // registrarVentaVarman). No corre sola: la dispara el socio desde la Caja,
+  // viendo antes cuántas ventas toca y en cuánta plata cambia el saldo — es su
+  // libro, no lo mueve nadie por detrás.
+  const repararVentasBodega = (arreglos) => {
+    if (!arreglos || !arreglos.length) return;
+    const porId = {};
+    arreglos.forEach((a) => { porId[a.id] = a; });
+    persist(products, sales.map((s) => (porId[s.id]
+      ? { ...s, precio: porId[s.id].despues, ventaLocal: porId[s.id].antes }
+      : s)));
+    showToast(arreglos.length + (arreglos.length === 1 ? " venta corregida ✓" : " ventas corregidas ✓"));
+  };
+
+  // ---------- Día de inventario: abrir, contar, cerrar ----------
+  const persistConteos = (next) => {
+    aplicarConteos(next);
+    store.set(CONTEOS_KEY, JSON.stringify(next));
+  };
+
+  // Solo puede haber UNO abierto: si el vendedor abre uno y el socio abre otro,
+  // cada uno contaría la mitad de la bodega y el cuadre saldría al revés.
+  const conteoAbierto = conteos.filter((c) => c.estado === "abierto")[0] || null;
+
+  const abrirConteo = () => {
+    if (conteoAbierto) return conteoAbierto;
+    const doc = {
+      id: "cnt" + Date.now(),
+      estado: "abierto",
+      abierto: new Date().toISOString(),
+      abiertoPor: (user && user.email) || "",
+      contado: {},
+    };
+    persistConteos([...conteosRef.current, doc]);
+    if (fbReady()) {
+      colRef(CONTEO_COL).doc(doc.id).set(doc)
+        .catch((e) => {
+          setCntError((e && e.code) || "error");
+          showToast("No se pudo abrir el conteo en la nube: " + (e && e.message), true);
+        });
+    }
+    return doc;
+  };
+
+  // Una talla contada se escribe SOLA (ruta `contado.<id>`), nunca el documento
+  // entero: si el vendedor y un socio cuentan al tiempo desde dos celulares,
+  // guardar el documento completo borraría lo que el otro acabara de digitar.
+  const contarTalla = (conteoId, productoId, entry) => {
+    persistConteos(conteosRef.current.map((c) => (c.id === conteoId
+      ? { ...c, contado: { ...(c.contado || {}), [productoId]: entry } }
+      : c)));
+    if (fbReady()) {
+      colRef(CONTEO_COL).doc(conteoId).update({ ["contado." + productoId]: entry })
+        .catch(() => colRef(CONTEO_COL).doc(conteoId).set({ contado: { [productoId]: entry } }, { merge: true }))
+        .catch((e) => {
+          console.warn("Error guardando la talla contada:", e && e.message);
+          setCntError((e && e.code) || "error");
+        });
+    }
+  };
+
+  // Borrar el número digitado devuelve la talla a "sin contar", que no es lo
+  // mismo que "conté cero": la sin contar no se ajusta al cerrar.
+  const descontarTalla = (conteoId, productoId) => {
+    persistConteos(conteosRef.current.map((c) => {
+      if (c.id !== conteoId) return c;
+      const next = { ...(c.contado || {}) };
+      delete next[productoId];
+      return { ...c, contado: next };
+    }));
+    if (fbReady()) {
+      try {
+        const borrar = firebase.firestore.FieldValue.delete();
+        colRef(CONTEO_COL).doc(conteoId).update({ ["contado." + productoId]: borrar })
+          .catch((e) => console.warn("Error quitando la talla del conteo:", e && e.message));
+      } catch (e) { /* SDK sin FieldValue: el número viejo queda hasta que lo pisen */ }
+    }
+  };
+
+  // Cerrar SÍ pisa el documento completo: a esta altura ya nadie más está
+  // contando y hay que dejar el acta entera de una sola vez.
+  const cerrarConteo = (conteoId, acta, nextProducts) => {
+    const previo = conteosRef.current.filter((c) => c.id === conteoId)[0];
+    if (!previo) return;
+    const doc = {
+      ...previo,
+      estado: "cerrado",
+      cerrado: new Date().toISOString(),
+      cerradoPor: (user && user.email) || "",
+      ajustes: (acta && acta.cambios) || [],
+      diferencias: (acta && acta.filas.filter((f) => f.dif !== 0)) || [],
+      resumen: (acta && acta.resumen) || null,
+    };
+    persistConteos(conteosRef.current.map((c) => (c.id === conteoId ? doc : c)));
+    if (fbReady()) {
+      colRef(CONTEO_COL).doc(conteoId).set(doc)
+        .catch((e) => showToast("El ajuste se aplicó, pero el acta no subió: " + (e && e.message), true));
+    }
+    // El ajuste del stock va por la puerta de siempre (persist), así el resto
+    // de la app — Stats, Búnker, la web — ve el inventario nuevo.
+    if (nextProducts) persist(nextProducts, sales);
+  };
+
+  const cancelarConteo = (conteoId) => {
+    const c = conteosRef.current.filter((x) => x.id === conteoId)[0];
+    if (!c) return;
+    const doc = { ...c, estado: "cancelado", cerrado: new Date().toISOString(), cerradoPor: (user && user.email) || "" };
+    persistConteos(conteosRef.current.map((x) => (x.id === conteoId ? doc : x)));
+    if (fbReady()) colRef(CONTEO_COL).doc(conteoId).set(doc).catch((e) => console.warn("Error cancelando el conteo:", e && e.message));
   };
 
   // ---------- Local Búnker: guardar ----------
@@ -1356,7 +1549,7 @@ function VarmanApp() {
         </div>
       ) : (
         <>
-          {tab === "inventario" && (
+          {tab === "inventario" && !verConteo && (
             <Inventario
               products={products}
               sales={sales}
@@ -1371,6 +1564,25 @@ function VarmanApp() {
               registrarCompra={esSocio ? addGasto : null}
               esSocio={esSocio}
               userEmail={user ? user.email || "" : ""}
+              conteoAbierto={conteoAbierto}
+              onAbrirConteo={() => setVerConteo(true)}
+            />
+          )}
+          {tab === "inventario" && verConteo && (
+            <DiaInventario
+              products={products}
+              fotos={fotos}
+              conteos={conteos}
+              conteoAbierto={conteoAbierto}
+              abrirConteo={abrirConteo}
+              contarTalla={contarTalla}
+              descontarTalla={descontarTalla}
+              cerrarConteo={cerrarConteo}
+              cancelarConteo={cancelarConteo}
+              showToast={showToast}
+              userEmail={user ? user.email || "" : ""}
+              error={cntError}
+              onSalir={() => setVerConteo(false)}
             />
           )}
           {(tab === "ventas" || tab === "ventas-nueva") && (
@@ -1393,7 +1605,16 @@ function VarmanApp() {
           {tab === "stats" && <Estadisticas products={products} sales={ventasValidas} />}
           {tab === "tienda" && <TiendaWeb showToast={showToast} products={products} />}
           {tab === "caja" && esSocio && (
-            <Caja sales={ventasValidas} gastos={gastos} persistGastos={persistGastos} addGasto={addGasto} showToast={showToast} />
+            <Caja
+              sales={ventasValidas}
+              gastos={gastos}
+              persistGastos={persistGastos}
+              addGasto={addGasto}
+              showToast={showToast}
+              products={products}
+              bunkerVentas={bkVentas}
+              repararVentasBodega={repararVentasBodega}
+            />
           )}
           {tab === "bunker" && esBunker && (
             <Bunker
@@ -1406,6 +1627,11 @@ function VarmanApp() {
               showToast={showToast}
               userEmail={user ? user.email || "" : ""}
               error={bkError}
+              // [2026-08-18] Para el cruce con VarMan (bodega VARMAN): descontar
+              // stock real y reflejar la venta en `sales`.
+              products={products}
+              sales={sales}
+              persist={persist}
             />
           )}
         </>
@@ -1424,12 +1650,14 @@ function VarmanApp() {
           padding: "3px 4px", scrollbarWidth: "none",
         }}
       >
-        {/* Con la pestaña Pedidos los botones se compactan un poco para que
-            las 6 pestañas de los socios (5 del vendedor) quepan en el celular */}
+        {/* [2026-08-18] Ventas y Pedidos se sacaron de la nav (decisión del
+            dueño): toda venta física de VarMan se registra ahora desde Búnker
+            (bodega VARMAN), y Pedidos ya no se llena porque el bot v12.0 dejó
+            de crear pedidos. Ninguno de los dos componentes se borró — solo
+            perdieron su botón — así que los datos viejos siguen intactos y el
+            código puede reactivarse con solo devolver estas dos líneas. */}
         {[
           { id: "inventario", label: "Inventario", icon: IconBox },
-          { id: "ventas", label: "Ventas", icon: IconChart },
-          { id: "pedidos", label: "Pedidos", icon: IconBag, badge: pedidosNuevos },
           { id: "stats", label: "Stats", icon: IconStats },
           { id: "tienda", label: "Tienda", icon: IconStore },
           ...(esSocio ? [{ id: "caja", label: "Caja", icon: IconCash }] : []),
@@ -1441,7 +1669,7 @@ function VarmanApp() {
           return (
             <button
               key={t.id}
-              onClick={() => { setLowOnly(false); setTab(t.id); }}
+              onClick={() => { setLowOnly(false); setVerConteo(false); setTab(t.id); }}
               aria-label={t.label + (t.badge ? " (" + t.badge + " nuevos)" : "")}
               data-activo={active ? "1" : "0"}
               style={{
@@ -1517,7 +1745,7 @@ function MiniStat({ label, value, warn, onClick }) {
 // ============================================================
 // Inventario
 // ============================================================
-function Inventario({ products, sales, persist, showToast, valorCosto, lowOnly, setLowOnly, fotos, asignarFoto, quitarFoto, registrarCompra, esSocio = false, userEmail = "" }) {
+function Inventario({ products, sales, persist, showToast, valorCosto, lowOnly, setLowOnly, fotos, asignarFoto, quitarFoto, registrarCompra, esSocio = false, userEmail = "", conteoAbierto = null, onAbrirConteo }) {
   const [q, setQ] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [showFotos, setShowFotos] = useState(false);
@@ -1529,6 +1757,20 @@ function Inventario({ products, sales, persist, showToast, valorCosto, lowOnly, 
   const [actionProduct, setActionProduct] = useState(null); // producto tocado (menú editar/eliminar)
   // [INV-POR-MODELO 2026-07-30] Referencia abierta en la ficha (clave del grupo).
   const [verGrupo, setVerGrupo] = useState(null);
+  // Repartir en tallas los pares que entraron sin talla (del Excel viejo o de
+  // una carga rápida). Guarda la clave del grupo y el id de la fila suelta.
+  const [asociar, setAsociar] = useState(null); // {clave, filaId}
+  const [asignacion, setAsignacion] = useState({}); // { "40": "3", ... }
+  const [tallaExtra, setTallaExtra] = useState("");
+  const [tallasExtra, setTallasExtra] = useState([]); // tallas fuera de la 36–45
+  // [2026-08-31] Escribir la cantidad de pares de una fila. El −/+ está hecho
+  // para vender de a uno; corregir "dice 28 y conté 26" con el − era 26 toques,
+  // y la otra vía (Editar producto) son tres toques y un formulario donde de
+  // paso se puede dañar la referencia o el costo. Aquí se escribe el número
+  // encima de donde se está viendo.
+  const [editStockId, setEditStockId] = useState(null);
+  const [stockDraft, setStockDraft] = useState("");
+  const guardandoStock = useRef(null); // evita que blur y ✓ guarden dos veces
   const confirmTimer = useRef(null);
 
   // Abrir el formulario para EDITAR un producto ya existente (mismo form que al crear)
@@ -1553,9 +1795,33 @@ function Inventario({ products, sales, persist, showToast, valorCosto, lowOnly, 
     if (lowOnly) setQ("");
   }, [lowOnly]);
 
+  // Al salir de la ficha no puede quedar una fila en modo edición: al volver a
+  // abrirla aparecería el campo abierto con un número de la vez pasada. Y lo
+  // que ya estaba escrito se guarda en vez de perderse — cerrar con el número
+  // puesto y que no pase nada es la forma de que alguien cuente dos veces.
+  useEffect(() => {
+    if (verGrupo) return;
+    if (editStockId) commitStock(editStockId);
+    setEditStockId(null);
+  }, [verGrupo]);
+
   const busqueda = products.filter((p) =>
     (p.referencia + " " + p.modelo + " " + p.color + " " + p.talla).toLowerCase().includes(q.toLowerCase())
   );
+
+  // [2026-08-18] Al crear un modelo nuevo no era obvio qué código VRM tocaba
+  // (pedido del dueño: "no sabemos cómo agregarlo"). Un producto sin
+  // referencia queda huérfano — no aparece en el selector de la pestaña
+  // Tienda (agrupa por referencia; sin ella no hay grupo). Esto solo sugiere
+  // el siguiente número libre; el campo se puede seguir editando a mano.
+  const siguienteCodigoVRM = (() => {
+    let max = 0;
+    products.forEach((p) => {
+      const m = /^VRM(\d{2,4})/i.exec((p.referencia || "").trim());
+      if (m) max = Math.max(max, parseInt(m[1], 10));
+    });
+    return "VRM" + String(max + 1).padStart(3, "0");
+  })();
 
   // [INV-POR-MODELO 2026-07-30] El inventario se ve por MODELO, no por talla.
   // Antes un modelo con 10 tallas ocupaba 10 tarjetas iguales y había que
@@ -1606,6 +1872,119 @@ function Inventario({ products, sales, persist, showToast, valorCosto, lowOnly, 
   })();
   const grupoAbierto = verGrupo ? grupos.find((g) => g.clave === verGrupo) : null;
 
+  // ---------- Asociar talla a los pares sueltos ----------
+  // Se trabaja contra `products` y no contra `grupos`: los grupos están
+  // filtrados por el buscador, y si alguien escribe algo mientras la hoja está
+  // abierta el grupo desaparecería debajo de los pies.
+  const filaSuelta = asociar ? products.filter((p) => p.id === asociar.filaId)[0] : null;
+  const dispSuelta = filaSuelta ? Number(filaSuelta.stock) || 0 : 0;
+  const delGrupoAsoc = asociar ? products.filter((p) => claveGrupo(p) === asociar.clave) : [];
+
+  // Las 36–45 de siempre, más las tallas que ese modelo YA tiene (una ballet
+  // puede ser 35) y las que se agreguen a mano. Sin esto habría que inventarse
+  // una talla que sí existe en la caja.
+  const tallasOfrecidas = (() => {
+    const set = {};
+    TALLAS.forEach((t) => { set[String(t)] = true; });
+    delGrupoAsoc.forEach((p) => { const t = String(p.talla == null ? "" : p.talla).trim(); if (t) set[t] = true; });
+    tallasExtra.forEach((t) => { set[t] = true; });
+    return Object.keys(set).sort((a, b) => (Number(a) || 0) - (Number(b) || 0));
+  })();
+
+  const stockDeTalla = (t) => delGrupoAsoc
+    .filter((p) => String(p.talla == null ? "" : p.talla).trim() === t)
+    .reduce((a, p) => a + (Number(p.stock) || 0), 0);
+
+  const totalAsignado = tallasOfrecidas.reduce((a, t) => a + Math.max(0, Math.round(Number(asignacion[t]) || 0)), 0);
+  const restanSueltos = dispSuelta - totalAsignado;
+
+  const abrirAsociar = (g, fila) => {
+    setAsociar({ clave: g.clave, filaId: fila.id });
+    setAsignacion({});
+    setTallaExtra("");
+    setTallasExtra([]);
+  };
+
+  const agregarTallaExtra = () => {
+    const t = tallaExtra.trim().replace(",", ".");
+    if (!t || !(Number(t) > 0)) { showToast("Escribe una talla válida (ej. 35 o 44.5).", true); return; }
+    if (tallasOfrecidas.indexOf(t) === -1) setTallasExtra([...tallasExtra, t]);
+    setTallaExtra("");
+  };
+
+  const guardarAsociacion = () => {
+    const fila = products.filter((p) => p.id === asociar.filaId)[0];
+    if (!fila) { setAsociar(null); showToast("Esa fila ya no existe.", true); return; }
+    const disp = Number(fila.stock) || 0;
+    const entradas = tallasOfrecidas
+      .map((t) => ({ talla: t, qty: Math.max(0, Math.round(Number(asignacion[t]) || 0)) }))
+      .filter((x) => x.qty > 0);
+    const total = entradas.reduce((a, x) => a + x.qty, 0);
+    if (!total) { showToast("Escribe cuántos pares hay de al menos una talla.", true); return; }
+    if (total > disp) {
+      showToast("Estás repartiendo " + total + " pares y solo hay " + disp + " sin talla.", true);
+      return;
+    }
+
+    // La base del código: "VRM033" y "VRM033-40" comparten base, así que la
+    // foto y el grupo se conservan solos. Si la fila no tiene referencia, las
+    // nuevas tampoco: no se inventa un código.
+    const refB = String(fila.referencia || "").replace(/\s*-\s*\d{1,3}(\.\d)?$/, "").trim();
+    let next = [...products];
+    let creadas = 0, sumadas = 0, reutilizada = false;
+
+    entradas.forEach((x) => {
+      const existente = next.filter((p) =>
+        p.id !== fila.id && claveGrupo(p) === asociar.clave &&
+        String(p.talla == null ? "" : p.talla).trim() === x.talla)[0];
+      if (existente) {
+        // Esa talla ya está en bodega: se suma, no se duplica la fila.
+        next = next.map((p) => (p.id === existente.id ? { ...p, stock: (Number(p.stock) || 0) + x.qty } : p));
+        sumadas++;
+        return;
+      }
+      if (total === disp && !reutilizada) {
+        // No queda nada suelto: la PRIMERA talla nueva se queda con la fila
+        // original (mismo id). Así las ventas viejas que apuntan a ese producto
+        // siguen enlazadas y no queda una fila fantasma en cero.
+        reutilizada = true;
+        next = next.map((p) => (p.id === fila.id
+          ? { ...p, talla: x.talla, stock: x.qty, referencia: refB ? refB + "-" + x.talla : p.referencia }
+          : p));
+        creadas++;
+        return;
+      }
+      next.push({
+        id: "p" + Date.now() + Math.floor(Math.random() * 9999) + "t" + String(x.talla).replace(".", ""),
+        referencia: refB ? refB + "-" + x.talla : "",
+        modelo: fila.modelo,
+        color: fila.color,
+        talla: x.talla,
+        stock: x.qty,
+        costo: fila.costo,
+        precio: fila.precio,
+      });
+      creadas++;
+    });
+
+    // Lo que no se repartió sigue sin talla, para terminarlo otro día. Si no
+    // sobró nada y la fila no se reutilizó (todas las tallas ya existían), se
+    // deja en cero en vez de borrarla: borrarla rompería el enlace de las
+    // ventas viejas y anular una de esas ventas ya no repondría el stock.
+    if (!reutilizada) {
+      next = next.map((p) => (p.id === fila.id ? { ...p, stock: disp - total } : p));
+    }
+
+    persist(next, sales);
+    setAsociar(null);
+    setAsignacion({});
+    const partes = [total + (total === 1 ? " par repartido" : " pares repartidos")];
+    if (creadas) partes.push(creadas + (creadas === 1 ? " talla nueva" : " tallas nuevas"));
+    if (sumadas) partes.push("sumados en " + sumadas);
+    if (disp - total > 0) partes.push("quedan " + (disp - total) + " sin talla");
+    showToast(partes.join(" · ") + " ✓");
+  };
+
   // Ventas de un modelo (para la ficha). Se cruza por productoId cuando la venta
   // lo trae; las ventas viejas no lo tienen, así que se cae al nombre del modelo.
   const ventasDeGrupo = (g) => {
@@ -1622,6 +2001,55 @@ function Inventario({ products, sales, persist, showToast, valorCosto, lowOnly, 
     persist(
       products.map((p) => (p.id === id ? { ...p, stock: Math.max(0, (Number(p.stock) || 0) + delta) } : p)),
       sales
+    );
+  };
+
+  // ---------- Escribir la cantidad de pares de una fila ----------
+  const abrirEditStock = (t) => {
+    guardandoStock.current = null;
+    setEditStockId(t.id);
+    setStockDraft(String(Number(t.stock) || 0));
+  };
+
+  // Salir sin guardar. Marca el candado ANTES de desmontar el campo: quitarlo
+  // de la pantalla dispara su blur, y sin esto "cancelar" terminaría guardando.
+  const cancelarEditStock = (id) => {
+    guardandoStock.current = id;
+    setEditStockId(null);
+  };
+
+  // Se llama desde el blur del campo Y desde el botón ✓ — el toque en ✓ quita
+  // el foco primero, así que sin el candado el mismo cambio se guardaría dos
+  // veces y el aviso saldría repetido. El candado se limpia al abrir otra
+  // edición, no con un temporizador: entre el blur y el clic hay tiempo de
+  // sobra para que un temporizador lo suelte antes de tiempo.
+  const commitStock = (id) => {
+    if (guardandoStock.current === id) return;
+    guardandoStock.current = id;
+
+    const fila = products.filter((p) => p.id === id)[0];
+    setEditStockId(null);
+    if (!fila) return;
+
+    const txt = String(stockDraft).trim().replace(",", ".");
+    // Campo vacío = se arrepintió, no "déjalo en cero": poner en cero un par
+    // que existe es perderlo del inventario sin que nadie lo pidiera.
+    if (txt === "" || !isFinite(Number(txt))) return;
+
+    const antes = Number(fila.stock) || 0;
+    const ahora = Math.round(Number(txt));
+    // Un negativo es un dedo mal puesto, no una intención. Recortarlo a cero
+    // dejaría la fila en cero por un guion de más: se rechaza y se avisa.
+    // El cero escrito a propósito sí pasa (agotar una talla).
+    if (!(ahora >= 0)) { showToast("Escribe un número de pares válido (0 o más).", true); return; }
+    if (ahora === antes) return;
+
+    persist(products.map((p) => (p.id === id ? { ...p, stock: ahora } : p)), sales);
+    const dif = ahora - antes;
+    const nombre = String(fila.talla == null ? "" : fila.talla).trim();
+    showToast(
+      (nombre ? "Talla " + nombre : "Pares sin talla") +
+      ": " + antes + " → " + ahora + " (" + (dif > 0 ? "+" : "") + dif + ") ✓"
     );
   };
 
@@ -1648,7 +2076,12 @@ function Inventario({ products, sales, persist, showToast, valorCosto, lowOnly, 
         showToast("El modelo y la talla son obligatorios.", true);
         return;
       }
-      persist(products.map((p) => (p.id === editingId ? { ...draft, id: editingId } : p)), sales);
+      // [2026-08-18] Si dejan la referencia en blanco, no se guarda vacía: se
+      // asigna el siguiente código VRM libre (pedido del dueño, tras
+      // encontrar 19 pares ya en bodega sin código y sin poder vincularse a
+      // Tienda). En edición el campo YA es el código completo con la talla.
+      const refFinal = draft.referencia.trim() || (siguienteCodigoVRM + "-" + draft.talla.toString().trim());
+      persist(products.map((p) => (p.id === editingId ? { ...draft, referencia: refFinal, id: editingId } : p)), sales);
       setShowForm(false);
       setDraft(emptyProduct());
       setEditingId(null);
@@ -1666,11 +2099,15 @@ function Inventario({ products, sales, persist, showToast, valorCosto, lowOnly, 
       showToast("Ingresa la cantidad de al menos una talla.", true);
       return;
     }
+    // Si dejan la referencia en blanco, se usa el siguiente código VRM libre
+    // (calculado UNA vez para que las tallas de este mismo modelo compartan
+    // la misma base, no uno distinto por talla).
+    const refBaseAUsar = draft.referencia.trim() || siguienteCodigoVRM;
     let next = [...products];
     let creadas = 0, sumadas = 0;
     conCantidad.forEach((t) => {
       const qty = Number(tallasQty[t]);
-      const subref = draft.referencia.trim() ? draft.referencia.trim() + "-" + t : "";
+      const subref = refBaseAUsar + "-" + t;
       const existente = next.find(
         (p) =>
           normTxt(p.modelo) === normTxt(draft.modelo) &&
@@ -1754,6 +2191,88 @@ function Inventario({ products, sales, persist, showToast, valorCosto, lowOnly, 
     showToast("Inventario exportado ✓");
   };
 
+  // [2026-08-31] El MISMO inventario, pero como PDF: una hoja que se imprime y
+  // se lleva a la bodega, o que se manda por WhatsApp sin que el otro necesite
+  // Excel. Usa el generador que ya arma el documento de las bodegas del Búnker
+  // (sin librerías: nada de sumarle 350 KB al archivo que baja cada celular).
+  const pdfInventario = () => {
+    if (products.length === 0) {
+      showToast("No hay productos para exportar.", true);
+      return;
+    }
+    // Ordenado por referencia y dentro de ella por talla: la hoja queda en el
+    // mismo orden en que están las cajas y no toca buscar dos veces lo mismo.
+    const filas = products.slice().sort((a, b) => {
+      const ra = refBase(a.referencia) || fotoKey(a.modelo, a.color);
+      const rb = refBase(b.referencia) || fotoKey(b.modelo, b.color);
+      if (ra !== rb) return ra < rb ? -1 : 1;
+      return (Number(a.talla) || 0) - (Number(b.talla) || 0);
+    });
+    const pares = filas.reduce((a, p) => a + (Number(p.stock) || 0), 0);
+    const costoTot = filas.reduce((a, p) => a + (Number(p.stock) || 0) * (Number(p.costo) || 0), 0);
+    const refs = {};
+    filas.forEach((p) => { refs[refBase(p.referencia) || fotoKey(p.modelo, p.color)] = true; });
+    const nRefs = Object.keys(refs).length;
+
+    // Los números de plata son de los socios (misma regla que la ficha del
+    // modelo). El vendedor se lleva la hoja para contar, con precio de venta
+    // pero sin costo: un PDF se reenvía, y ahí es donde se filtra.
+    //
+    // Las x son puntos sobre la hoja carta (40 a 572). El aire antes de TALLA
+    // no es estético: "sin talla" va centrado y crece hacia la izquierda, y con
+    // la columna de color pegada se montaba encima.
+    const cols = esSocio
+      ? [
+          { txt: "REF", x: 40, al: "i", ancho: 58 },
+          { txt: "MODELO", x: 104, al: "i", ancho: 150 },
+          { txt: "COLOR", x: 260, al: "i", ancho: 84 },
+          { txt: "TALLA", x: 372, al: "c" },
+          { txt: "PARES", x: 428, al: "d" },
+          { txt: "COSTO", x: 496, al: "d" },
+          { txt: "VALOR A COSTO", x: 572, al: "d" },
+        ]
+      : [
+          { txt: "REF", x: 40, al: "i", ancho: 58 },
+          { txt: "MODELO", x: 104, al: "i", ancho: 186 },
+          { txt: "COLOR", x: 296, al: "i", ancho: 108 },
+          { txt: "TALLA", x: 436, al: "c" },
+          { txt: "PARES", x: 496, al: "d" },
+          { txt: "PRECIO", x: 572, al: "d" },
+        ];
+
+    descargarPDF({
+      archivo: "varman-inventario-" + hoyLocal() + ".pdf",
+      titulo: "Inventario",
+      sub: "VarMan Crew · " + nRefs + " referencia" + (nRefs === 1 ? "" : "s") +
+        " · " + pares + " par" + (pares === 1 ? "" : "es") +
+        (esSocio ? " · valor a costo " + fmt(costoTot) : ""),
+      derecha: ["Generado el " + fechaCorta(hoyLocal())],
+      columnas: cols,
+      filas: filas.map((p) => {
+        const n = Number(p.stock) || 0;
+        // La talla vacía se marca: es una fila que le falta algo, no un espacio
+        // en blanco de la impresora.
+        const talla = String(p.talla == null ? "" : p.talla).trim() || "sin talla";
+        const base = [
+          (p.referencia || "").replace(/\s*-\s*\d{1,3}(\.\d)?$/, "").trim(),
+          p.modelo || "", p.color || "", talla, String(n),
+        ];
+        return esSocio
+          ? base.concat([fmt(p.costo), fmt(n * (Number(p.costo) || 0))])
+          : base.concat([fmt(p.precio)]);
+      }),
+      total: {
+        izq: pares + " par" + (pares === 1 ? "" : "es") + " en " + filas.length + " fila" + (filas.length === 1 ? "" : "s"),
+        der: esSocio ? fmt(costoTot) : pares + " pares",
+      },
+      firmas: ["Contó —", "Revisó —"],
+      pie: esSocio
+        ? "Cantidades del sistema al momento de generar la hoja. Valores al costo de compra — documento interno."
+        : "Cantidades del sistema al momento de generar la hoja.",
+    });
+    showToast("PDF del inventario descargado ✓");
+  };
+
   const margen = (p) => {
     const c = Number(p.costo) || 0, v = Number(p.precio) || 0;
     return c && v ? Math.round(((v - c) / v) * 100) : null;
@@ -1783,11 +2302,28 @@ function Inventario({ products, sales, persist, showToast, valorCosto, lowOnly, 
             {grupos.length} referencia{grupos.length === 1 ? "" : "s"} · valor a costo {fmt(valorCosto)}
           </div>
         </div>
-        <div style={{ display: "flex", gap: 8 }}>
+        {/* Tres botones no caben en una línea de 375px: se deja que bajen. Por
+            eso "Excel" y "PDF" van cortos — con "Exportar Excel" completo la
+            fila se partía en tres renglones. */}
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <button onClick={() => setShowFotos(true)} style={btnGhost({ padding: "8px 12px", borderRadius: 11, fontSize: 12 })}>
             📷 Fotos
           </button>
-          <BotonExportar onClick={exportInventario} />
+          <BotonExportar onClick={exportInventario} label="Excel" />
+          <button
+            onClick={pdfInventario}
+            title="Descargar el inventario en PDF"
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 6,
+              background: C.card, color: C.ink,
+              border: `1.5px solid ${C.line}`, borderRadius: 11,
+              padding: "8px 13px", fontFamily: "Inter, sans-serif",
+              fontWeight: 800, fontSize: 12, cursor: "pointer",
+            }}
+          >
+            <IconDownload />
+            PDF
+          </button>
         </div>
       </div>
 
@@ -1810,6 +2346,33 @@ function Inventario({ products, sales, persist, showToast, valorCosto, lowOnly, 
           + Agregar
         </button>
       </div>
+
+      {/* Día de inventario: contar la bodega contra el sistema. Va aquí abajo y
+          no en la fila de botones de arriba porque en 375px esa fila ya está
+          llena (Fotos + Exportar) y el tercer botón partía la línea. Cuando hay
+          un conteo abierto el botón cambia de color: es un aviso, no un adorno
+          — un conteo abierto que nadie cierra deja el inventario a medias. */}
+      {onAbrirConteo && (
+        <button
+          onClick={onAbrirConteo}
+          className="vm-press"
+          style={{
+            width: "100%", marginBottom: 14, padding: "13px 16px", borderRadius: 14,
+            cursor: "pointer", fontFamily: "Inter, sans-serif", fontWeight: 800, fontSize: 13.5,
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+            border: "1.5px solid " + (conteoAbierto ? C.accent : C.line),
+            background: conteoAbierto ? C.accentSoft : C.card,
+            color: conteoAbierto ? "#A33A12" : C.ink,
+          }}
+        >
+          📋 Día de inventario
+          {conteoAbierto && (
+            <span style={{ background: C.accent, color: "#fff", fontSize: 10.5, fontWeight: 800, padding: "3px 8px", borderRadius: 99, letterSpacing: ".03em" }}>
+              EN CURSO
+            </span>
+          )}
+        </button>
+      )}
 
       {grupos.length === 0 && (
         <EmptyState
@@ -1894,9 +2457,120 @@ function Inventario({ products, sales, persist, showToast, valorCosto, lowOnly, 
                 );
               })}
             </div>
+
+            {/* Pares que están en bodega sin talla. El botón va AQUÍ, pegado al
+                chip "—", que es donde se ve el problema; mandarlo a un menú de
+                otra pantalla es garantizar que nadie lo encuentre. Corta la
+                propagación para no abrir la ficha del modelo. */}
+            {(() => {
+              const suelta = g.tallas.filter((t) => !String(t.talla == null ? "" : t.talla).trim() && (Number(t.stock) || 0) > 0)[0];
+              if (!suelta) return null;
+              return (
+                <button
+                  onClick={(e) => { e.stopPropagation(); abrirAsociar(g, suelta); }}
+                  style={{
+                    width: "100%", marginTop: 9, padding: "9px 12px", borderRadius: 11,
+                    border: `1.5px dashed ${C.accent}`, background: C.accentSoft, color: "#A33A12",
+                    fontFamily: "Inter, sans-serif", fontWeight: 800, fontSize: 12.5, cursor: "pointer",
+                  }}
+                >
+                  🏷 Asociar talla · {Number(suelta.stock) || 0} sin talla
+                </button>
+              );
+            })()}
           </div>
         );
       })}
+
+      {/* ---------- Repartir en tallas los pares sueltos ---------- */}
+      {asociar && filaSuelta && (
+        <Sheet title="Asociar talla" onClose={() => setAsociar(null)}>
+          <div style={{ fontSize: 13.5, color: C.ink2, lineHeight: 1.5, marginBottom: 4 }}>
+            <b>{filaSuelta.modelo || "(sin modelo)"}</b>{filaSuelta.color ? " " + filaSuelta.color : ""}
+            {filaSuelta.referencia ? " · " + filaSuelta.referencia : ""}
+          </div>
+          <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5, marginBottom: 12 }}>
+            Hay <b style={{ color: C.ink }}>{dispSuelta} pares sin talla</b>. Escribe cuántos
+            hay de cada una. No tienes que repartirlos todos hoy: lo que no asignes
+            sigue sin talla.
+          </div>
+
+          {/* El contador es lo único que importa mientras se digita: se pone
+              rojo si se pasa, para que el error se vea ANTES de guardar. */}
+          <div style={{
+            display: "flex", justifyContent: "space-between", alignItems: "center",
+            background: restanSueltos < 0 ? C.redSoft : C.bg,
+            border: `1.5px solid ${restanSueltos < 0 ? C.red : C.line}`,
+            borderRadius: 12, padding: "10px 13px", marginBottom: 12,
+            fontSize: 13, fontWeight: 700,
+          }}>
+            <span style={{ color: C.ink2 }}>Repartidos {totalAsignado} de {dispSuelta}</span>
+            <b style={{ color: restanSueltos < 0 ? C.red : restanSueltos === 0 ? C.green : C.ink }}>
+              {restanSueltos < 0 ? "te pasaste por " + -restanSueltos : "quedan " + restanSueltos}
+            </b>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8, marginBottom: 12 }}>
+            {tallasOfrecidas.map((t) => {
+              const tiene = Number(asignacion[t]) > 0;
+              const ya = stockDeTalla(t);
+              return (
+                <div key={t} style={{
+                  background: tiene ? C.accentSoft : C.card,
+                  border: `1.5px solid ${tiene ? C.accent : C.line}`,
+                  borderRadius: 12, padding: "8px 4px 6px", textAlign: "center",
+                }}>
+                  <div style={{ ...eyebrow(tiene ? C.accent : C.muted), fontSize: 10, marginBottom: 4 }}>{t}</div>
+                  <input
+                    type="number"
+                    min="0"
+                    inputMode="numeric"
+                    value={asignacion[t] || ""}
+                    placeholder="0"
+                    aria-label={"Pares de la talla " + t}
+                    onChange={(e) => setAsignacion({ ...asignacion, [t]: e.target.value })}
+                    style={inputStyle({ padding: "8px 2px", textAlign: "center", fontWeight: 800, border: "none", background: "transparent" })}
+                  />
+                  {/* Saber que esa talla YA tiene pares evita el susto de creer
+                      que el número se va a perder: se suma, no se pisa. */}
+                  <div style={{ fontSize: 9.5, color: C.muted, fontWeight: 700, marginTop: -2 }}>
+                    {ya > 0 ? "ya hay " + ya : "\u00a0"}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <Field label="¿Una talla que no está en la lista?">
+            <div style={{ display: "flex", gap: 8 }}>
+              <input
+                value={tallaExtra}
+                inputMode="decimal"
+                onChange={(e) => setTallaExtra(e.target.value)}
+                placeholder="35"
+                style={inputStyle({ flex: 1 })}
+              />
+              <button onClick={agregarTallaExtra} style={btnGhost({ padding: "0 16px" })}>Agregar</button>
+            </div>
+          </Field>
+
+          <button
+            onClick={guardarAsociacion}
+            disabled={totalAsignado === 0 || restanSueltos < 0}
+            style={btnPrimary({
+              width: "100%", padding: 14, fontSize: 15, marginTop: 6,
+              opacity: totalAsignado === 0 || restanSueltos < 0 ? 0.5 : 1,
+              cursor: totalAsignado === 0 || restanSueltos < 0 ? "not-allowed" : "pointer",
+            })}
+          >
+            Guardar las tallas
+          </button>
+          <div style={{ fontSize: 11.5, color: C.muted, marginTop: 8, lineHeight: 1.45, textAlign: "center" }}>
+            Se crea una fila por talla{filaSuelta.referencia ? " (" + String(filaSuelta.referencia).replace(/\s*-\s*\d{1,3}(\.\d)?$/, "").trim() + "-40)" : ""}.
+            El costo y el precio se copian de estos pares.
+          </div>
+        </Sheet>
+      )}
 
       {showForm && (
         <Sheet title={editingId ? "Editar producto" : "Nuevo producto"} onClose={() => { setShowForm(false); setEditingId(null); }}>
@@ -1909,6 +2583,15 @@ function Inventario({ products, sales, persist, showToast, valorCosto, lowOnly, 
             </Field>
             <Field label="Referencia base">
               <input value={draft.referencia} onChange={(e) => setDraft({ ...draft, referencia: e.target.value })} placeholder="AF1-BL" style={inputStyle()} />
+              {!editingId && !draft.referencia.trim() && (
+                <button
+                  type="button"
+                  onClick={() => setDraft({ ...draft, referencia: siguienteCodigoVRM })}
+                  style={{ marginTop: 6, border: "none", background: "transparent", color: C.accent, fontSize: 11.5, fontWeight: 700, cursor: "pointer", padding: 0 }}
+                >
+                  Usar el siguiente código libre: {siguienteCodigoVRM}
+                </button>
+              )}
             </Field>
             {editingId && (
               <Field label="Talla *">
@@ -2089,53 +2772,118 @@ function Inventario({ products, sales, persist, showToast, valorCosto, lowOnly, 
               </div>
             </div>
 
-            {/* Tallas: ajustar stock aquí mismo, o tocar la talla para editarla */}
+            {/* Tallas: ajustar stock aquí mismo, o tocar la talla para editarla.
+                [2026-08-31] El NÚMERO también se toca: abre el campo para
+                escribir cuántos pares hay de verdad. Es el camino para cuadrar
+                después de contar; el −/+ es para el par que acaba de salir. */}
             <div style={{ ...eyebrow(), margin: "2px 4px 8px" }}>Tallas</div>
             <div style={cardStyle({ padding: "4px 6px", marginBottom: 12 })}>
               {g.tallas.map((t, i) => {
                 const n = Number(t.stock) || 0;
+                const editando = editStockId === t.id;
+                const sinTalla = !String(t.talla == null ? "" : t.talla).trim();
                 return (
-                  <div
-                    key={t.id}
-                    style={{
-                      display: "flex", alignItems: "center", gap: 10, padding: "8px 8px",
-                      borderTop: i > 0 ? `1px solid ${C.line}` : "none",
-                    }}
-                  >
-                    <button
-                      onClick={() => { setVerGrupo(null); setActionProduct(t); }}
-                      aria-label={`Editar talla ${t.talla}`}
-                      style={btnGhost({
-                        minWidth: 52, height: 44, borderRadius: 12, padding: "0 10px",
-                        fontWeight: 900, fontSize: 15, fontVariantNumeric: "tabular-nums",
-                        color: n === 0 ? C.muted : C.ink,
-                      })}
-                    >
-                      {t.talla || "—"}
-                    </button>
-                    <div style={{ flex: 1, minWidth: 0, fontSize: 12, color: C.muted, fontWeight: 600 }}>
-                      {t.referencia ? t.referencia : "sin referencia"}
-                      {n === 0 && <span style={{ color: C.red, fontWeight: 800 }}> · agotada</span>}
-                      {n > 0 && n <= 2 && <span style={{ color: "#A33A12", fontWeight: 800 }}> · quedan pocas</span>}
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+                  <div key={t.id} style={{ borderTop: i > 0 ? `1px solid ${C.line}` : "none" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 8px" }}>
                       <button
-                        onClick={() => adjustStock(t.id, -1)}
-                        disabled={n === 0}
-                        aria-label={`Quitar un par de la talla ${t.talla}`}
-                        style={btnGhost({ width: 44, height: 44, borderRadius: 12, padding: 0, fontSize: 19, fontWeight: 800, opacity: n === 0 ? 0.4 : 1, cursor: n === 0 ? "default" : "pointer" })}
+                        onClick={() => { setVerGrupo(null); setActionProduct(t); }}
+                        aria-label={`Editar talla ${t.talla}`}
+                        style={btnGhost({
+                          minWidth: 52, height: 44, borderRadius: 12, padding: "0 10px",
+                          fontWeight: 900, fontSize: 15, fontVariantNumeric: "tabular-nums",
+                          color: n === 0 ? C.muted : C.ink,
+                        })}
                       >
-                        −
+                        {t.talla || "—"}
                       </button>
-                      <span style={{ ...display(17, n === 0 ? C.red : C.ink), minWidth: 30, textAlign: "center", fontVariantNumeric: "tabular-nums" }}>{n}</span>
-                      <button
-                        onClick={() => adjustStock(t.id, 1)}
-                        aria-label={`Sumar un par a la talla ${t.talla}`}
-                        style={btnGhost({ width: 44, height: 44, borderRadius: 12, padding: 0, fontSize: 19, fontWeight: 800 })}
-                      >
-                        +
-                      </button>
+                      <div style={{ flex: 1, minWidth: 0, fontSize: 12, color: C.muted, fontWeight: 600 }}>
+                        {editando
+                          ? <span style={{ color: C.accent, fontWeight: 800 }}>¿cuántos hay?</span>
+                          : <>
+                              {t.referencia ? t.referencia : "sin referencia"}
+                              {n === 0 && <span style={{ color: C.red, fontWeight: 800 }}> · agotada</span>}
+                              {n > 0 && n <= 2 && <span style={{ color: "#A33A12", fontWeight: 800 }}> · quedan pocas</span>}
+                            </>}
+                      </div>
+                      {editando ? (
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                          <input
+                            type="number"
+                            min="0"
+                            inputMode="numeric"
+                            autoFocus
+                            value={stockDraft}
+                            onFocus={(e) => e.target.select()}
+                            onChange={(e) => setStockDraft(e.target.value)}
+                            onBlur={() => commitStock(t.id)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") { e.preventDefault(); e.currentTarget.blur(); }
+                              else if (e.key === "Escape") { e.preventDefault(); cancelarEditStock(t.id); }
+                            }}
+                            aria-label={`Cuántos pares hay${t.talla ? " de la talla " + t.talla : " sin talla"}`}
+                            style={inputStyle({
+                              width: 78, height: 44, padding: "0 8px", textAlign: "center",
+                              fontWeight: 900, fontSize: 16, fontVariantNumeric: "tabular-nums",
+                              border: `1.5px solid ${C.accent}`,
+                            })}
+                          />
+                          <button
+                            onClick={() => commitStock(t.id)}
+                            aria-label="Guardar la cantidad"
+                            style={btnPrimary({ width: 44, height: 44, borderRadius: 12, padding: 0, fontSize: 18 })}
+                          >
+                            ✓
+                          </button>
+                        </div>
+                      ) : (
+                        <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+                          <button
+                            onClick={() => adjustStock(t.id, -1)}
+                            disabled={n === 0}
+                            aria-label={`Quitar un par de la talla ${t.talla}`}
+                            style={btnGhost({ width: 44, height: 44, borderRadius: 12, padding: 0, fontSize: 19, fontWeight: 800, opacity: n === 0 ? 0.4 : 1, cursor: n === 0 ? "default" : "pointer" })}
+                          >
+                            −
+                          </button>
+                          {/* El número es el botón: se toca donde se está mirando. */}
+                          <button
+                            onClick={() => abrirEditStock(t)}
+                            aria-label={`Escribir cuántos pares hay${t.talla ? " de la talla " + t.talla : " sin talla"}`}
+                            style={{
+                              ...display(17, n === 0 ? C.red : C.ink),
+                              minWidth: 44, height: 44, padding: "0 6px",
+                              border: `1.5px dashed ${C.line}`, borderRadius: 12, background: "transparent",
+                              cursor: "pointer", fontVariantNumeric: "tabular-nums",
+                            }}
+                          >
+                            {n}
+                          </button>
+                          <button
+                            onClick={() => adjustStock(t.id, 1)}
+                            aria-label={`Sumar un par a la talla ${t.talla}`}
+                            style={btnGhost({ width: 44, height: 44, borderRadius: 12, padding: 0, fontSize: 19, fontWeight: 800 })}
+                          >
+                            +
+                          </button>
+                        </div>
+                      )}
                     </div>
+
+                    {/* Los pares sin talla se reparten desde aquí mismo. Antes el
+                        botón solo estaba en la tarjeta de la lista, y quien entra
+                        a la ficha a cuadrar cantidades ya no lo volvía a ver. */}
+                    {sinTalla && n > 0 && (
+                      <button
+                        onClick={() => { setVerGrupo(null); abrirAsociar(g, t); }}
+                        style={{
+                          width: "calc(100% - 16px)", margin: "0 8px 8px", padding: "9px 12px", borderRadius: 11,
+                          border: `1.5px dashed ${C.accent}`, background: C.accentSoft, color: "#A33A12",
+                          fontFamily: "Inter, sans-serif", fontWeight: 800, fontSize: 12.5, cursor: "pointer",
+                        }}
+                      >
+                        🏷 Asociar talla · {n} sin talla
+                      </button>
+                    )}
                   </div>
                 );
               })}
@@ -2270,6 +3018,659 @@ function Inventario({ products, sales, persist, showToast, valorCosto, lowOnly, 
 // ============================================================
 // Gestor de fotos del catálogo
 // ============================================================
+// ============================================================
+// DÍA DE INVENTARIO — contar la bodega contra lo que dice el sistema.
+// Pantalla completa dentro de la pestaña Inventario, no una hoja modal:
+// contar son decenas de referencias y una hoja se cierra con cualquier toque
+// afuera. Salir NO cierra el conteo: la sesión queda abierta hasta que alguien
+// la cierre a propósito (decisión del dueño: se puede contar por partes).
+// ============================================================
+function DiaInventario({
+  products, fotos, conteos, conteoAbierto, abrirConteo, contarTalla, descontarTalla,
+  cerrarConteo, cancelarConteo, showToast, userEmail, error, onSalir,
+}) {
+  const [q, setQ] = useState("");
+  const [filtro, setFiltro] = useState("pendientes"); // pendientes | contadas | todas
+  const [abierta, setAbierta] = useState(null);       // referencia desplegada
+  const [paso, setPaso] = useState(null);             // faltan | cuadre | cancelar
+  const [verActa, setVerActa] = useState(null);       // acta de un conteo cerrado
+  const [borradores, setBorradores] = useState({});   // lo que se está tecleando
+  const timers = useRef({});
+
+  // Si el celular se apaga a mitad de un número, el temporizador se queda
+  // colgado: al desmontar se limpian todos.
+  useEffect(() => () => {
+    const t = timers.current;
+    Object.keys(t).forEach((k) => clearTimeout(t[k]));
+  }, []);
+
+  const num = (x) => Number(x) || 0;
+  const contado = (conteoAbierto && conteoAbierto.contado) || {};
+
+  // ---------- Una tarjeta por referencia, igual que en el inventario ----------
+  const claveGrupo = (p) => refBase(p.referencia) || fotoKey(p.modelo, p.color);
+  const grupos = (() => {
+    const orden = [], porClave = {};
+    products.forEach((p) => {
+      const clave = claveGrupo(p);
+      if (!porClave[clave]) {
+        porClave[clave] = {
+          clave,
+          ref: (p.referencia || "").replace(/\s*-\s*\d{1,3}(\.\d)?$/, "").trim(),
+          modelo: p.modelo || "", color: p.color || "", tallas: [], pares: 0,
+        };
+        orden.push(porClave[clave]);
+      }
+      porClave[clave].tallas.push(p);
+      porClave[clave].pares += num(p.stock);
+    });
+    orden.forEach((g) => {
+      g.tallas.sort((a, b) => num(a.talla) - num(b.talla));
+      g.foto = fotoDeProd(fotos, g.tallas[0]);
+      g.hechas = g.tallas.filter((t) => contado[t.id]).length;
+      g.completa = g.tallas.length > 0 && g.hechas === g.tallas.length;
+      // Diferencia acumulada de la referencia (solo con lo ya contado)
+      g.dif = g.tallas.reduce((a, t) => a + (contado[t.id] ? contado[t.id].n - contado[t.id].base : 0), 0);
+    });
+    return orden;
+  })();
+
+  const refsListas = grupos.filter((g) => g.completa).length;
+  const tallasHechas = Object.keys(contado).length;
+  const pctRefs = grupos.length ? Math.round((refsListas / grupos.length) * 100) : 0;
+
+  // Buscador por nombre o por código, y filtro. Por defecto se esconden las ya
+  // contadas: es lo que pidió el dueño para no volver a tropezarse con ellas.
+  const qn = normTxt(q);
+  const visibles = grupos
+    .filter((g) => !qn || normTxt(g.ref + " " + g.modelo + " " + g.color).indexOf(qn) !== -1)
+    .filter((g) => (filtro === "todas" ? true : filtro === "contadas" ? g.completa : !g.completa))
+    // Las que el sistema tiene en cero se van al final: son las que menos
+    // sentido tiene ir a buscar en la bodega, pero NO se esconden — ahí es
+    // justamente donde aparecen los pares que existen y nadie cargó.
+    .sort((a, b) => (a.pares > 0 ? 0 : 1) - (b.pares > 0 ? 0 : 1));
+
+  // Las que la búsqueda SÍ encontró pero el filtro esconde. Sin esto, buscar
+  // una referencia ya contada respondía "sin resultados", que se lee como "esa
+  // referencia no existe" — y de ahí a crearla duplicada hay un paso.
+  const escondidasPorFiltro = grupos.filter((g) =>
+    qn && normTxt(g.ref + " " + g.modelo + " " + g.color).indexOf(qn) !== -1 &&
+    !visibles.some((v) => v.clave === g.clave));
+
+  // Si la búsqueda deja una sola referencia, se abre sola: buscar y tener que
+  // dar otro toque para escribir el número es un toque de más por referencia.
+  const abiertaEfectiva = qn && visibles.length === 1 ? visibles[0].clave : abierta;
+
+  // ---------- Digitar ----------
+  // Se guarda solo (medio segundo después de dejar de teclear) y también al
+  // salir del campo. Tener que tocar "guardar" en cada talla es la forma más
+  // rápida de perder media hora de conteo.
+  const commit = (p, valor) => {
+    if (!conteoAbierto) return;
+    const s = String(valor == null ? "" : valor).trim();
+    if (s === "") { descontarTalla(conteoAbierto.id, p.id); return; }
+    contarTalla(conteoAbierto.id, p.id, conteoEntry(s, p.stock, userEmail));
+  };
+  const teclear = (p, valor) => {
+    setBorradores((b) => ({ ...b, [p.id]: valor }));
+    clearTimeout(timers.current[p.id]);
+    timers.current[p.id] = setTimeout(() => commit(p, valor), 500);
+  };
+  const cerrarCampo = (p, valor) => {
+    clearTimeout(timers.current[p.id]);
+    commit(p, valor);
+  };
+  const valorDe = (p) =>
+    borradores[p.id] != null ? borradores[p.id] : contado[p.id] ? String(contado[p.id].n) : "";
+
+  // Atajo para la referencia que está completa y correcta: marca de una las
+  // tallas que faltan con lo que dice el sistema. Solo toca las SIN CONTAR:
+  // pisar lo ya digitado borraría trabajo real de otra persona.
+  const todasIguales = (g) => {
+    const pend = g.tallas.filter((t) => !contado[t.id]);
+    if (!pend.length) { showToast("Esta referencia ya está contada completa."); return; }
+    pend.forEach((t) => contarTalla(conteoAbierto.id, t.id, conteoEntry(num(t.stock), t.stock, userEmail)));
+    showToast(pend.length + (pend.length === 1 ? " talla marcada" : " tallas marcadas") + " igual al sistema ✓");
+  };
+
+  // ---------- El acta ----------
+  // Aquí se aplica la regla del `base` (ver el comentario de CONTEO_COL): lo
+  // que se vendió después de contar una talla no puede salir como faltante.
+  const armarActa = () => {
+    const filas = [];
+    products.forEach((p) => {
+      const c = contado[p.id];
+      if (!c) return;
+      const base = num(c.base), n = num(c.n), ahora = num(p.stock);
+      const movido = base - ahora;                    // salió del sistema después de contarla
+      const nuevo = Math.max(0, n - movido);
+      filas.push({
+        productoId: p.id,
+        referencia: p.referencia || "",
+        modelo: p.modelo || "", color: p.color || "", talla: p.talla || "",
+        base, contado: n, movido, stockAntes: ahora, stockNuevo: nuevo,
+        dif: n - base, costo: num(p.costo),
+      });
+    });
+    const cambios = filas.filter((f) => f.stockNuevo !== f.stockAntes);
+    const sobra = filas.filter((f) => f.dif > 0);
+    const falta = filas.filter((f) => f.dif < 0);
+    return {
+      filas, cambios, sobra, falta,
+      resumen: {
+        refs: refsListas,
+        tallas: filas.length,
+        paresSobrantes: sobra.reduce((a, f) => a + f.dif, 0),
+        paresFaltantes: falta.reduce((a, f) => a - f.dif, 0),
+        valorSobrante: sobra.reduce((a, f) => a + f.dif * f.costo, 0),
+        valorFaltante: falta.reduce((a, f) => a - f.dif * f.costo, 0),
+        movidas: filas.filter((f) => f.movido !== 0).length,
+        sinContar: products.length - filas.length,
+      },
+    };
+  };
+
+  const acta = conteoAbierto ? armarActa() : null;
+  const faltanPorContar = grupos.filter((g) => !g.completa);
+
+  const aplicar = (ajustar) => {
+    const a = armarActa();
+    let next = null;
+    if (ajustar) {
+      const porId = {};
+      a.cambios.forEach((f) => { porId[f.productoId] = f.stockNuevo; });
+      next = products.map((p) => (porId[p.id] != null ? { ...p, stock: porId[p.id] } : p));
+    }
+    cerrarConteo(conteoAbierto.id, a, next);
+    setPaso(null);
+    setBorradores({});
+    showToast(
+      ajustar
+        ? "Conteo cerrado ✓ " + a.cambios.length + (a.cambios.length === 1 ? " talla ajustada" : " tallas ajustadas")
+        : "Conteo cerrado sin ajustar el inventario ✓"
+    );
+  };
+
+  const exportarActa = (c) => {
+    const filas = (c.diferencias && c.diferencias.length ? c.diferencias : c.ajustes) || [];
+    if (!filas.length) { showToast("Ese conteo cerró sin diferencias.", true); return; }
+    const rows = [
+      ["Referencia", "Modelo", "Color", "Talla", "Sistema", "Contado", "Diferencia", "Vendido durante el conteo", "Stock nuevo", "Costo", "Valor de la diferencia"],
+      ...filas.map((f) => [
+        f.referencia, f.modelo, f.color, f.talla, f.base, f.contado, f.dif, f.movido, f.stockNuevo, f.costo, f.dif * f.costo,
+      ]),
+    ];
+    downloadCSV(rows, "varman-conteo-" + String(c.cerrado || c.abierto || "").slice(0, 10) + ".csv");
+    showToast("Acta exportada ✓");
+  };
+
+  const cerrados = conteos
+    .filter((c) => c.estado === "cerrado")
+    .sort((a, b) => String(b.cerrado || "").localeCompare(String(a.cerrado || "")));
+
+  const chip = (texto, color, fondo) => (
+    <span style={{
+      background: fondo, color, fontWeight: 800, fontSize: 10.5, padding: "3px 8px",
+      borderRadius: 99, letterSpacing: ".03em", whiteSpace: "nowrap",
+    }}>{texto}</span>
+  );
+
+  const avisoError = error ? (
+    <div style={{
+      background: C.redSoft, border: "1.5px solid " + C.red, borderRadius: 14,
+      padding: "12px 14px", marginBottom: 12, fontSize: 12.5, color: C.red, lineHeight: 1.5,
+    }}>
+      <b>Firestore está rechazando el conteo ({error}).</b> Lo que cuentes queda solo
+      en este celular y el resto del equipo no lo ve. Falta publicar las reglas de la
+      colección <b>conteos</b> en la consola de Firebase (están en
+      app/reglas-firestore.txt).
+    </div>
+  ) : null;
+
+  const cabecera = (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, padding: "0 4px", gap: 8 }}>
+      <div style={{ minWidth: 0 }}>
+        <div style={display(19)}>Día de inventario</div>
+        <div style={{ fontSize: 12, color: C.muted, fontWeight: 600, marginTop: 2 }}>
+          {conteoAbierto ? "Conteo abierto · lo ve todo el equipo" : "Contar la bodega contra el sistema"}
+        </div>
+      </div>
+      <button onClick={onSalir} style={btnGhost({ padding: "8px 14px", borderRadius: 12, flexShrink: 0 })}>Salir</button>
+    </div>
+  );
+
+  // ============================================================
+  // SIN CONTEO ABIERTO: arrancar uno + historial de los anteriores
+  // ============================================================
+  if (!conteoAbierto) {
+    return (
+      <div style={{ padding: "16px 16px 100px" }} className="vm-fade">
+        {cabecera}
+        {avisoError}
+
+        <div style={cardStyle({ padding: 18, marginBottom: 14 })}>
+          <div style={{ fontWeight: 800, fontSize: 15.5, marginBottom: 6 }}>Contar la bodega</div>
+          <div style={{ fontSize: 13, color: C.ink2, lineHeight: 1.55, marginBottom: 14 }}>
+            Vas referencia por referencia escribiendo cuántos pares hay de cada talla.
+            Puedes contar por partes: el conteo queda abierto hasta que lo cierres, y
+            lo que cuentes lo ve el resto del equipo al instante.
+            <br /><br />
+            <b>Nada se ajusta solo.</b> Al cerrar te muestro las diferencias y tú decides
+            si se aplican.
+          </div>
+          <button onClick={abrirConteo} style={btnPrimary({ width: "100%", padding: 14, fontSize: 15 })}>
+            📋 Empezar día de inventario
+          </button>
+          <div style={{ fontSize: 11.5, color: C.muted, marginTop: 10, textAlign: "center" }}>
+            {products.length} tallas en {grupos.length} referencias por contar
+          </div>
+        </div>
+
+        <div style={{ ...eyebrow(C.ink2), padding: "0 4px", marginBottom: 8 }}>Conteos anteriores</div>
+        {!cerrados.length && (
+          <EmptyState icon={<IconBox big />} title="Todavía no has contado" text="Cuando cierres tu primer día de inventario, el acta queda guardada aquí." />
+        )}
+        {cerrados.map((c) => {
+          const r = c.resumen || {};
+          return (
+            <button
+              key={c.id}
+              onClick={() => setVerActa(c)}
+              className="vm-press"
+              style={cardStyle({
+                padding: "13px 15px", marginBottom: 8, width: "100%", textAlign: "left",
+                border: "none", cursor: "pointer", display: "flex", justifyContent: "space-between",
+                alignItems: "center", gap: 10,
+              })}
+            >
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontWeight: 800, fontSize: 13.5 }}>{fechaCorta(String(c.cerrado || "").slice(0, 10))}</div>
+                <div style={{ fontSize: 11.5, color: C.muted, marginTop: 2, fontWeight: 600 }}>
+                  {nombreUsuario(c.cerradoPor)} · {r.tallas || 0} tallas contadas
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 5, flexShrink: 0 }}>
+                {r.paresFaltantes > 0 && chip("−" + r.paresFaltantes, C.red, C.redSoft)}
+                {r.paresSobrantes > 0 && chip("+" + r.paresSobrantes, C.green, C.greenSoft)}
+                {!r.paresFaltantes && !r.paresSobrantes && chip("CUADRÓ", C.green, C.greenSoft)}
+              </div>
+            </button>
+          );
+        })}
+
+        {verActa && (
+          <Sheet title={"Acta del " + fechaCorta(String(verActa.cerrado || "").slice(0, 10))} onClose={() => setVerActa(null)}>
+            <ActaConteo c={verActa} />
+            <button onClick={() => exportarActa(verActa)} style={btnGhost({ width: "100%", marginTop: 12 })}>
+              Descargar Excel
+            </button>
+          </Sheet>
+        )}
+      </div>
+    );
+  }
+
+  // ============================================================
+  // CONTEO ABIERTO
+  // ============================================================
+  const r = acta.resumen;
+
+  return (
+    <div style={{ padding: "16px 16px 100px" }} className="vm-fade">
+      {cabecera}
+      {avisoError}
+
+      {/* ---- Avance ---- */}
+      <div style={cardStyle({ padding: "14px 16px", marginBottom: 12 })}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
+          <div style={{ fontWeight: 800, fontSize: 15 }}>
+            {refsListas} de {grupos.length} referencias
+          </div>
+          <div style={{ fontSize: 12, color: C.muted, fontWeight: 700 }}>{tallasHechas} {tallasHechas === 1 ? "talla contada" : "tallas contadas"}</div>
+        </div>
+        <div style={{ background: C.bg, borderRadius: 99, height: 9, overflow: "hidden" }}>
+          <div style={{ width: pctRefs + "%", height: "100%", background: C.accent, borderRadius: 99, transition: "width .3s ease" }} />
+        </div>
+        <div style={{ fontSize: 11.5, color: C.muted, marginTop: 8, fontWeight: 600 }}>
+          Abierto por {nombreUsuario(conteoAbierto.abiertoPor)} · {fechaCorta(String(conteoAbierto.abierto || "").slice(0, 10))}
+        </div>
+        <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+          <button onClick={() => setPaso(faltanPorContar.length ? "faltan" : "cuadre")} style={btnPrimary({ flex: 1 })}>
+            Cerrar conteo
+          </button>
+          <button onClick={() => setPaso("cancelar")} style={btnGhost({ padding: "10px 14px", color: C.red, border: "1.5px solid " + C.redSoft })}>
+            Descartar
+          </button>
+        </div>
+      </div>
+
+      {/* ---- Buscar + filtro ---- */}
+      <div style={{ position: "relative", marginBottom: 10 }}>
+        <span style={{ position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)", color: C.muted }}>
+          <IconSearch />
+        </span>
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Buscar por nombre o código…"
+          style={inputStyle({ paddingLeft: 38, borderRadius: 14 })}
+        />
+      </div>
+      <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
+        {[["pendientes", "Por contar"], ["contadas", "Contadas"], ["todas", "Todas"]].map(([id, label]) => (
+          <button key={id} onClick={() => setFiltro(id)} style={{
+            flex: 1, padding: "9px 0", borderRadius: 11, cursor: "pointer",
+            fontFamily: "Inter, sans-serif", fontWeight: 700, fontSize: 12.5,
+            border: "1.5px solid " + (filtro === id ? C.ink : C.line),
+            background: filtro === id ? C.ink : C.card,
+            color: filtro === id ? "#fff" : C.ink2,
+          }}>
+            {label}{id === "pendientes" ? " (" + (grupos.length - refsListas) + ")" : ""}
+          </button>
+        ))}
+      </div>
+
+      {!visibles.length && !!escondidasPorFiltro.length && (
+        <div style={cardStyle({ padding: "20px 18px", textAlign: "center" })}>
+          <div style={{ fontWeight: 800, fontSize: 15, marginBottom: 6 }}>
+            {escondidasPorFiltro.length === 1 ? "Esa referencia ya está contada" : "Esas referencias ya están contadas"}
+          </div>
+          <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5, marginBottom: 14 }}>
+            {escondidasPorFiltro.slice(0, 3).map((g) => (g.ref ? g.ref + " " : "") + g.modelo).join(" · ")}
+            {escondidasPorFiltro.length > 3 ? " y " + (escondidasPorFiltro.length - 3) + " más" : ""}
+          </div>
+          <button onClick={() => setFiltro("todas")} style={btnGhost({ width: "100%" })}>
+            Verlas de todas formas
+          </button>
+        </div>
+      )}
+      {!visibles.length && !escondidasPorFiltro.length && (
+        <EmptyState
+          icon={<IconBox big />}
+          title={filtro === "pendientes" && !qn ? "No queda nada por contar" : "Sin resultados"}
+          text={filtro === "pendientes" && !qn
+            ? "Ya contaste todas las referencias. Toca Cerrar conteo para ver el cuadre."
+            : "Ninguna referencia coincide. Prueba con el código (VRM051) o parte del nombre."}
+        />
+      )}
+
+      {/* ---- Las referencias ---- */}
+      {visibles.map((g) => {
+        const abiertaEsta = abiertaEfectiva === g.clave;
+        return (
+          <div key={g.clave} style={cardStyle({ marginBottom: 10, overflow: "hidden" })}>
+            <button
+              onClick={() => setAbierta(abiertaEsta ? null : g.clave)}
+              className="vm-press"
+              style={{
+                width: "100%", textAlign: "left", border: "none", background: "transparent",
+                cursor: "pointer", padding: "12px 14px", display: "flex", alignItems: "center", gap: 11,
+              }}
+            >
+              <div style={{
+                width: 44, height: 44, borderRadius: 12, flexShrink: 0, background: C.bg,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                color: C.muted, overflow: "hidden",
+              }}>
+                {g.foto
+                  ? <img src={g.foto} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  : <IconBox />}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 800, fontSize: 13.5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  {g.ref ? g.ref + " · " : ""}{g.modelo || "Sin nombre"}
+                </div>
+                <div style={{ fontSize: 11.5, color: C.muted, marginTop: 2, fontWeight: 600 }}>
+                  {g.color ? g.color + " · " : ""}{g.tallas.length} tallas · {g.pares} en sistema
+                </div>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0 }}>
+                {g.completa
+                  ? chip("CONTADO", C.green, C.greenSoft)
+                  : g.hechas > 0
+                    ? chip(g.hechas + "/" + g.tallas.length, C.accent, C.accentSoft)
+                    : null}
+                {g.completa && g.dif !== 0 && chip((g.dif > 0 ? "+" : "−") + Math.abs(g.dif), g.dif > 0 ? C.green : C.red, g.dif > 0 ? C.greenSoft : C.redSoft)}
+              </div>
+            </button>
+
+            {abiertaEsta && (
+              <div style={{ borderTop: "1px solid " + C.line, padding: "6px 14px 12px" }}>
+                {g.tallas.map((t) => {
+                  const c = contado[t.id];
+                  const dif = c ? c.n - c.base : 0;
+                  return (
+                    <div key={t.id} style={{
+                      display: "flex", alignItems: "center", gap: 10, padding: "8px 0",
+                      borderBottom: "1px solid " + C.line,
+                    }}>
+                      <div style={{ width: 54, flexShrink: 0 }}>
+                        {/* Los pares que entraron sin talla se cuentan igual; el
+                            rótulo lo dice en vez de dejar un "Talla" en blanco.
+                            Para ponerles talla: botón Asociar talla en Inventario. */}
+                        <div style={{ fontWeight: 800, fontSize: 14 }}>
+                          {String(t.talla == null ? "" : t.talla).trim() ? "Talla " + t.talla : "Sin talla"}
+                        </div>
+                      </div>
+                      <div style={{ flex: 1, fontSize: 11.5, color: C.muted, fontWeight: 600 }}>
+                        sistema: {num(t.stock)}
+                        {c && dif !== 0 && (
+                          <span style={{ color: dif > 0 ? C.green : C.red, fontWeight: 800 }}>
+                            {"  ·  " + (dif > 0 ? "sobran " + dif : "faltan " + -dif)}
+                          </span>
+                        )}
+                        {/* Sin esta línea, la talla que se vendió DESPUÉS de contarla
+                            se ve como un número que no cuadra ("conté 4 y dice 3") y
+                            el que cuenta vuelve a la bodega a buscar un par que ya
+                            se despachó. */}
+                        {c && c.base !== num(t.stock) && (
+                          <span style={{ display: "block", color: C.accent, fontWeight: 700, marginTop: 2 }}>
+                            {"contaste " + c.n + " · " + Math.abs(c.base - num(t.stock)) + (Math.abs(c.base - num(t.stock)) === 1 ? " se movió" : " se movieron") + " después"}
+                          </span>
+                        )}
+                      </div>
+                      <input
+                        type="number"
+                        min="0"
+                        inputMode="numeric"
+                        value={valorDe(t)}
+                        onChange={(e) => teclear(t, e.target.value)}
+                        onBlur={(e) => cerrarCampo(t, e.target.value)}
+                        placeholder="—"
+                        aria-label={"Pares contados de la talla " + t.talla}
+                        style={inputStyle({
+                          width: 72, flexShrink: 0, textAlign: "center", padding: "10px 6px",
+                          fontWeight: 800, fontSize: 16,
+                          borderColor: c ? (dif === 0 ? C.green : C.accent) : C.line,
+                        })}
+                      />
+                    </div>
+                  );
+                })}
+                <button onClick={() => todasIguales(g)} style={btnGhost({ width: "100%", marginTop: 12, fontSize: 12.5 })}>
+                  ✓ Las que faltan están igual al sistema
+                </button>
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      {!!visibles.length && (
+        <button onClick={() => setPaso(faltanPorContar.length ? "faltan" : "cuadre")} style={btnPrimary({ width: "100%", marginTop: 6, padding: 14, fontSize: 15 })}>
+          Cerrar conteo
+        </button>
+      )}
+
+      {/* ---- Aviso: qué falta por contar ---- */}
+      {paso === "faltan" && (
+        <Sheet title="Falta contar" onClose={() => setPaso(null)}>
+          <div style={{ fontSize: 13.5, color: C.ink2, lineHeight: 1.55, marginBottom: 12 }}>
+            Quedan <b>{faltanPorContar.length}</b> referencias sin terminar de contar.
+            Si cierras ahora, <b>esas no se tocan</b>: su stock queda como está.
+          </div>
+          <div style={{ maxHeight: 260, overflowY: "auto", marginBottom: 12 }}>
+            {faltanPorContar.map((g) => (
+              <div key={g.clave} style={{
+                display: "flex", justifyContent: "space-between", gap: 10, padding: "9px 0",
+                borderBottom: "1px solid " + C.line, fontSize: 13,
+              }}>
+                <span style={{ minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  <b>{g.ref || "—"}</b> {g.modelo}{g.color ? " " + g.color : ""}
+                </span>
+                <span style={{ color: C.muted, fontWeight: 700, flexShrink: 0 }}>
+                  {g.tallas.length - g.hechas} de {g.tallas.length}
+                </span>
+              </div>
+            ))}
+          </div>
+          <button onClick={() => setPaso(null)} style={btnPrimary({ width: "100%", marginBottom: 8 })}>
+            Volver a contar
+          </button>
+          <button onClick={() => setPaso("cuadre")} style={btnGhost({ width: "100%" })}>
+            Cerrar solo con lo contado
+          </button>
+        </Sheet>
+      )}
+
+      {/* ---- El cuadre: lo que hay que aprobar ---- */}
+      {paso === "cuadre" && (
+        <Sheet title="Cuadre del conteo" onClose={() => setPaso(null)}>
+          <div style={{ fontSize: 13, color: C.ink2, lineHeight: 1.5, marginBottom: 12 }}>
+            Contaste <b>{r.tallas}</b> tallas.
+            {r.sinContar > 0 && <> Quedan <b>{r.sinContar}</b> sin contar y no se van a tocar.</>}
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
+            <div style={cardStyle({ padding: "12px 13px" })}>
+              <div style={eyebrow()}>Faltan</div>
+              <div style={{ ...display(20, r.paresFaltantes ? C.red : C.ink), marginTop: 3 }}>{r.paresFaltantes}</div>
+              <div style={{ fontSize: 11, color: C.muted, fontWeight: 600, marginTop: 2 }}>{fmt(r.valorFaltante)} a costo</div>
+            </div>
+            <div style={cardStyle({ padding: "12px 13px" })}>
+              <div style={eyebrow()}>Sobran</div>
+              <div style={{ ...display(20, r.paresSobrantes ? C.green : C.ink), marginTop: 3 }}>{r.paresSobrantes}</div>
+              <div style={{ fontSize: 11, color: C.muted, fontWeight: 600, marginTop: 2 }}>{fmt(r.valorSobrante)} a costo</div>
+            </div>
+          </div>
+
+          {r.movidas > 0 && (
+            <div style={{
+              background: C.accentSoft, border: "1.5px solid " + C.accent, borderRadius: 14,
+              padding: "11px 13px", marginBottom: 12, fontSize: 12.5, color: "#A33A12", lineHeight: 1.5,
+            }}>
+              ⚠ <b>{r.movidas}</b> {r.movidas === 1 ? "talla se vendió" : "tallas se vendieron"} después de que las contaste.
+              Eso <b>no</b> es faltante: ya lo descontamos del ajuste.
+            </div>
+          )}
+
+          {!acta.sobra.length && !acta.falta.length ? (
+            <div style={{
+              background: C.greenSoft, borderRadius: 14, padding: "14px 13px", marginBottom: 12,
+              fontSize: 13.5, color: C.green, fontWeight: 700, textAlign: "center",
+            }}>
+              Todo cuadró. Ni un par de diferencia.
+            </div>
+          ) : (
+            <div style={{ maxHeight: 300, overflowY: "auto", marginBottom: 12 }}>
+              {[...acta.falta, ...acta.sobra].map((f) => (
+                <div key={f.productoId} style={{ padding: "9px 0", borderBottom: "1px solid " + C.line }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 10, fontSize: 13 }}>
+                    <span style={{ minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      <b>{f.referencia || "—"}</b> {f.modelo}{f.color ? " " + f.color : ""}
+                    </span>
+                    <b style={{ color: f.dif > 0 ? C.green : C.red, flexShrink: 0 }}>
+                      {(f.dif > 0 ? "+" : "−") + Math.abs(f.dif)}
+                    </b>
+                  </div>
+                  <div style={{ fontSize: 11.5, color: C.muted, marginTop: 2, fontWeight: 600 }}>
+                    talla {f.talla} · sistema {f.base} · contaste {f.contado}
+                    {f.movido !== 0 && " · " + Math.abs(f.movido) + " vendidos durante el conteo"}
+                    {" → queda en " + f.stockNuevo}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <button onClick={() => aplicar(true)} style={btnPrimary({ width: "100%", padding: 14, fontSize: 15, marginBottom: 8 })}>
+            Aplicar y cerrar
+          </button>
+          <button onClick={() => aplicar(false)} style={btnGhost({ width: "100%", marginBottom: 8 })}>
+            Cerrar sin tocar el inventario
+          </button>
+          <button onClick={() => setPaso(null)} style={btnGhost({ width: "100%", border: "none", color: C.muted })}>
+            Volver
+          </button>
+        </Sheet>
+      )}
+
+      {/* ---- Descartar el conteo ---- */}
+      {paso === "cancelar" && (
+        <Sheet title="Descartar el conteo" onClose={() => setPaso(null)}>
+          <div style={{ fontSize: 13.5, color: C.ink2, lineHeight: 1.55, marginBottom: 14 }}>
+            Se pierde lo que llevas contado ({tallasHechas} tallas) y el inventario
+            queda exactamente como está. Esto no se puede deshacer.
+          </div>
+          <button
+            onClick={() => { cancelarConteo(conteoAbierto.id); setPaso(null); setBorradores({}); showToast("Conteo descartado."); }}
+            style={{ ...btnPrimary({ width: "100%", padding: 14, fontSize: 15, marginBottom: 8 }), background: C.red, boxShadow: "none" }}
+          >
+            Sí, descartar
+          </button>
+          <button onClick={() => setPaso(null)} style={btnGhost({ width: "100%" })}>Seguir contando</button>
+        </Sheet>
+      )}
+    </div>
+  );
+}
+
+// El acta de un conteo cerrado, tal como quedó guardada. Se lee sola: es el
+// documento al que se vuelve cuando alguien pregunta "¿y esos pares dónde
+// están?" tres semanas después.
+function ActaConteo({ c }) {
+  const r = c.resumen || {};
+  const filas = (c.diferencias && c.diferencias.length ? c.diferencias : []) || [];
+  return (
+    <div>
+      <div style={{ fontSize: 12.5, color: C.muted, fontWeight: 600, marginBottom: 12 }}>
+        Cerrado por {nombreUsuario(c.cerradoPor)} · {r.tallas || 0} tallas contadas
+        {r.sinContar ? " · " + r.sinContar + " sin contar" : ""}
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
+        <div style={cardStyle({ padding: "12px 13px" })}>
+          <div style={eyebrow()}>Faltaron</div>
+          <div style={{ ...display(20, r.paresFaltantes ? C.red : C.ink), marginTop: 3 }}>{r.paresFaltantes || 0}</div>
+          <div style={{ fontSize: 11, color: C.muted, fontWeight: 600, marginTop: 2 }}>{fmt(r.valorFaltante || 0)} a costo</div>
+        </div>
+        <div style={cardStyle({ padding: "12px 13px" })}>
+          <div style={eyebrow()}>Sobraron</div>
+          <div style={{ ...display(20, r.paresSobrantes ? C.green : C.ink), marginTop: 3 }}>{r.paresSobrantes || 0}</div>
+          <div style={{ fontSize: 11, color: C.muted, fontWeight: 600, marginTop: 2 }}>{fmt(r.valorSobrante || 0)} a costo</div>
+        </div>
+      </div>
+      {!filas.length && (
+        <div style={{ background: C.greenSoft, borderRadius: 14, padding: "14px 13px", fontSize: 13.5, color: C.green, fontWeight: 700, textAlign: "center" }}>
+          Cuadró sin diferencias.
+        </div>
+      )}
+      {filas.map((f) => (
+        <div key={f.productoId} style={{ padding: "9px 0", borderBottom: "1px solid " + C.line }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 10, fontSize: 13 }}>
+            <span style={{ minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              <b>{f.referencia || "—"}</b> {f.modelo}{f.color ? " " + f.color : ""}
+            </span>
+            <b style={{ color: f.dif > 0 ? C.green : C.red, flexShrink: 0 }}>{(f.dif > 0 ? "+" : "−") + Math.abs(f.dif)}</b>
+          </div>
+          <div style={{ fontSize: 11.5, color: C.muted, marginTop: 2, fontWeight: 600 }}>
+            talla {f.talla} · decía {f.base} · se contaron {f.contado} → quedó en {f.stockNuevo}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function FotosManager({ products, fotos, asignarFoto, quitarFoto, showToast, onClose }) {
   const [pool, setPool] = useState([]);      // fotos de la carpeta cargadas en esta sesión
   const [cargando, setCargando] = useState(false);
@@ -4072,6 +5473,10 @@ function TiendaWeb({ showToast, products }) {
   // ref) y nombres de bodegas externas reutilizables (colección proveedores)
   const [mapa, setMapa] = useState({});           // { ref: docMapa }
   const [proveedores, setProveedores] = useState([]); // nombres ordenados
+  // [2026-08-18] Buscador del selector "código del inventario" (antes un
+  // <select> con las 80+ referencias en orden alfabético: había que
+  // desplazarse toda la lista para encontrar una — pedido del dueño.
+  const [buscaInv, setBuscaInv] = useState("");
   // [REF-PAUTA] (2026-07-18): config del bot (botConfig/general). Aquí se elige
   // la referencia de la PUBLICACIÓN activa: cuando un cliente le escriba al bot
   // solo "precio" o "quiero más información", el bot responde con ESA ref.
@@ -4241,9 +5646,18 @@ function TiendaWeb({ showToast, products }) {
   };
   const abrirEditar = (p) => {
     setConfirmDel(false);
+    // Promo (03-bis): si hay precioAntes > precio, el input "Precio" vuelve a
+    // mostrar el precio DE LISTA (no el rebajado) y el % se recalcula para
+    // que el dueño lo vea y lo pueda ajustar sin perder la promo.
+    const hayPromo = p.precioAntes && Number(p.precioAntes) > Number(p.precio);
     setSheet({
       esNuevo: false,
-      draft: { ...p, precio: String(p.precio || ""), fotos: (p.fotos || []).map((fid) => ({ fid })), quitadas: [], inv: invDe(p) },
+      draft: {
+        ...p,
+        precio: String((hayPromo ? p.precioAntes : p.precio) || ""),
+        descuentoPct: hayPromo ? String(Math.round((1 - Number(p.precio) / Number(p.precioAntes)) * 100)) : "",
+        fotos: (p.fotos || []).map((fid) => ({ fid })), quitadas: [], inv: invDe(p),
+      },
     });
   };
   const abrirNueva = () => {
@@ -4253,7 +5667,7 @@ function TiendaWeb({ showToast, products }) {
     setConfirmDel(false);
     setSheet({
       esNuevo: true,
-      draft: { id: "c" + ref, ref, cat: "deportivas", precio: "", tag: "Nuevo", orden: minOrden - 1, activo: true, refInventario: "", marca: "", genero: "", tallas: "", fotos: [], quitadas: [], inv: { codigosInv: [], proveedor: "", nota: "" } },
+      draft: { id: "c" + ref, ref, cat: "deportivas", precio: "", descuentoPct: "", tag: "Nuevo", orden: minOrden - 1, activo: true, refInventario: "", marca: "", genero: "", tallas: "", fotos: [], quitadas: [], inv: { codigosInv: [], proveedor: "", nota: "" } },
     });
   };
 
@@ -4293,8 +5707,14 @@ function TiendaWeb({ showToast, products }) {
   const guardar = async () => {
     if (!sheet || progreso) return;
     const d = sheet.draft;
-    const precio = Number(String(d.precio).replace(/[^\d]/g, ""));
-    if (!precio) return showToast("Escribe el precio.", true);
+    // Promo (03-bis): "precio" en el draft es el precio DE LISTA (ver
+    // abrirEditar). Del % de descuento se deriva el precio FINAL, que es el
+    // que de verdad se cobra (bot y checkout leen "precio" tal cual).
+    const precioLista = Number(String(d.precio).replace(/[^\d]/g, ""));
+    if (!precioLista) return showToast("Escribe el precio.", true);
+    const pct = Math.min(90, Math.max(0, Math.round(Number(d.descuentoPct) || 0)));
+    const precioFinal = pct > 0 ? Math.round(precioLista * (100 - pct) / 100) : precioLista;
+    const precioAntes = pct > 0 ? precioLista : "";
     if (!d.fotos.length) return showToast("Añade al menos una foto.", true);
     if (!fbReady()) return showToast("Sin conexión con la nube.", true);
     try {
@@ -4310,7 +5730,7 @@ function TiendaWeb({ showToast, products }) {
       const proveedor = (inv.proveedor || "").trim();
       const tipoMapa = codigos.length && proveedor ? "mixta" : codigos.length ? "propia" : proveedor ? "externa" : "";
       await colRef("catalogo").doc(d.id).set({
-        id: d.id, ref: d.ref, cat: d.cat, precio, tag: d.tag || "",
+        id: d.id, ref: d.ref, cat: d.cat, precio: precioFinal, precioAntes, tag: d.tag || "",
         orden: d.orden || 0, activo: d.activo !== false, fotos: d.fotos.map((f) => f.fid),
         // Compatibilidad ronda 2: refInventario = primer código propio (los
         // pedidos viejos y cualquier código que aún lo lea siguen andando)
@@ -4637,6 +6057,11 @@ function TiendaWeb({ showToast, products }) {
                 const oculta = p.activo === false;
                 const enPauta = refsPautaSel.indexOf(p.ref) >= 0;
                 const sinNombre = !p.marca;
+                // Promo (03-bis): precioAntes solo cuenta si es mayor que el
+                // precio final guardado; si no, la tarjeta se ve igual que
+                // siempre (catálogo viejo sin este campo, cero cambios).
+                const hayPromo = p.precioAntes && Number(p.precioAntes) > Number(p.precio);
+                const pctBadge = hayPromo ? Math.round((1 - Number(p.precio) / Number(p.precioAntes)) * 100) : 0;
                 return (
                   <div
                     key={p.id}
@@ -4678,7 +6103,19 @@ function TiendaWeb({ showToast, products }) {
                         Ref {p.ref} · {catTiendaLabel(p.cat)}
                       </div>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 4 }}>
-                        <div style={{ fontWeight: 800, fontSize: 15, fontVariantNumeric: "tabular-nums" }}>{precioTienda(p.precio)}</div>
+                        <div style={{ display: "flex", alignItems: "baseline", gap: 6, flexWrap: "wrap" }}>
+                          {hayPromo ? (
+                            <span style={{ fontSize: 11, color: C.muted, textDecoration: "line-through", fontVariantNumeric: "tabular-nums" }}>
+                              {precioTienda(p.precioAntes)}
+                            </span>
+                          ) : null}
+                          <span style={{ fontWeight: 800, fontSize: 15, fontVariantNumeric: "tabular-nums" }}>{precioTienda(p.precio)}</span>
+                          {hayPromo ? (
+                            <span style={{ background: C.redSoft, color: C.red, fontWeight: 800, fontSize: 9.5, padding: "1px 6px", borderRadius: 99 }}>
+                              -{pctBadge}%
+                            </span>
+                          ) : null}
+                        </div>
                         <button
                           onClick={(e) => { e.stopPropagation(); toggleActivo(p); }}
                           title={oculta ? "Mostrar en la página" : "Ocultar de la página"}
@@ -4766,11 +6203,44 @@ function TiendaWeb({ showToast, products }) {
               placeholder="299900"
               style={inputStyle()}
             />
-            {sheet.draft.precio ? (
+            {/* Precio SIN descuento (el "de lista"): si hay % de descuento
+                más abajo, lo que de verdad se cobra y se muestra en la
+                página es el precio con descuento (ver preview del campo
+                Descuento) — por eso este aviso solo aparece sin promo. */}
+            {sheet.draft.precio && !(Number(sheet.draft.descuentoPct) > 0) ? (
               <div style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>
                 En la página se verá: <b style={{ color: C.ink }}>{precioTienda(String(sheet.draft.precio).replace(/[^\d]/g, ""))} COP</b>
               </div>
             ) : null}
+            {Number(sheet.draft.descuentoPct) > 0 ? (
+              <div style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>
+                Este es el precio de lista, sin descuento.
+              </div>
+            ) : null}
+          </Field>
+
+          <Field label="Descuento (%)">
+            <input
+              type="number"
+              min="0"
+              max="90"
+              value={sheet.draft.descuentoPct || ""}
+              onChange={(e) => setSheet((s) => ({ ...s, draft: { ...s.draft, descuentoPct: e.target.value } }))}
+              placeholder="0"
+              style={inputStyle()}
+            />
+            {Number(sheet.draft.descuentoPct) > 0 && sheet.draft.precio ? (() => {
+              const lista = Number(String(sheet.draft.precio).replace(/[^\d]/g, ""));
+              const pctPreview = Math.min(90, Math.max(0, Math.round(Number(sheet.draft.descuentoPct) || 0)));
+              const final = Math.round(lista * (100 - pctPreview) / 100);
+              return (
+                <div style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>
+                  Con {pctPreview}% de descuento se ve:{" "}
+                  <span style={{ textDecoration: "line-through", color: C.muted }}>{precioTienda(lista)}</span>{" "}
+                  <b style={{ color: C.ink }}>{precioTienda(final)}</b> en la página
+                </div>
+              );
+            })() : null}
           </Field>
 
           <div style={{ display: "flex", gap: 10 }}>
@@ -4881,22 +6351,43 @@ function TiendaWeb({ showToast, products }) {
                   <span style={{ fontSize: 12, color: C.muted }}>Sin códigos propios.</span>
                 )}
               </div>
-              <select
-                value=""
-                onChange={(e) => {
-                  const v = e.target.value;
-                  if (!v) return;
-                  setSheet((s) => (s.draft.inv.codigosInv || []).includes(v) ? s : ({ ...s, draft: { ...s.draft, inv: { ...s.draft.inv, codigosInv: [...(s.draft.inv.codigosInv || []), v] } } }));
-                }}
-                style={inputStyle()}
-              >
-                <option value="">+ Añadir código del inventario…</option>
-                {refsInventario.filter((r) => !(sheet.draft.inv.codigosInv || []).includes(r.ref)).map((r) => (
-                  <option key={r.ref} value={r.ref}>
-                    {r.ref}{r.modelo ? " — " + r.modelo : ""}{r.color ? " (" + r.color + ")" : ""}
-                  </option>
-                ))}
-              </select>
+              {/* [2026-08-18] Buscador en vez de <select>: con 80+ referencias
+                  había que desplazarse toda la lista (ordenada alfabéticamente
+                  por código, no por fecha) para encontrar una nueva. */}
+              <input
+                value={buscaInv}
+                onChange={(e) => setBuscaInv(e.target.value)}
+                placeholder="Escribe la referencia o el modelo…"
+                style={inputStyleBuscador(!!buscaInv.trim())}
+              />
+              {buscaInv.trim() && (() => {
+                const opciones = refsInventario
+                  .filter((r) => !(sheet.draft.inv.codigosInv || []).includes(r.ref))
+                  .filter((r) => normTxt(r.ref + " " + r.modelo + " " + r.color).includes(normTxt(buscaInv)))
+                  .slice(0, 40);
+                return (
+                  <div style={{ maxHeight: 230, overflowY: "auto", border: `1.5px solid ${C.line}`, borderTop: "none", borderBottomLeftRadius: 12, borderBottomRightRadius: 12 }}>
+                    {opciones.length === 0 ? (
+                      <div style={{ padding: "10px 13px", fontSize: 12.5, color: C.muted }}>Sin coincidencias.</div>
+                    ) : opciones.map((r, i) => (
+                      <button
+                        key={r.ref}
+                        onClick={() => {
+                          setSheet((s) => (s.draft.inv.codigosInv || []).includes(r.ref) ? s : ({ ...s, draft: { ...s.draft, inv: { ...s.draft.inv, codigosInv: [...(s.draft.inv.codigosInv || []), r.ref] } } }));
+                          setBuscaInv("");
+                        }}
+                        style={{
+                          display: "block", width: "100%", textAlign: "left", cursor: "pointer",
+                          border: "none", borderTop: i ? `1px solid ${C.line}` : "none", background: "transparent",
+                          padding: "10px 13px", fontFamily: "Inter, sans-serif", fontSize: 13, color: C.ink,
+                        }}
+                      >
+                        <b>{r.ref}</b>{r.modelo ? " — " + r.modelo : ""}{r.color ? " (" + r.color + ")" : ""}
+                      </button>
+                    ))}
+                  </div>
+                );
+              })()}
 
               <div style={{ ...eyebrow(C.muted), fontSize: 9.5, margin: "12px 0 6px" }}>Bodega externa · proveedor</div>
               <input
@@ -4993,7 +6484,7 @@ const ATAJOS_GASTO = [
   { label: "📣 Pauta Meta", desc: "PAGO CAMPAÑA META", monto: "", categoria: "pauta" },
 ];
 
-function Caja({ sales, gastos, persistGastos, addGasto, showToast }) {
+function Caja({ sales, gastos, persistGastos, addGasto, showToast, products = [], bunkerVentas = [], repararVentasBodega }) {
   const num = (x) => Number(x) || 0;
   const qty = (s) => num(s.cantidad) || 1;
   // fmt con signo bonito para saldos negativos: −$1.000 en vez de $-1.000
@@ -5006,11 +6497,41 @@ function Caja({ sales, gastos, persistGastos, addGasto, showToast }) {
   const [confirmDel, setConfirmDel] = useState(false);
   const [periodo, setPeriodo] = useState("mes");
   const [mostrar, setMostrar] = useState(30);
+  // Día desplegado en el estado de cuenta: el renglón "INGRESO POR VENTAS" solo
+  // decía cuánta plata entró ese día; ahora se abre y muestra qué se vendió.
+  const [diaAbierto, setDiaAbierto] = useState(null);
 
   // ---- Movimientos: ventas por día (entradas) + gastos (salidas) ----
   const ventasDia = {};
+  const paresDia = {}; // las ventas de cada día, para el detalle desplegable
   sales.forEach((s) => {
-    if (s.fecha) ventasDia[s.fecha] = (ventasDia[s.fecha] || 0) + num(s.precio) * qty(s);
+    if (!s.fecha) return;
+    ventasDia[s.fecha] = (ventasDia[s.fecha] || 0) + num(s.precio) * qty(s);
+    (paresDia[s.fecha] = paresDia[s.fecha] || []).push(s);
+  });
+
+  // La venta guarda el modelo y la talla, pero NO la referencia: esa sale del
+  // producto al que apunta `productoId`. Las ventas viejas no siempre lo traen,
+  // así que ahí se muestra lo que la venta sí tenga escrito — un código no se
+  // inventa, que para eso está el guion.
+  const prodPorId = {};
+  products.forEach((p) => { prodPorId[p.id] = p; });
+
+  // Ventas de la bodega VARMAN guardadas con el precio al que revendió el local
+  // en vez del precio de VarMan. Se detectan cruzando por `ventaVarmanId` con el
+  // libro del Búnker; si el libro no está a mano, sencillamente no se ofrece
+  // nada (no se adivina un precio).
+  const bvPorVenta = {};
+  bunkerVentas.forEach((v) => { if (v.ventaVarmanId) bvPorVenta[v.ventaVarmanId] = v; });
+  const arreglosBodega = [];
+  let difBodega = 0;
+  sales.forEach((s) => {
+    const bv = bvPorVenta[s.id];
+    if (!bv) return;
+    const precioBodega = num(bv.compra);
+    if (precioBodega <= 0 || num(s.precio) === precioBodega) return;
+    arreglosBodega.push({ id: s.id, antes: num(s.precio), despues: precioBodega });
+    difBodega += (num(s.precio) - precioBodega) * qty(s);
   });
   const movs = [];
   Object.keys(ventasDia).forEach((f) =>
@@ -5215,6 +6736,30 @@ function Caja({ sales, gastos, persistGastos, addGasto, showToast }) {
         </button>
       </div>
 
+      {/* Ventas del local guardadas con el precio equivocado. El aviso se va
+          solo cuando ya no queda nada por corregir. */}
+      {!!arreglosBodega.length && !!repararVentasBodega && (
+        <div style={{
+          background: C.redSoft, border: `1.5px solid ${C.red}`, borderRadius: 16,
+          padding: "13px 15px", marginBottom: 12,
+        }}>
+          <div style={{ fontWeight: 800, fontSize: 13.5, color: C.red, marginBottom: 5 }}>
+            {arreglosBodega.length} {arreglosBodega.length === 1 ? "venta del local está" : "ventas del local están"} con el precio equivocado
+          </div>
+          <div style={{ fontSize: 12.5, color: C.ink2, lineHeight: 1.5, marginBottom: 11 }}>
+            Quedaron guardadas al precio que cobró el Búnker, no al tuyo. Por eso la
+            caja está {difBodega >= 0 ? "inflada" : "corta"} en <b>{fmt(Math.abs(difBodega))}</b>.
+            Corregirlas cambia el saldo — es tu libro, tú decides.
+          </div>
+          <button
+            onClick={() => repararVentasBodega(arreglosBodega)}
+            style={{ ...btnPrimary({ width: "100%" }), background: C.red, boxShadow: "none" }}
+          >
+            Corregir {arreglosBodega.length === 1 ? "esa venta" : "esas " + arreglosBodega.length + " ventas"}
+          </button>
+        </div>
+      )}
+
       {/* ---- Estado de cuenta (como el Excel, lo más reciente arriba) ---- */}
       <div style={{ ...eyebrow(C.ink2), padding: "0 4px", marginBottom: 8 }}>Estado de cuenta</div>
       {filasR.length === 0 && (
@@ -5226,29 +6771,105 @@ function Caja({ sales, gastos, persistGastos, addGasto, showToast }) {
             : 'No hay movimientos en este periodo. Toca "Todo" para ver el historial completo.'}
         />
       )}
-      {filasR.slice(0, mostrar).map((m) => (
-        <div
-          key={m.tipo === "gasto" ? m.gasto.id : "v" + m.fecha}
-          onClick={m.tipo === "gasto" ? () => { setConfirmDel(false); setActionGasto(m.gasto); } : undefined}
-          style={cardStyle({ padding: "12px 14px", marginBottom: 8, cursor: m.tipo === "gasto" ? "pointer" : "default", display: "flex", alignItems: "center", gap: 10 })}
-        >
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontWeight: 800, fontSize: 13.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {m.desc}
-              {m.tipo === "gasto" && m.gasto.auto && (
-                <span style={{ marginLeft: 6, background: C.accentSoft, color: C.accent, fontWeight: 800, fontSize: 9.5, padding: "2px 7px", borderRadius: 99, letterSpacing: "0.05em" }}>AUTO</span>
+      {filasR.slice(0, mostrar).map((m) => {
+        const esVenta = m.tipo === "venta";
+        const items = esVenta ? (paresDia[m.fecha] || []) : [];
+        const abierto = esVenta && diaAbierto === m.fecha;
+        const paresDelDia = items.reduce((a, s) => a + qty(s), 0);
+        return (
+          <div
+            key={m.tipo === "gasto" ? m.gasto.id : "v" + m.fecha}
+            style={cardStyle({ padding: 0, marginBottom: 8, overflow: "hidden" })}
+          >
+            <div
+              onClick={esVenta
+                ? () => setDiaAbierto(abierto ? null : m.fecha)
+                : () => { setConfirmDel(false); setActionGasto(m.gasto); }}
+              className="vm-press"
+              style={{ padding: "12px 14px", cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}
+            >
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 800, fontSize: 13.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {m.desc}
+                  {m.tipo === "gasto" && m.gasto.auto && (
+                    <span style={{ marginLeft: 6, background: C.accentSoft, color: C.accent, fontWeight: 800, fontSize: 9.5, padding: "2px 7px", borderRadius: 99, letterSpacing: "0.05em" }}>AUTO</span>
+                  )}
+                </div>
+                <div style={{ fontSize: 11.5, color: C.muted, marginTop: 2, fontWeight: 600 }}>
+                  {formatDate(m.fecha)}
+                  {esVenta && paresDelDia > 0 && " · " + paresDelDia + (paresDelDia === 1 ? " par" : " pares")}
+                </div>
+              </div>
+              <div style={{ textAlign: "right", flexShrink: 0 }}>
+                <div style={{ fontWeight: 800, fontSize: 14.5, color: m.entrada ? C.green : C.red }}>
+                  {m.entrada ? "+" + fmt(m.entrada) : "−" + fmt(m.salida)}
+                </div>
+                <div style={{ fontSize: 11, color: C.muted, marginTop: 2, fontWeight: 600 }}>saldo {fmtS(m.total)}</div>
+              </div>
+              {/* La flecha es la única señal de que el renglón se abre: sin ella
+                  nadie descubre el detalle (el renglón se veía igual que antes). */}
+              {esVenta && (
+                <div style={{
+                  color: C.muted, flexShrink: 0, fontSize: 11, fontWeight: 800,
+                  transform: abierto ? "rotate(180deg)" : "none", transition: "transform .2s ease",
+                }}>▼</div>
               )}
             </div>
-            <div style={{ fontSize: 11.5, color: C.muted, marginTop: 2, fontWeight: 600 }}>{formatDate(m.fecha)}</div>
+
+            {abierto && (
+              <div style={{ borderTop: "1px solid " + C.line, background: C.bg, padding: "4px 14px 10px" }}>
+                {!items.length && (
+                  <div style={{ fontSize: 12.5, color: C.muted, padding: "10px 0", fontWeight: 600 }}>
+                    Ese día no quedó registrada ninguna venta con detalle.
+                  </div>
+                )}
+                {items.map((s) => {
+                  const p = prodPorId[s.productoId];
+                  const ref = (p && p.referencia) || "";
+                  const nombre = (p && p.modelo) || s.modelo || "Sin nombre";
+                  const color = (p && p.color) || "";
+                  const talla = s.talla || (p && p.talla) || "";
+                  const cant = qty(s);
+                  const gan = (num(s.precio) - num(s.costo)) * cant;
+                  return (
+                    <div key={s.id} style={{
+                      display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10,
+                      padding: "9px 0", borderBottom: "1px solid " + C.line,
+                    }}>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontWeight: 700, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                          {ref ? ref + " · " : ""}{nombre}{color ? " " + color : ""}
+                        </div>
+                        <div style={{ fontSize: 11.5, color: C.muted, marginTop: 2, fontWeight: 600 }}>
+                          {talla ? "talla " + talla : "sin talla"}{cant > 1 ? " · " + cant + " pares" : ""}
+                        </div>
+                      </div>
+                      {/* El precio es el de la bodega (lo que te pagan) y debajo lo
+                          que ese par te dejó. La Caja es solo de socios, así que el
+                          costo no se le escapa a nadie. */}
+                      <div style={{ textAlign: "right", flexShrink: 0 }}>
+                        <div style={{ fontWeight: 800, fontSize: 13.5 }}>{fmt(num(s.precio) * cant)}</div>
+                        <div style={{ fontSize: 11.5, fontWeight: 700, marginTop: 2, color: gan >= 0 ? C.green : C.red }}>
+                          {(gan >= 0 ? "+" : "−") + fmt(Math.abs(gan))}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+                {!!items.length && (
+                  <div style={{ display: "flex", justifyContent: "space-between", paddingTop: 9, fontSize: 12, fontWeight: 700, color: C.ink2 }}>
+                    <span>{paresDelDia} {paresDelDia === 1 ? "par" : "pares"} ese día</span>
+                    <span>
+                      {fmt(m.entrada)}
+                      <b style={{ color: C.green }}>{"  ·  " + fmt(items.reduce((a, s) => a + (num(s.precio) - num(s.costo)) * qty(s), 0))}</b>
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
-          <div style={{ textAlign: "right", flexShrink: 0 }}>
-            <div style={{ fontWeight: 800, fontSize: 14.5, color: m.entrada ? C.green : C.red }}>
-              {m.entrada ? "+" + fmt(m.entrada) : "−" + fmt(m.salida)}
-            </div>
-            <div style={{ fontSize: 11, color: C.muted, marginTop: 2, fontWeight: 600 }}>saldo {fmtS(m.total)}</div>
-          </div>
-        </div>
-      ))}
+        );
+      })}
       {filasR.length > mostrar ? (
         <button onClick={() => setMostrar(mostrar + 60)} style={btnGhost({ width: "100%", padding: "12px", marginBottom: 8 })}>
           Ver movimientos anteriores ({filasR.length - mostrar} más)
@@ -5407,7 +7028,7 @@ const FILTROS_PEDIDO = [
 // local, bodegas (proveedores), pagos a esas bodegas y gastos del local.
 // Nada de aquí toca el inventario, las ventas ni la caja de VarMan Crew.
 
-const emptyBkVenta = () => ({ fecha: hoyLocal(), desc: "", talla: "", proveedor: "", compra: "", venta: "", medio: "efectivo" });
+const emptyBkVenta = () => ({ fecha: hoyLocal(), desc: "", talla: "", proveedor: "", compra: "", venta: "", medio: "efectivo", productoId: "" });
 const emptyBkPago = () => ({ fecha: hoyLocal(), monto: "", medio: "efectivo", nota: "" });
 const emptyBkGastoBk = () => ({ fecha: hoyLocal(), desc: "", monto: "", categoria: "cajamenor" });
 
@@ -5600,10 +7221,63 @@ const compactoCOP = (n) => {
   return "$" + Math.round(n);
 };
 
-function Bunker({ ventas, proveedores, pagos, gastos, persistBunker, importarBunker, showToast, userEmail, error }) {
+function Bunker({ ventas, proveedores, pagos, gastos, persistBunker, importarBunker, showToast, userEmail, error, products = [], sales = [], persist }) {
   const num = (x) => Number(x) || 0;
   const qty = (v) => num(v.cantidad) || 1;
   const fmtS = (n) => (n < 0 ? "−" + fmt(-n) : fmt(n));
+
+  // ---------- Cruce con VarMan (bodega VARMAN, ver nota 2026-08-18 arriba) ----------
+  const bodegaVarmanId = (proveedores.find((p) => bkSlug(p.nombre) === "varman") || {}).id || "";
+
+  // Descuenta el stock real y crea el reflejo en `sales`, para que la venta
+  // se vea en el resto de la app (panel del día, Stats, exportar) igual que
+  // si se hubiera registrado desde la antigua pestaña Ventas.
+  // [2026-08-27] El precio que entra a la caja de VarMan es `compra`, NO `venta`.
+  // En consignación el local le paga a la bodega el precio de la bodega
+  // (`compra`, que aquí es el precio de catálogo de VarMan) y se queda con la
+  // diferencia. Guardar `venta` metía en la caja de VarMan la plata de Andrés:
+  // inflaba ventas, ganancia bruta, el saldo corrido y las Stats. `ventaLocal`
+  // se conserva solo como dato, para poder mirar a cuánto revendió el local.
+  const registrarVentaVarman = (productoId, precioBodega, fecha, ventaLocal) => {
+    const prod = products.find((p) => p.id === productoId);
+    if (!prod || !persist) return null;
+    const nextProducts = products.map((p) =>
+      p.id === productoId ? { ...p, stock: Math.max(0, (Number(p.stock) || 0) - 1) } : p
+    );
+    const ventaId = "s" + Date.now() + Math.floor(Math.random() * 999) + "bk";
+    const nextSales = [
+      ...sales,
+      {
+        id: ventaId,
+        productoId,
+        fecha: fecha || hoyLocal(),
+        cliente: "",
+        modelo: prod.modelo,
+        talla: prod.talla,
+        precio: Number(precioBodega) || 0,
+        ventaLocal: Number(ventaLocal) || 0,
+        cantidad: 1,
+        costo: Number(prod.costo) || 0,
+        canal: "Búnker",
+        origen: "bunker",
+        vendedor: userEmail || "",
+      },
+    ];
+    persist(nextProducts, nextSales);
+    return ventaId;
+  };
+
+  // Devuelve el stock y borra el reflejo en `sales` (al borrar o desvincular
+  // una venta de Búnker que sí había descontado inventario real).
+  const revertirVentaVarman = (ventaVarmanId) => {
+    if (!ventaVarmanId || !persist) return;
+    const s = sales.find((x) => x.id === ventaVarmanId);
+    if (!s || s.anulada) return; // ya anulada por un socio: el stock ya se repuso
+    const nextProducts = s.productoId
+      ? products.map((p) => (p.id === s.productoId ? { ...p, stock: (Number(p.stock) || 0) + (Number(s.cantidad) || 1) } : p))
+      : products;
+    persist(nextProducts, sales.filter((x) => x.id !== ventaVarmanId));
+  };
 
   const [vista, setVista] = useState("resumen"); // resumen | ventas | bodegas | gastos
   const [periodo, setPeriodo] = useState("mes"); // hoy | semana | mes | mesPasado | todo | custom
@@ -5622,6 +7296,14 @@ function Bunker({ ventas, proveedores, pagos, gastos, persistBunker, importarBun
   const [buscar, setBuscar] = useState("");
   const [mostrarVentas, setMostrarVentas] = useState(60);
   const [confirmBorrar, setConfirmBorrar] = useState(null); // {que, item}
+  // Buscador de producto real cuando la bodega elegida es VARMAN (en vez de
+  // escribir la descripción a mano: así se sabe exactamente qué descontar).
+  const [pqVarman, setPqVarman] = useState("");
+  const [showSugVarman, setShowSugVarman] = useState(false);
+  const sugerenciasVarman = !pqVarman.trim() ? [] : products
+    .filter((p) => (Number(p.stock) || 0) > 0)
+    .filter((p) => normTxt(p.referencia + " " + p.modelo + " " + p.color + " " + p.talla).includes(normTxt(pqVarman)))
+    .slice(0, 30);
 
   // ---------- Rango de fechas ----------
   const pad2 = (n) => String(n).padStart(2, "0");
@@ -5745,9 +7427,15 @@ function Bunker({ ventas, proveedores, pagos, gastos, persistBunker, importarBun
 
   const guardarVenta = () => {
     const d = formVenta.draft;
+    if (!d.proveedor) return showToast("Elige de qué bodega es.", true);
+    const esVarman = d.proveedor === bodegaVarmanId;
+    // Venta NUEVA de la bodega VARMAN: hay que saber EXACTAMENTE qué producto
+    // real se descuenta, así que no basta con texto libre (ver buscador abajo).
+    if (esVarman && !formVenta.editId && !d.productoId) {
+      return showToast("Elige el producto del inventario de VarMan en la lista.", true);
+    }
     const compra = Math.round(num(d.compra)), venta = Math.round(num(d.venta));
     if (!d.desc.trim()) return showToast("Escribe qué se vendió.", true);
-    if (!d.proveedor) return showToast("Elige de qué bodega es.", true);
     if (compra <= 0 || venta <= 0) return showToast("El precio de compra y el de venta deben ser mayores a 0.", true);
     const base = {
       fecha: d.fecha || hoyLocal(),
@@ -5760,18 +7448,52 @@ function Bunker({ ventas, proveedores, pagos, gastos, persistBunker, importarBun
       medio: d.medio || "efectivo",
     };
     if (formVenta.editId) {
+      const vOriginal = ventas.find((v) => v.id === formVenta.editId);
+      let productoId = vOriginal ? vOriginal.productoId || "" : "";
+      let ventaVarmanId = vOriginal ? vOriginal.ventaVarmanId || null : null;
+      if (vOriginal && ventaVarmanId) {
+        if (esVarman) {
+          // Sigue siendo VarMan: el reflejo en `sales` se actualiza
+          // (fecha/precio/talla) pero el STOCK no se vuelve a tocar —
+          // cambiar de producto a mano en una edición no está permitido
+          // (ver el bloque de solo-lectura de arriba).
+          const sOriginal = sales.find((s) => s.id === ventaVarmanId);
+          if (sOriginal && !sOriginal.anulada && persist) {
+            persist(products, sales.map((s) => (s.id === ventaVarmanId
+              ? { ...s, fecha: base.fecha, precio: compra, ventaLocal: venta, talla: base.talla || s.talla }
+              : s)));
+          }
+        } else {
+          // Le cambiaron la bodega a una que ya no es VarMan: se revierte el
+          // cruce por completo (devuelve stock, borra el reflejo) — si no,
+          // quedaría una venta de otra bodega apuntando a un producto VarMan.
+          revertirVentaVarman(ventaVarmanId);
+          productoId = "";
+          ventaVarmanId = null;
+        }
+      }
       // Si la venta venía del Excel con el pago PARTIDO ("mixto") y no se le
       // cambió el medio, se conserva el desglose original; si eligió un medio
       // concreto, el desglose deja de tener sentido y se limpia.
       persistBunker("ventas", ventas.map((v) => (v.id === formVenta.editId
-        ? { ...v, ...base, partes: base.medio === "mixto" ? v.partes || null : null }
+        ? { ...v, ...base, partes: base.medio === "mixto" ? v.partes || null : null, productoId, ventaVarmanId }
         : v)));
       showToast("Venta actualizada ✓");
     } else {
-      persistBunker("ventas", [...ventas, { ...base, id: nuevoId("bv"), origen: "app", creado: new Date().toISOString(), creadoPor: userEmail || "" }]);
-      showToast("Venta registrada · utilidad " + fmt(venta - compra) + " ✓");
+      let ventaVarmanId = null;
+      if (esVarman && d.productoId) {
+        ventaVarmanId = registrarVentaVarman(d.productoId, compra, base.fecha, venta);
+        if (!ventaVarmanId) return showToast("Ese producto ya no existe en el inventario de VarMan.", true);
+      }
+      persistBunker("ventas", [...ventas, {
+        ...base, id: nuevoId("bv"), origen: "app", creado: new Date().toISOString(), creadoPor: userEmail || "",
+        productoId: d.productoId || "", ventaVarmanId,
+      }]);
+      showToast(esVarman ? "Venta registrada · stock de VarMan descontado ✓" : "Venta registrada · utilidad " + fmt(venta - compra) + " ✓");
     }
     setFormVenta(null);
+    setPqVarman("");
+    setShowSugVarman(false);
   };
 
   const guardarPago = () => {
@@ -5841,7 +7563,14 @@ function Bunker({ ventas, proveedores, pagos, gastos, persistBunker, importarBun
 
   const borrar = () => {
     const { que, item } = confirmBorrar;
-    if (que === "ventas") persistBunker("ventas", ventas.filter((v) => v.id !== item.id));
+    if (que === "ventas") {
+      // Si esta venta había descontado stock real de VarMan, devolverlo y
+      // borrar su reflejo en `sales` — si no, el par quedaría descontado
+      // para siempre aunque la venta de Búnker ya no exista.
+      const v = ventas.find((x) => x.id === item.id);
+      if (v && v.ventaVarmanId) revertirVentaVarman(v.ventaVarmanId);
+      persistBunker("ventas", ventas.filter((v) => v.id !== item.id));
+    }
     if (que === "pagos") persistBunker("pagos", pagos.filter((p) => p.id !== item.id));
     if (que === "gastos") persistBunker("gastos", gastos.filter((g) => g.id !== item.id));
     if (que === "proveedores") {
@@ -6270,7 +7999,7 @@ function Bunker({ ventas, proveedores, pagos, gastos, persistBunker, importarBun
       {vista === "ventas" && (
         <div>
           <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-            <button onClick={() => setFormVenta({ draft: { ...emptyBkVenta(), proveedor: bodegasActivas.length === 1 ? bodegasActivas[0].id : "" }, editId: null })} style={btnPrimary({ flex: 1 })}>
+            <button onClick={() => { setFormVenta({ draft: { ...emptyBkVenta(), proveedor: bodegasActivas.length === 1 ? bodegasActivas[0].id : "" }, editId: null }); setPqVarman(""); setShowSugVarman(false); }} style={btnPrimary({ flex: 1 })}>
               + Registrar venta
             </button>
           </div>
@@ -6298,10 +8027,10 @@ function Bunker({ ventas, proveedores, pagos, gastos, persistBunker, importarBun
                   {d.items.map((v, i) => (
                     <button
                       key={v.id}
-                      onClick={() => setFormVenta({
-                        draft: { fecha: v.fecha, desc: v.desc, talla: v.talla || "", proveedor: v.proveedor, compra: v.compra, venta: v.venta, medio: v.medio || "efectivo" },
+                      onClick={() => { setFormVenta({
+                        draft: { fecha: v.fecha, desc: v.desc, talla: v.talla || "", proveedor: v.proveedor, compra: v.compra, venta: v.venta, medio: v.medio || "efectivo", productoId: v.productoId || "" },
                         editId: v.id,
-                      })}
+                      }); setPqVarman(""); setShowSugVarman(false); }}
                       className="vm-press"
                       style={{
                         width: "100%", textAlign: "left", border: "none", background: "transparent", cursor: "pointer",
@@ -6474,32 +8203,113 @@ function Bunker({ ventas, proveedores, pagos, gastos, persistBunker, importarBun
           <Field label="Fecha">
             <input type="date" value={formVenta.draft.fecha} onChange={(e) => setFormVenta({ ...formVenta, draft: { ...formVenta.draft, fecha: e.target.value } })} style={inputStyle()} />
           </Field>
-          <Field label="Qué se vendió (referencia)">
-            <input
-              value={formVenta.draft.desc}
-              onChange={(e) => setFormVenta({ ...formVenta, draft: { ...formVenta.draft, desc: e.target.value } })}
-              placeholder="NIKE AIR MAX NEGRO"
+          <Field label="Bodega (proveedor)">
+            <select
+              value={formVenta.draft.proveedor}
+              onChange={(e) => {
+                // Cambiar de/hacia VARMAN limpia lo elegido: no tiene sentido
+                // mezclar un texto libre con un producto real del inventario.
+                setFormVenta({ ...formVenta, draft: { ...formVenta.draft, proveedor: e.target.value, productoId: "", desc: "", talla: "" } });
+                setPqVarman(""); setShowSugVarman(false);
+              }}
               style={inputStyle()}
-            />
+            >
+              <option value="">Elegir…</option>
+              {bodegasActivas.map((p) => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+              {formVenta.draft.proveedor && provPorId[formVenta.draft.proveedor] && provPorId[formVenta.draft.proveedor].activo === false && (
+                <option value={formVenta.draft.proveedor}>{provPorId[formVenta.draft.proveedor].nombre} (inactiva)</option>
+              )}
+            </select>
           </Field>
-          <div style={{ display: "flex", gap: 8 }}>
-            <div style={{ width: 110 }}>
-              <Field label="Talla">
-                <input value={formVenta.draft.talla} inputMode="numeric" onChange={(e) => setFormVenta({ ...formVenta, draft: { ...formVenta.draft, talla: e.target.value } })} style={inputStyle()} />
-              </Field>
-            </div>
-            <div style={{ flex: 1 }}>
-              <Field label="Bodega (proveedor)">
-                <select value={formVenta.draft.proveedor} onChange={(e) => setFormVenta({ ...formVenta, draft: { ...formVenta.draft, proveedor: e.target.value } })} style={inputStyle()}>
-                  <option value="">Elegir…</option>
-                  {bodegasActivas.map((p) => <option key={p.id} value={p.id}>{p.nombre}</option>)}
-                  {formVenta.draft.proveedor && provPorId[formVenta.draft.proveedor] && provPorId[formVenta.draft.proveedor].activo === false && (
-                    <option value={formVenta.draft.proveedor}>{provPorId[formVenta.draft.proveedor].nombre} (inactiva)</option>
+          {/* [2026-08-18] Bodega VARMAN: hay que elegir el producto REAL del
+              inventario (para saber qué descontar), no escribirlo a mano. */}
+          {formVenta.draft.proveedor && formVenta.draft.proveedor === bodegaVarmanId ? (
+            <Field label="Qué se vendió (del inventario de VarMan)">
+              {formVenta.editId && formVenta.draft.productoId ? (
+                // El producto de una venta YA GUARDADA no se cambia editando
+                // (mezclaría el ajuste de stock de dos productos distintos).
+                // Para cambiarlo: borrar esta venta y registrar una nueva.
+                <div style={{ background: C.bg, border: `1.5px solid ${C.line}`, borderRadius: 12, padding: "11px 13px", fontSize: 13.5 }}>
+                  <b>{formVenta.draft.desc}</b>{formVenta.draft.talla ? " · talla " + formVenta.draft.talla : ""}
+                  <div style={{ fontSize: 11.5, color: C.muted, marginTop: 4 }}>
+                    Si vendiste otra cosa: borra esta venta y registra una nueva.
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <input
+                    value={pqVarman}
+                    onChange={(e) => { setPqVarman(e.target.value); setShowSugVarman(true); }}
+                    onFocus={() => setShowSugVarman(true)}
+                    placeholder="Escribe el modelo o la referencia…"
+                    style={inputStyleBuscador(showSugVarman && !!pqVarman.trim())}
+                  />
+                  {formVenta.draft.productoId && !pqVarman.trim() && (
+                    <div style={{ fontSize: 12, color: C.green, fontWeight: 700, marginTop: 5 }}>
+                      ✓ {formVenta.draft.desc}{formVenta.draft.talla ? " · talla " + formVenta.draft.talla : ""}
+                    </div>
                   )}
-                </select>
+                  {showSugVarman && pqVarman.trim() && (
+                    <div style={{ maxHeight: 220, overflowY: "auto", border: `1.5px solid ${C.line}`, borderTop: "none", borderBottomLeftRadius: 12, borderBottomRightRadius: 12, marginBottom: 4 }}>
+                      {sugerenciasVarman.length === 0 ? (
+                        <div style={{ padding: "10px 13px", fontSize: 12.5, color: C.muted }}>Sin coincidencias con stock.</div>
+                      ) : sugerenciasVarman.map((p, i) => (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => {
+                            setFormVenta({
+                              ...formVenta,
+                              draft: {
+                                ...formVenta.draft,
+                                productoId: p.id,
+                                desc: ((p.modelo || "").toUpperCase() + (p.color ? " " + p.color.toUpperCase() : "")).trim(),
+                                talla: String(p.talla || ""),
+                                // [2026-08-18 fix] "precio de compra" en Búnker es lo que le
+                                // cuesta al LOCAL conseguir el par de la bodega VARMAN — el
+                                // precio de catálogo de VarMan (p.precio), NUNCA el costo
+                                // interno de fabricación (p.costo, dato privado de VarMan que
+                                // no tiene nada que hacer en el libro de otro negocio). Así se
+                                // registraban las ventas de siempre (confirmado contra el
+                                // histórico: "compra" coincide con el precio de catálogo).
+                                compra: formVenta.draft.compra || (p.precio != null && p.precio !== "" ? String(p.precio) : ""),
+                                venta: formVenta.draft.venta || (p.precio != null && p.precio !== "" ? String(p.precio) : ""),
+                              },
+                            });
+                            setPqVarman("");
+                            setShowSugVarman(false);
+                          }}
+                          style={{
+                            display: "block", width: "100%", textAlign: "left", cursor: "pointer",
+                            border: "none", borderTop: i ? `1px solid ${C.line}` : "none", background: "transparent",
+                            padding: "10px 13px", fontFamily: "Inter, sans-serif", fontSize: 13, color: C.ink,
+                          }}
+                        >
+                          <b>{p.referencia || p.modelo}</b>{p.referencia && p.modelo ? " — " + p.modelo : ""}{p.color ? " " + p.color : ""} · talla {p.talla} · quedan {p.stock}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </Field>
+          ) : (
+            <>
+              <Field label="Qué se vendió (referencia)">
+                <input
+                  value={formVenta.draft.desc}
+                  onChange={(e) => setFormVenta({ ...formVenta, draft: { ...formVenta.draft, desc: e.target.value } })}
+                  placeholder="NIKE AIR MAX NEGRO"
+                  style={inputStyle()}
+                />
               </Field>
-            </div>
-          </div>
+              <div style={{ width: 110 }}>
+                <Field label="Talla">
+                  <input value={formVenta.draft.talla} inputMode="numeric" onChange={(e) => setFormVenta({ ...formVenta, draft: { ...formVenta.draft, talla: e.target.value } })} style={inputStyle()} />
+                </Field>
+              </div>
+            </>
+          )}
           <div style={{ display: "flex", gap: 8 }}>
             <div style={{ flex: 1 }}>
               <Field label="Precio de compra">
@@ -7748,6 +9558,18 @@ const inputStyle = (extra = {}) => ({
   ...extra,
 });
 
+// [2026-08-18] Input que hace de "cabecera" de una lista desplegable debajo
+// (buscador con sugerencias, sin lista mientras no hay texto). No se puede
+// lograr pasándole las esquinas sueltas a inputStyle(): quedaría el
+// `borderRadius` corto de inputStyle Y las esquinas largas en el mismo
+// objeto, y React avisa por mezclar shorthand con longhand (bug real que
+// salió en la prueba en el navegador, no solo cosmético).
+const inputStyleBuscador = (abierto) => {
+  const s = inputStyle();
+  delete s.borderRadius;
+  return { ...s, borderTopLeftRadius: 12, borderTopRightRadius: 12, borderBottomLeftRadius: abierto ? 0 : 12, borderBottomRightRadius: abierto ? 0 : 12 };
+};
+
 const btnPrimary = (extra = {}) => ({
   background: C.accent,
   color: "#fff",
@@ -7852,7 +9674,9 @@ function IconDownload() {
 
 // Botón de exportar: verde estilo Excel, con icono de descarga y texto claro.
 // El archivo que baja es un CSV que Excel abre directo.
-function BotonExportar({ onClick }) {
+// `label` se usa donde el botón comparte fila con otro de descarga (Inventario
+// tiene también PDF): con el texto largo la fila se parte en 375px.
+function BotonExportar({ onClick, label }) {
   return (
     <button
       onClick={onClick}
@@ -7866,7 +9690,7 @@ function BotonExportar({ onClick }) {
       }}
     >
       <IconDownload />
-      Exportar Excel
+      {label || "Exportar Excel"}
     </button>
   );
 }

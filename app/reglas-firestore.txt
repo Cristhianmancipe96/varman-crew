@@ -1,6 +1,15 @@
-REGLAS DE FIRESTORE — VarMan Crew (actualizadas 2026-08-12: se agregó el LOCAL
+REGLAS DE FIRESTORE — VarMan Crew (actualizadas 2026-08-27: se agregó la
+colección `conteos` — el DÍA DE INVENTARIO, la sesión de conteo físico de la
+bodega. La escribe todo el EQUIPO: cualquiera cuenta y cualquiera cierra, por
+decisión del dueño; el acta guarda quién lo hizo. SIN ESTA REGLA el conteo
+parece funcionar pero no guarda nada en la nube — la app ahora avisa en rojo,
+pero igual toca pegarla.
+Antes 2026-08-18: se agregó el
+vendedor [varmansneakersandclothes@gmail.com] a esBunker() — con Ventas
+tradicional retirada de la app, registra ahí toda venta física de VarMan.
+Antes 2026-08-12: se agregó el LOCAL
 BÚNKER — cuatro colecciones nuevas [bunkerVentas, bunkerProveedores,
-bunkerPagos, bunkerGastos] que SOLO pueden leer/escribir los dos correos de
+bunkerPagos, bunkerGastos] que SOLO pueden leer/escribir los correos de
 esBunker(). Sin estas reglas la pestaña Búnker sale vacía con error de
 permisos. Antes 2026-07-18: se agregó botConfig
 — la app elige la "referencia de la publicación" que el bot responde a "precio"
@@ -64,16 +73,20 @@ service cloud.firestore {
     }
 
     // LOCAL BÚNKER (2026-08-12): el local del socio es un libro APARTE del
-    // negocio de VarMan Crew. Solo estos correos lo ven. Ojo: son datos de
-    // OTRO negocio (costos de compra de 8 bodegas y lo que se les debe), por
-    // eso NO se usa esEquipo() — el vendedor no tiene nada que hacer aquí.
+    // negocio de VarMan Crew. Ojo: son datos de OTRO negocio (costos de
+    // compra de 8 bodegas y lo que se les debe).
+    // [2026-08-18] Se agregó el vendedor: con la pestaña Ventas tradicional
+    // retirada, toda venta física de VarMan se registra aquí (bodega VARMAN),
+    // así que necesita entrar. Esto le da acceso COMPLETO a Búnker, incluidas
+    // las otras 7 bodegas del local — no solo lo de VarMan.
     // Si cambia, hay que actualizarlo en DOS lugares: aquí y SOCIOS_BUNKER
     // al inicio de app.jsx.
     function esBunker() {
       return request.auth != null
         && request.auth.token.email in [
           'andresvargasm91@gmail.com',
-          'c.mancipe.96@gmail.com'
+          'c.mancipe.96@gmail.com',
+          'varmansneakersandclothes@gmail.com'
         ];
     }
 
@@ -181,6 +194,13 @@ service cloud.firestore {
       match /bunkerProveedores/{doc} { allow read, write: if esBunker(); }
       match /bunkerPagos/{doc}       { allow read, write: if esBunker(); }
       match /bunkerGastos/{doc}      { allow read, write: if esBunker(); }
+
+      // ---- NUEVA 2026-08-27: DÍA DE INVENTARIO ----
+      // Cada documento es una sesión de conteo físico: qué se contó, quién lo
+      // contó y el acta con las diferencias al cerrar. Es esEquipo() y no
+      // esSocio() porque el que cuenta la bodega es el vendedor; el rastro de
+      // quién cerró y qué ajustó queda dentro del documento.
+      match /conteos/{doc} { allow read, write: if esEquipo(); }
 
       match /botConfig/{doc} {
         allow read:  if esEquipo();
