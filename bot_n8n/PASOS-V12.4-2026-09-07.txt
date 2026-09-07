@@ -6,13 +6,13 @@ Palabra que solo existe desde esta version: BOT_MENU_CANDIDATAS.
 Incluye la v12.3 (subida 11:59, sin promos) y la v12.2 (saludo + link del 320).
 
 Que cambia respecto a la v12.2 que quedo a las 11:19:
-  1. SIN PROMOS (v12.3, orden del dueno: "no quiero nada de promos"). Fuera
-     fmtPrecioPromo y BOT_PROMO_CATALOGO del bot; la ficha dice el precio y
-     nada mas aunque el catalogo traiga un precioAntes viejo (prueba P55).
-     Lo mismo se quito de la web (web/publicar/index.html vuelve al commit
-     d3255f5) y de la app (app/app.jsx: fuera el campo "Descuento (%)", el
-     precio tachado y la insignia -NN%). OJO: web y app se suben aparte
-     (Cloudflare Pages, arrastrar carpeta) - ver PENDIENTE abajo.
+  1. EL BOT NO OFRECE PROMOS (v12.3). Aclaracion del dueno (7-sep 12:25):
+     "solo quiero poder hacer los descuentos como ya los estoy haciendo en
+     la app, no que el bot los ofrezca". Entonces: la app conserva el campo
+     "Descuento (%)" y la web el precio tachado (los dos ya estan asi en
+     produccion, NO hay nada que subir); los 46 precios rebajados se quedan.
+     Del bot salen fmtPrecioPromo y BOT_PROMO_CATALOGO: la ficha dice el
+     precio vigente y nada mas, sin "antes", sin % (prueba P55).
   2. MENU DE BOTONES (v12.4). Cuando el bot manda DOS fichas candidatas
      (mostrar_candidatas), debajo va un mensaje con tres botones:
        [Rosada · $215.920]  [Rosado · $242.910]  [Ninguna de las dos]
@@ -45,14 +45,8 @@ PRUEBA EN VIVO (desde un TERCER numero, no el 320):
      pasa al asesor.
   6. Ficha de cualquier modelo: solo precio, sin "antes" ni %.
 
-PENDIENTE (no lo hace el bot):
-  - Subir web\publicar a Cloudflare Pages (proyecto varmancrew) y app\ (con
-    vendor\) al proyecto varmanapp: hoy en internet TODAVIA estan con promo
-    (comprobado: el index.html y el app.jsx de produccion son los de la promo).
-  - Los precios de las refs que tenian promo quedaron guardados como el precio
-    REBAJADO (ej. Puma ballet rosada $215.920 = 269.900 - 20%). Decision del
-    dueno: dejarlos asi o volver al precio de lista (se puede hacer desde la
-    app editando cada ref, o en lote por Firestore con precioAntes -> precio).
+NOTA: web y app NO se tocan (decision del dueno): en git vuelven a ser
+identicas a lo que corre en Cloudflare (commit 9181fd2 revierte el retiro).
 
 ROLLBACK (un comando, en la VM):
   cd ~/varman-bot && cp ~/bot-varman-ARCHIVO-ANTES-DE-v12.4-2026-09-07.json workflows/bot-varman.json && docker compose stop n8n && docker compose run --rm --no-deps -u node n8n import:workflow --input=/workflows/bot-varman.json && docker compose run --rm --entrypoint n8n n8n publish:workflow --id=VarmanBotV4Ped01 && docker compose start n8n
