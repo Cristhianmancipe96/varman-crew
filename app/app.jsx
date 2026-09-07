@@ -5646,12 +5646,18 @@ function TiendaWeb({ showToast, products }) {
   };
   const abrirEditar = (p) => {
     setConfirmDel(false);
-    // (7-sep) Sin promos: el precio que se ve es el que se cobra. Si el doc
-    // trae un precioAntes viejo (de la promo que se quitó), se ignora y al
-    // guardar desaparece (el set() de abajo escribe solo los campos que van).
+    // Promo (03-bis): si hay precioAntes > precio, el input "Precio" vuelve a
+    // mostrar el precio DE LISTA (no el rebajado) y el % se recalcula para
+    // que el dueño lo vea y lo pueda ajustar sin perder la promo.
+    const hayPromo = p.precioAntes && Number(p.precioAntes) > Number(p.precio);
     setSheet({
       esNuevo: false,
-      draft: { ...p, precio: String(p.precio || ""), fotos: (p.fotos || []).map((fid) => ({ fid })), quitadas: [], inv: invDe(p) },
+      draft: {
+        ...p,
+        precio: String((hayPromo ? p.precioAntes : p.precio) || ""),
+        descuentoPct: hayPromo ? String(Math.round((1 - Number(p.precio) / Number(p.precioAntes)) * 100)) : "",
+        fotos: (p.fotos || []).map((fid) => ({ fid })), quitadas: [], inv: invDe(p),
+      },
     });
   };
   const abrirNueva = () => {
@@ -5661,7 +5667,7 @@ function TiendaWeb({ showToast, products }) {
     setConfirmDel(false);
     setSheet({
       esNuevo: true,
-      draft: { id: "c" + ref, ref, cat: "deportivas", precio: "", tag: "Nuevo", orden: minOrden - 1, activo: true, refInventario: "", marca: "", genero: "", tallas: "", fotos: [], quitadas: [], inv: { codigosInv: [], proveedor: "", nota: "" } },
+      draft: { id: "c" + ref, ref, cat: "deportivas", precio: "", descuentoPct: "", tag: "Nuevo", orden: minOrden - 1, activo: true, refInventario: "", marca: "", genero: "", tallas: "", fotos: [], quitadas: [], inv: { codigosInv: [], proveedor: "", nota: "" } },
     });
   };
 
@@ -5701,8 +5707,14 @@ function TiendaWeb({ showToast, products }) {
   const guardar = async () => {
     if (!sheet || progreso) return;
     const d = sheet.draft;
-    const precio = Number(String(d.precio).replace(/[^\d]/g, ""));
-    if (!precio) return showToast("Escribe el precio.", true);
+    // Promo (03-bis): "precio" en el draft es el precio DE LISTA (ver
+    // abrirEditar). Del % de descuento se deriva el precio FINAL, que es el
+    // que de verdad se cobra (bot y checkout leen "precio" tal cual).
+    const precioLista = Number(String(d.precio).replace(/[^\d]/g, ""));
+    if (!precioLista) return showToast("Escribe el precio.", true);
+    const pct = Math.min(90, Math.max(0, Math.round(Number(d.descuentoPct) || 0)));
+    const precioFinal = pct > 0 ? Math.round(precioLista * (100 - pct) / 100) : precioLista;
+    const precioAntes = pct > 0 ? precioLista : "";
     if (!d.fotos.length) return showToast("Añade al menos una foto.", true);
     if (!fbReady()) return showToast("Sin conexión con la nube.", true);
     try {
@@ -5718,7 +5730,7 @@ function TiendaWeb({ showToast, products }) {
       const proveedor = (inv.proveedor || "").trim();
       const tipoMapa = codigos.length && proveedor ? "mixta" : codigos.length ? "propia" : proveedor ? "externa" : "";
       await colRef("catalogo").doc(d.id).set({
-        id: d.id, ref: d.ref, cat: d.cat, precio, tag: d.tag || "",
+        id: d.id, ref: d.ref, cat: d.cat, precio: precioFinal, precioAntes, tag: d.tag || "",
         orden: d.orden || 0, activo: d.activo !== false, fotos: d.fotos.map((f) => f.fid),
         // Compatibilidad ronda 2: refInventario = primer código propio (los
         // pedidos viejos y cualquier código que aún lo lea siguen andando)
@@ -6045,6 +6057,11 @@ function TiendaWeb({ showToast, products }) {
                 const oculta = p.activo === false;
                 const enPauta = refsPautaSel.indexOf(p.ref) >= 0;
                 const sinNombre = !p.marca;
+                // Promo (03-bis): precioAntes solo cuenta si es mayor que el
+                // precio final guardado; si no, la tarjeta se ve igual que
+                // siempre (catálogo viejo sin este campo, cero cambios).
+                const hayPromo = p.precioAntes && Number(p.precioAntes) > Number(p.precio);
+                const pctBadge = hayPromo ? Math.round((1 - Number(p.precio) / Number(p.precioAntes)) * 100) : 0;
                 return (
                   <div
                     key={p.id}
@@ -6086,7 +6103,19 @@ function TiendaWeb({ showToast, products }) {
                         Ref {p.ref} · {catTiendaLabel(p.cat)}
                       </div>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 4 }}>
-                        <div style={{ fontWeight: 800, fontSize: 15, fontVariantNumeric: "tabular-nums" }}>{precioTienda(p.precio)}</div>
+                        <div style={{ display: "flex", alignItems: "baseline", gap: 6, flexWrap: "wrap" }}>
+                          {hayPromo ? (
+                            <span style={{ fontSize: 11, color: C.muted, textDecoration: "line-through", fontVariantNumeric: "tabular-nums" }}>
+                              {precioTienda(p.precioAntes)}
+                            </span>
+                          ) : null}
+                          <span style={{ fontWeight: 800, fontSize: 15, fontVariantNumeric: "tabular-nums" }}>{precioTienda(p.precio)}</span>
+                          {hayPromo ? (
+                            <span style={{ background: C.redSoft, color: C.red, fontWeight: 800, fontSize: 9.5, padding: "1px 6px", borderRadius: 99 }}>
+                              -{pctBadge}%
+                            </span>
+                          ) : null}
+                        </div>
                         <button
                           onClick={(e) => { e.stopPropagation(); toggleActivo(p); }}
                           title={oculta ? "Mostrar en la página" : "Ocultar de la página"}
@@ -6174,11 +6203,44 @@ function TiendaWeb({ showToast, products }) {
               placeholder="299900"
               style={inputStyle()}
             />
-            {sheet.draft.precio ? (
+            {/* Precio SIN descuento (el "de lista"): si hay % de descuento
+                más abajo, lo que de verdad se cobra y se muestra en la
+                página es el precio con descuento (ver preview del campo
+                Descuento) — por eso este aviso solo aparece sin promo. */}
+            {sheet.draft.precio && !(Number(sheet.draft.descuentoPct) > 0) ? (
               <div style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>
                 En la página se verá: <b style={{ color: C.ink }}>{precioTienda(String(sheet.draft.precio).replace(/[^\d]/g, ""))} COP</b>
               </div>
             ) : null}
+            {Number(sheet.draft.descuentoPct) > 0 ? (
+              <div style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>
+                Este es el precio de lista, sin descuento.
+              </div>
+            ) : null}
+          </Field>
+
+          <Field label="Descuento (%)">
+            <input
+              type="number"
+              min="0"
+              max="90"
+              value={sheet.draft.descuentoPct || ""}
+              onChange={(e) => setSheet((s) => ({ ...s, draft: { ...s.draft, descuentoPct: e.target.value } }))}
+              placeholder="0"
+              style={inputStyle()}
+            />
+            {Number(sheet.draft.descuentoPct) > 0 && sheet.draft.precio ? (() => {
+              const lista = Number(String(sheet.draft.precio).replace(/[^\d]/g, ""));
+              const pctPreview = Math.min(90, Math.max(0, Math.round(Number(sheet.draft.descuentoPct) || 0)));
+              const final = Math.round(lista * (100 - pctPreview) / 100);
+              return (
+                <div style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>
+                  Con {pctPreview}% de descuento se ve:{" "}
+                  <span style={{ textDecoration: "line-through", color: C.muted }}>{precioTienda(lista)}</span>{" "}
+                  <b style={{ color: C.ink }}>{precioTienda(final)}</b> en la página
+                </div>
+              );
+            })() : null}
           </Field>
 
           <div style={{ display: "flex", gap: 10 }}>

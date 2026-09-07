@@ -576,6 +576,25 @@ section { padding: var(--s9) var(--s7); }
   font-size: var(--t-sm); color: var(--ink-2);
   font-family: 'Inter', sans-serif;
 }
+/* Promoción: precioAntes > precio (ver contrato de datos del catálogo).
+   .has-promo solo se agrega cuando hay descuento real, así que una tarjeta
+   sin promo queda exactamente igual que antes de este cambio. */
+.prod-price.has-promo {
+  display: flex; align-items: baseline; flex-wrap: wrap;
+  gap: 2px var(--s2);
+}
+.prod-price-old {
+  font-family: 'Inter', sans-serif; font-size: var(--t-xs); font-weight: 500;
+  color: var(--ink-2); text-decoration: line-through;
+  text-decoration-color: oklch(0.72 0.008 40 / 0.55);
+  flex-basis: 100%;
+}
+.prod-badge-desc {
+  font-family: 'Inter', sans-serif; font-size: var(--t-xs); font-weight: 800;
+  color: var(--ink-on-brand); background: var(--brand);
+  padding: 2px 7px; border-radius: 4px; letter-spacing: 0.02em;
+  line-height: 1.4;
+}
 /* Touch target 44×44 */
 .prod-btn {
   width: 44px; height: 44px; border-radius: var(--r-sm);
@@ -3299,6 +3318,15 @@ document.addEventListener('click', function(e){
     prods.forEach(function(p){
       var lbl = LBL[p.cat] || esc(p.cat);
       var precio = fmt(p.precio);
+      // promo: precioAntes solo cuenta si es mayor que el precio real (si no,
+      // no hay descuento que mostrar). El % se deriva, nunca se guarda aparte.
+      var hayPromo = p.precioAntes > p.precio;
+      var pct = hayPromo ? Math.round((1 - p.precio / p.precioAntes) * 100) : 0;
+      var precioHtml = hayPromo
+        ? '<span class="prod-price-old">$ ' + fmt(p.precioAntes) + '</span>'
+          + '<span class="prod-price-now">$ ' + precio + ' <small>COP</small></span>'
+          + '<span class="prod-badge-desc">-' + pct + '%</span>'
+        : '$ ' + precio + ' <small>COP</small>';
       var imgs = '';
       p.fotos.forEach(function(fid, i){
         imgs += '<img class="cv' + (i === 0 ? ' active' : '') + '" src="' + PLACEHOLDER + '" data-foto="' + esc(fid) + '" alt="">';
@@ -3313,7 +3341,7 @@ document.addEventListener('click', function(e){
         + '<div class="prod-img prod-carousel">' + imgs + tag + genChip
         + '<span class="prod-zoom" aria-hidden="true"><i class="ti ti-arrows-maximize"></i></span></div>'
         + '<div class="prod-info"><div class="prod-cat">' + lbl + '</div>'
-        + '<div class="prod-foot"><div class="prod-price">$ ' + precio + ' <small>COP</small></div>'
+        + '<div class="prod-foot"><div class="prod-price' + (hayPromo ? ' has-promo' : '') + '">' + precioHtml + '</div>'
         + '<button class="prod-btn js-wa" data-ref="' + esc(p.ref) + '" data-precio="' + precio + '" aria-label="Pedir por WhatsApp"><i class="ti ti-brand-whatsapp"></i></button>'
         + '</div></div></div>';
     });
@@ -3343,6 +3371,7 @@ document.addEventListener('click', function(e){
         var f = d.fields || {};
         return {
           ref: val(f.ref) || '', cat: val(f.cat) || '', precio: val(f.precio) || 0,
+          precioAntes: val(f.precioAntes) || 0,
           tag: val(f.tag) || '', orden: val(f.orden) || 0,
           activo: val(f.activo) !== false, fotos: val(f.fotos) || [],
           genero: val(f.genero) || '', tallas: val(f.tallas) || ''
