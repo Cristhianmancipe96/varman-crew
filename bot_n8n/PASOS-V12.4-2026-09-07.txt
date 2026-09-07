@@ -1,0 +1,60 @@
+SUBIR EL BOT v12.4 (sin promos + menu de botones bajo las dos candidatas)
+==========================================================================
+7-sep-2026 (tarde). NO toca el .env. Cambia UN nodo (el Cerebro).
+Artefacto: bot-varman-PARA-SUBIR-v12.4-2026-09-07.json - 641.230 bytes, 13 nodos.
+Palabra que solo existe desde esta version: BOT_MENU_CANDIDATAS.
+Incluye la v12.3 (subida 11:59, sin promos) y la v12.2 (saludo + link del 320).
+
+Que cambia respecto a la v12.2 que quedo a las 11:19:
+  1. SIN PROMOS (v12.3, orden del dueno: "no quiero nada de promos"). Fuera
+     fmtPrecioPromo y BOT_PROMO_CATALOGO del bot; la ficha dice el precio y
+     nada mas aunque el catalogo traiga un precioAntes viejo (prueba P55).
+     Lo mismo se quito de la web (web/publicar/index.html vuelve al commit
+     d3255f5) y de la app (app/app.jsx: fuera el campo "Descuento (%)", el
+     precio tachado y la insignia -NN%). OJO: web y app se suben aparte
+     (Cloudflare Pages, arrastrar carpeta) - ver PENDIENTE abajo.
+  2. MENU DE BOTONES (v12.4). Cuando el bot manda DOS fichas candidatas
+     (mostrar_candidatas), debajo va un mensaje con tres botones:
+       [Rosada · $215.920]  [Rosado · $242.910]  [Ninguna de las dos]
+     y la pregunta del modelo va en ese mensaje, no en el pie de la foto.
+     El toque llega como `cand:<ref>` y el Cerebro lo vuelve texto
+     ("Elijo la Puma speedcat ballet rosado (ref 41)"): la ref queda activa,
+     Gemini lo ve en [SESION] (eligio_con_boton) y sigue con la ciudad sin
+     reenviar la ficha. "Ninguna" entra como "Ninguna de las dos es la que
+     busco". Nacio de que el cliente contestaba CITANDO la ficha ("Estas"
+     sobre la foto) y Meta no manda el contenido citado al bot.
+     Flag BOT_MENU_CANDIDATAS: ausente = ON; `off` = sin botones (como antes).
+
+Pruebas: bateria offline 154 PASS / 0 FAIL ($0 de Gemini): P55 (precioAntes
+se ignora), P58 (10 casos: botones, titulos <= 20, toque cand:41, "ninguna",
+flag off) y P27 adaptada (la pregunta ahora vive en el menu).
+
+DESPLIEGUE (remoto desde el PC, con gcloud):
+  scp del JSON a /home/andre/bot-varman-v12.4.json + desplegar-v12.4.sh
+  bash /home/andre/desplegar-v12.4.sh
+  bash /home/andre/verificar-webhook.sh   ("token invalido" = ACTIVO, hasta 8 min)
+
+PRUEBA EN VIVO (desde un TERCER numero, no el 320):
+  1. mancipiola
+  2. "hola precio porfavor" -> saluda y pregunta el modelo (sin "no lo encontre").
+  3. Manda la foto/pantallazo de las Puma ballet rosadas -> dos fichas +
+     el menu de botones debajo.
+  4. Toca [Rosado · $242.910] -> el bot sigue con la ciudad, SIN reenviar la
+     ficha y SIN decir "no entendi".
+  5. (otra conversacion) toca [Ninguna de las dos] -> pide foto/nombre o
+     pasa al asesor.
+  6. Ficha de cualquier modelo: solo precio, sin "antes" ni %.
+
+PENDIENTE (no lo hace el bot):
+  - Subir web\publicar a Cloudflare Pages (proyecto varmancrew) y app\ (con
+    vendor\) al proyecto varmanapp: hoy en internet TODAVIA estan con promo
+    (comprobado: el index.html y el app.jsx de produccion son los de la promo).
+  - Los precios de las refs que tenian promo quedaron guardados como el precio
+    REBAJADO (ej. Puma ballet rosada $215.920 = 269.900 - 20%). Decision del
+    dueno: dejarlos asi o volver al precio de lista (se puede hacer desde la
+    app editando cada ref, o en lote por Firestore con precioAntes -> precio).
+
+ROLLBACK (un comando, en la VM):
+  cd ~/varman-bot && cp ~/bot-varman-ARCHIVO-ANTES-DE-v12.4-2026-09-07.json workflows/bot-varman.json && docker compose stop n8n && docker compose run --rm --no-deps -u node n8n import:workflow --input=/workflows/bot-varman.json && docker compose run --rm --entrypoint n8n n8n publish:workflow --id=VarmanBotV4Ped01 && docker compose start n8n
+Solo apagar el menu (sin volver atras):
+  echo "BOT_MENU_CANDIDATAS=off" >> ~/varman-bot/.env && docker compose up -d

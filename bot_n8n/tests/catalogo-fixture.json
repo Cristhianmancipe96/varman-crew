@@ -12,9 +12,6 @@
     "precio": {
      "integerValue": "250000"
     },
-    "precioAntes": {
-     "integerValue": "312500"
-    },
     "marca": {
      "stringValue": "adidas"
     },

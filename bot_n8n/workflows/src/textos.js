@@ -929,6 +929,13 @@ Object.assign(TEXTOS, {
   leadLinkDto: '\nDescuento {pct}%: −{ahorro}',
   // ESTE es el mensaje que el dueño copia y pega — sale como burbuja aparte
   leadLinkParaCliente: '¡Listo! Te comparto tu link de pago para que pagues con tarjeta, Nequi, llave o transferencia por *{total}*:\n\n👉 {url}\n\nEl envío ya va incluido. Apenas se acredite el pago dejamos tu pedido en alistamiento y te compartimos la guía de rastreo. 👟',
+  // [MENU-CANDIDATAS] (7-sep) botones debajo de las dos fichas candidatas.
+  // El cliente contestaba citando la foto y el bot no ve lo citado: con los
+  // botones toca y listo. `candNingunaBoton` ≤ 20 chars (tope de WhatsApp).
+  candMenuBody: '¿Cuál de las dos es la que buscas? Toca una opción 👇',
+  candNingunaBoton: 'Ninguna de las dos',
+  candNingunaTexto: 'Ninguna de las dos es la que busco',
+  candElijoTexto: 'Elijo la {nombre} (ref {ref})',
   // [LINK-320] varios pares en un solo link (7-sep): una línea por par
   leadLinkLinea: '• Ref {ref} · Talla {talla} · {modelo} · {precio}',
   leadLinkResumenVarios: '💳 *Link listo* · {n} pares\n{lineas}\nSubtotal: {precio}{lineaDto}\n*Total: {total}*\n\n👇 Copia de aquí para abajo y pégaselo al cliente:',

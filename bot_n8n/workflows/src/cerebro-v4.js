@@ -70,22 +70,6 @@ const INTENCION_COMPRA = /\bl[oa]s?\s+(?:quiero|llevo|compro)\b|\bme\s+interesa\
 function fmtPrecio(n) {
   return '$' + String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 }
-// [PROMO 2026-08-18] Si el catálogo trae precioAntes > precio (promo puesta
-// desde la app), lo menciona junto al precio; si no, es BYTE A BYTE lo mismo
-// que fmtPrecio(p.precio) de toda la vida. Detrás de FLAG_PROMO_CATALOGO: con
-// el flag OFF (default) el catálogo puede traer precioAntes y no cambia nada.
-// Solo se usa en fichas que arma el CÓDIGO (mostrar_ficha, catálogo con
-// fotos...), nunca en los campos que el modelo VE y podría redactar él mismo
-// en texto libre — ese texto libre sí pasa por iaPrometeImposible/L3, que
-// bloquean cualquier "%" o cifra que Gemini invente (R4 del cuaderno: "nunca
-// da descuentos"), y un % legítimo del catálogo caería en el mismo bloqueo.
-function fmtPrecioPromo(p) {
-  const ahora = Number(p && p.precio) || 0;
-  const antes = Number(p && p.precioAntes) || 0;
-  if (!FLAG_PROMO_CATALOGO || !antes || antes <= ahora) return fmtPrecio(ahora);
-  const pct = Math.round((1 - ahora / antes) * 100);
-  return fmtPrecio(ahora) + ' (antes ' + fmtPrecio(antes) + ' · -' + pct + '%)';
-}
 // cantidad de pares que pide el cliente ("2 pares", "dos pares", "un par").
 // Default 1; tope 10 para no disparar totales absurdos por un typo.
 const NUM_PALABRA = { un: 1, uno: 1, una: 1, dos: 2, tres: 3, cuatro: 4, cinco: 5, seis: 6 };
@@ -779,9 +763,9 @@ function tandaCatalogo(to, items, offset, intro, masIdBase) {
   const fotos = [];
   for (const p of tanda) {
     const url = fotoUrlDe(p);
-    const caption = T(TEXTOS.fotoCaption, { ref: p.ref, detalle: detalleDe(p), precio: fmtPrecioPromo(p) });
+    const caption = T(TEXTOS.fotoCaption, { ref: p.ref, detalle: detalleDe(p), precio: fmtPrecio(p.precio) });
     if (url) fotos.push(msjImagen(to, url, caption));
-    else sinFoto.push(T(TEXTOS.fotoFallbackLinea, { ref: p.ref, detalle: detalleDe(p), precio: fmtPrecioPromo(p) }));
+    else sinFoto.push(T(TEXTOS.fotoFallbackLinea, { ref: p.ref, detalle: detalleDe(p), precio: fmtPrecio(p.precio) }));
   }
   if (FLAG_FLUIDEZ_CATALOGO) {
     // [F-CATALOGO] menos burbujas de golpe (fluidez F1): sin burbuja de intro
@@ -898,6 +882,16 @@ function msjPedirTalla(to, bodyTexto) {
 // una FOTO. Ids 'ref:NN' = el mismo flujo de pedido de siempre (elegir de la
 // lista arranca el pedido, sin escribir nada) + fila "Ninguna de estas" →
 // asesor humano (sel 'foto:asesor'). Máx 9 refs + esa fila (límite WhatsApp: 10).
+// [MENU-CANDIDATAS] botones de respuesta (máximo 3, títulos ≤ 20) debajo de
+// las dos fichas candidatas. El id `cand:<ref>` lo traduce el arranque del
+// Cerebro a texto ("Elijo la … (ref NN)") para que lo atienda Gemini.
+function msjBotonesCandidatas(to, body, botones) {
+  return { messaging_product: 'whatsapp', to, type: 'interactive', interactive: {
+    type: 'button',
+    body: { text: String(body || '').slice(0, 1024) },
+    action: { buttons: botones.slice(0, 3).map((b) => ({ type: 'reply', reply: { id: String(b.id).slice(0, 256), title: String(b.title).slice(0, 20) } })) }
+  }};
+}
 function listaFotoRefs(to, items) {
   const rows = items.slice(0, 9).map((p) => ({
     id: 'ref:' + p.ref,
@@ -997,9 +991,27 @@ function leerMensajeDelCliente() {
 const parsed = leerMensajeDelCliente();
 const catalogo = parseCatalogo($json);
 const to = parsed.wa_id;
-const sel = (parsed.inter_id || '').trim();
+// [MENU-CANDIDATAS] (pedido del dueño, 7-sep) cuando el bot manda DOS fichas
+// candidatas, debajo va un menú de botones (Rosada · $215.920 / Rosado ·
+// $242.910 / Ninguna de las dos). El toque llega como interactive con id
+// `cand:<ref>` y aquí se vuelve TEXTO para que lo atienda el cerebro
+// ("Elijo la Puma speedcat ballet rosado (ref 41)"): si se dejara como `sel`,
+// cerebroIAAplica() lo mandaría al flujo clásico, que no lo conoce. Nació de
+// que el cliente contestaba CITANDO la ficha ("Estás" sobre la foto) y el bot
+// no recibe el contenido citado. Flag BOT_MENU_CANDIDATAS: ausente = ON;
+// `off` = sin botones y el toque (que ya no existiría) seguiría al clásico.
+const FLAG_MENU_CANDIDATAS = !/^(off|0|false|no)$/i.test(String($env.BOT_MENU_CANDIDATAS || '').trim());
+const selCrudo = (parsed.inter_id || '').trim();
+const candTap = FLAG_MENU_CANDIDATAS && /^cand:/.test(selCrudo) ? selCrudo.slice(5).trim() : '';
+function textoDeCandidata(refC) {
+  if (refC === 'ninguna') return TEXTOS.candNingunaTexto;
+  const pC = catalogo.find((x) => String(x.ref) === refC);
+  return T(TEXTOS.candElijoTexto, { nombre: (pC && String(pC.marca || '').trim()) || ('ref ' + refC), ref: refC });
+}
+if (candTap) parsed.cand_ref = candTap;
+const sel = candTap ? '' : selCrudo;
 
-const texto = (parsed.texto || '').trim();
+const texto = candTap ? textoDeCandidata(candTap) : (parsed.texto || '').trim();
 const dueno = String($env.OWNER_WHATSAPP || '').replace(/\D/g, '');
 const esDueno = !!dueno && to === dueno;
 const mensajes = [];
@@ -1357,12 +1369,6 @@ const FLAG_ELIGE_PAGO = /^(on|1|true|si|s[ií])$/i.test(String($env.BOT_ELIGE_PA
 // Con el flag ON, esa reescritura CONSERVA la línea de Bogotá delante del
 // pedido de dato. Con el flag OFF: exactamente el comportamiento de hoy.
 const FLAG_BOGOTA_CE = /^(on|1|true|si|s[ií])$/i.test(String($env.BOT_BOGOTA_CE || '').trim());
-// [PROMO-CATALOGO] (pedido del dueño, 18-ago) menciona la promoción de una
-// referencia (precioAntes/precio del catálogo, la misma que ya se ve en la
-// app y en la web) en las fichas que arma el CÓDIGO — no toca lo que el
-// modelo redacta libre. Flag OFF (default): el precio se ve exactamente
-// igual que siempre, aunque el catálogo ya traiga precioAntes.
-const FLAG_PROMO_CATALOGO = /^(on|1|true|si|s[ií])$/i.test(String($env.BOT_PROMO_CATALOGO || '').trim());
 // [LINK-320] (pedido del dueño, 7-sep) el comando `link` del 320 vivía detrás
 // de BOT_LEAD_CALIENTE, que en la VM quedó en `off` (el .env lo trae dos veces
 // y gana la última): el dueño pedía el link de Wompi y el bot lo trataba como
@@ -2010,7 +2016,7 @@ async function principal() {
     // (conversación espaciada, no un bloque de información de golpe).
     const nomFC = String(p.marca || '').trim();
     const tituloFC = nomFC ? nomFC.charAt(0).toUpperCase() + nomFC.slice(1) : (CAT_LABEL[p.cat] || 'Nuestro modelo');
-    const capFC = T(TEXTOS.conversaFicha, { nombre: tituloFC, precio: fmtPrecioPromo(p) });
+    const capFC = T(TEXTOS.conversaFicha, { nombre: tituloFC, precio: fmtPrecio(p.precio) });
     const urlsFC = (Array.isArray(p.fotos) ? p.fotos : []).map(fotoUrlDeId).filter(Boolean);
     // [CIUDAD-UNA-VEZ] la ciudad se pregunta UNA sola vez: si ya la dio
     // (convCiudad) o ya se le preguntó (convCiudadPreg), la ficha cierra con
@@ -2042,7 +2048,7 @@ async function principal() {
     if (!conFoto.length) return false;
     mensajes.push(msjTexto(to, intro || TEXTOS.conversaSondeoFotosIntro));
     conFoto.forEach((pS, i) => {
-      let capS = T(TEXTOS.conversaFicha, { nombre: String(pS.marca || '').trim() || (CAT_LABEL[pS.cat] || ''), precio: fmtPrecioPromo(pS) });
+      let capS = T(TEXTOS.conversaFicha, { nombre: String(pS.marca || '').trim() || (CAT_LABEL[pS.cat] || ''), precio: fmtPrecio(pS.precio) });
       if (i === conFoto.length - 1) capS += '\n\n' + TEXTOS.conversaSondeoCual;
       mensajes.push(msjImagen(to, fotoUrlDe(pS), capS));
     });
@@ -2854,7 +2860,7 @@ async function principal() {
       { ref: p.ref, precio: p.precio, cantidad, nombrePerfil: parsed.nombre || '' },
       tallaM ? { estado: 'datos', talla: tallaM[1] } : { estado: 'talla' }
     ));
-    const ficha = T(TEXTOS.fichaCaption, { ref: p.ref, info: infoRef(p), precio: fmtPrecioPromo(p) });
+    const ficha = T(TEXTOS.fichaCaption, { ref: p.ref, info: infoRef(p), precio: fmtPrecio(p.precio) });
     const url = fotoUrlDe(p);
     // [PAUTA-CATALOGO] invita a ver el resto del catálogo cuando el cliente
     // llegó de un anuncio (al final, como mensaje aparte). Flag OFF → no corre.
@@ -3595,7 +3601,7 @@ async function principal() {
         await recordarFuente();
         for (const pF of itemsF.slice(0, 5)) {
           const urlF = fotoUrlDe(pF);
-          if (urlF) mensajes.push(msjImagen(to, urlF, T(TEXTOS.fotoCaption, { ref: pF.ref, detalle: detalleDe(pF), precio: fmtPrecioPromo(pF) })));
+          if (urlF) mensajes.push(msjImagen(to, urlF, T(TEXTOS.fotoCaption, { ref: pF.ref, detalle: detalleDe(pF), precio: fmtPrecio(pF.precio) })));
         }
         mensajes.push(listaFotoRefs(to, itemsF));
         if (dueno && dueno !== to) {
@@ -4066,6 +4072,8 @@ async function principal() {
         return pv ? (r + ' ' + iaNombreDe(pv)) : r;
       }).join(' | ')),
       'ya_salude: ' + d(st.saludado ? 'sí' : '') + ' · genero_ya_preguntado: ' + d(st.generoPreguntado ? 'sí' : ''),
+      // [MENU-CANDIDATAS] el toque en el botón de las dos candidatas
+      'eligio_con_boton: ' + d(st.candElegida),
       // [SIN-MODELO] el dato que evita el "no lo encontré" a un simple "hola"
       'modelo_nombrado_por_el_cliente: ' + (st.sinModelo
         ? 'NO (en este mensaje no dijo ningún modelo, marca ni color: no busques nada, no digas que no lo encontraste; saluda si falta y pregunta qué modelo busca)'
@@ -4091,7 +4099,7 @@ async function principal() {
         parameters: { type: 'OBJECT', properties: { ref: S('Número de referencia del catálogo (2 dígitos, ej. 07).') }, required: ['ref'] } },
       { name: 'buscar_catalogo', description: 'Busca en el catálogo real por marca, modelo, color, el titular del anuncio o lo que viste en la foto. Si encuentra UN modelo claro, el sistema le manda la ficha al cliente automáticamente; si hay DOS posibles, manda las dos fichas; si hay más, te devuelve la lista y tú los nombras SIN fotos. Devuelve solo referencias que EXISTEN.',
         parameters: { type: 'OBJECT', properties: { texto: S('Lo que hay que buscar (marca, nombre del modelo, color o el titular del anuncio).') }, required: ['texto'] } },
-      { name: 'mostrar_candidatas', description: 'Cuando DUDAS entre dos modelos concretos: envía las DOS fichas con foto y precio real y preguntas cuál es. Úsala en vez de dos mostrar_ficha seguidas.',
+      { name: 'mostrar_candidatas', description: 'Cuando DUDAS entre dos modelos concretos: envía las DOS fichas con foto y precio real y, debajo, BOTONES para que el cliente toque cuál es (o "Ninguna de las dos"). Tu texto es solo la pregunta corta. Úsala en vez de dos mostrar_ficha seguidas.',
         parameters: { type: 'OBJECT', properties: {
           refs: { type: 'ARRAY', items: { type: 'STRING' }, description: 'Las DOS referencias candidatas del catálogo.' }
         }, required: ['refs'] } },
@@ -4298,6 +4306,7 @@ async function principal() {
       busquedaVacia: false,
       saludoPendiente: false,
       sinModelo: false,     // [SIN-MODELO] el mensaje no trae nada que buscar
+      menuCandidatas: null, // [MENU-CANDIDATAS] botones que van debajo de las dos fichas
       fallos: 0,
       estado: {}            // campos de sesión a persistir al final
     };
@@ -4347,7 +4356,7 @@ async function principal() {
         const gF = iaGeneroDe(p);
         if (gF) { st.genero = gF; mv.estado.iaGenero = gF; }
       }
-      const cap = T(TEXTOS.conversaFicha, { nombre: iaNombreDe(p), precio: fmtPrecioPromo(p) });
+      const cap = T(TEXTOS.conversaFicha, { nombre: iaNombreDe(p), precio: fmtPrecio(p.precio) });
       if (yaVista) {
         mv.fichaRepetida = cap;
         return Object.assign(iaFichaJson(p), { foto_ya_enviada: true,
@@ -4430,12 +4439,31 @@ async function principal() {
       mv.contenido++;
       for (const p of conFoto) {
         mv.precios.push(Number(p.precio) || 0);
-        const cap = T(TEXTOS.conversaFicha, { nombre: iaNombreDe(p), precio: fmtPrecioPromo(p) });
+        const cap = T(TEXTOS.conversaFicha, { nombre: iaNombreDe(p), precio: fmtPrecio(p.precio) });
         if (!mv.fichaTexto) mv.fichaTexto = cap;
         if (iaAgregarFoto(mv, fotoUrlDe(p), cap)) iaMarcarFichaVista(p.ref, st, mv);
       }
+      // [MENU-CANDIDATAS] los botones para que toque cuál (títulos ≤ 20 chars,
+      // que es el tope de WhatsApp). Color + precio distingue "rosada" de
+      // "rosado"; si no hay color o se pasa de largo, va "Ref NN · $precio".
+      if (FLAG_MENU_CANDIDATAS) {
+        const etiqueta = (p) => {
+          const col = iaColorDe(p);
+          const conColor = col ? (col.charAt(0).toUpperCase() + col.slice(1) + ' · ' + fmtPrecio(p.precio)) : '';
+          const conRef = 'Ref ' + p.ref + ' · ' + fmtPrecio(p.precio);
+          return (conColor && conColor.length <= 20) ? conColor : (conRef.length <= 20 ? conRef : ('Ref ' + p.ref));
+        };
+        let botones = conFoto.map((p) => ({ id: 'cand:' + p.ref, title: etiqueta(p) }));
+        if (botones[0].title === botones[1].title) {
+          botones = conFoto.map((p) => ({ id: 'cand:' + p.ref, title: ('Ref ' + p.ref + ' · ' + fmtPrecio(p.precio)).slice(0, 20) }));
+        }
+        botones.push({ id: 'cand:ninguna', title: TEXTOS.candNingunaBoton });
+        mv.menuCandidatas = botones;
+      }
       return { encontrado: true, candidatas: conFoto.map((p) => iaFichaJson(p)),
-        nota: 'Se le enviaron las dos fichas. Pregúntale cuál de las dos es la que busca. NO afirmes que una es la suya.' };
+        nota: FLAG_MENU_CANDIDATAS
+          ? 'Se le enviaron las dos fichas y debajo van BOTONES para que toque cuál. Tu texto es solo la pregunta corta (una frase); no le pidas que escriba el nombre. NO afirmes que una es la suya.'
+          : 'Se le enviaron las dos fichas. Pregúntale cuál de las dos es la que busca. NO afirmes que una es la suya.' };
     }
     if (nombre === 'enviar_fotos') {
       const p = iaRefValida(args.ref) || iaRefValida(st.refActiva);
@@ -4827,8 +4855,21 @@ async function principal() {
         fichasVistas: String((ses && ses.iaFichasVistas) || '').split(',').map((x) => x.trim()).filter(Boolean),
         generoPreguntado: (ses && ses.iaGenPreg) || '',
         saludado: (ses && ses.iaSaludo) || '',
-        fotoCliente: ''
+        fotoCliente: '',
+        candElegida: ''
       };
+      // [MENU-CANDIDATAS] tocó un botón: esa referencia queda activa sin que el
+      // modelo tenga que adivinarla (y "ninguna" se lo dice tal cual).
+      if (parsed.cand_ref) {
+        const pCand = parsed.cand_ref !== 'ninguna' ? iaRefValida(parsed.cand_ref) : null;
+        if (pCand) {
+          st.refActiva = pCand.ref;
+          mv.estado.iaRef = pCand.ref;
+          st.candElegida = pCand.ref + ' ' + iaNombreDe(pCand) + ' (la ficha ya la tiene: NO la reenvíes; sigue con la ciudad o su duda)';
+        } else if (parsed.cand_ref === 'ninguna') {
+          st.candElegida = 'NINGUNA de las dos (tocó el botón): pídele una foto o el nombre del modelo, o pásalo al asesor si no hay más pistas';
+        }
+      }
 
       // ---- L2 · primer contacto sin intención: primero saludar y entender ----
       const sinHistorial = !hist.length && !st.saludado;
@@ -5092,7 +5133,7 @@ async function principal() {
         // del catálogo. Quedarse callado justo aquí es lo que no se puede hacer.
         const pPrecio = iaRefValida(st.refActiva);
         if (pPrecio && Number(pPrecio.precio) > 0 && !mv.saludoPendiente) {
-          cuerpo = T(TEXTOS.conversaFicha, { nombre: iaNombreDe(pPrecio), precio: fmtPrecioPromo(pPrecio) })
+          cuerpo = T(TEXTOS.conversaFicha, { nombre: iaNombreDe(pPrecio), precio: fmtPrecio(pPrecio.precio) })
             + (st.ciudad ? ' ¿Te la dejamos lista?' : ' ¿En qué ciudad estás ubicado?');
         } else if (mv.saludoPendiente) {
           cuerpo = T(TEXTOS.iaAperturaSaludo, { saludo: iaSaludoFranja(), asesor: iaNombreAsesor() })
@@ -5143,12 +5184,17 @@ async function principal() {
 
       // ---- UNA burbuja, en orden, completa ----
       const salidas = [];
+      // [MENU-CANDIDATAS] con botones, la pregunta va en el cuerpo del menú (no
+      // en el pie de la última foto) para que el cliente vea pregunta y opciones
+      // juntas. Sin menú: byte a byte lo de siempre.
+      const conMenu = !!(mv.menuCandidatas && mv.menuCandidatas.length && mv.fotos.length && !mv.handoff);
       if (mv.fotos.length) {
         mv.fotos.forEach((f, i) => {
           const ultima = i === mv.fotos.length - 1;
-          const cap = [f.caption, ultima ? cuerpo : ''].filter(Boolean).join('\n\n');
+          const cap = [f.caption, (ultima && !conMenu) ? cuerpo : ''].filter(Boolean).join('\n\n');
           salidas.push(msjImagen(to, f.url, cap));
         });
+        if (conMenu) salidas.push(msjBotonesCandidatas(to, cuerpo || TEXTOS.candMenuBody, mv.menuCandidatas));
       } else if (mv.fichaTexto) {
         salidas.push(msjTexto(to, [mv.fichaTexto, cuerpo].filter(Boolean).join('\n\n')));
       } else if (cuerpo) {

@@ -590,7 +590,10 @@ console.log('\n── P27 · mostrar_candidatas envía las DOS fichas ──');
                  { texto: '¿Es alguna de estas?' }];
   const t = await turno('', { imagen_id: 'MEDIA_X', tipo: 'image' });
   check('P27: llegan DOS fotos', t.fotos === 2, { fotos: t.fotos, txt: t.cliTxt.slice(0, 160) });
-  check('P27: pregunta cuál es (no afirma)', /alguna de estas|cu[áa]l|es este/i.test(t.cliTxt), t.cliTxt);
+  // (7-sep) con el menú de candidatas la pregunta va en el cuerpo de los botones
+  const menu27 = t.cli.find((x) => x.type === 'interactive');
+  const preg27 = t.cliTxt + ' ' + ((menu27 && menu27.interactive && menu27.interactive.body && menu27.interactive.body.text) || '');
+  check('P27: pregunta cuál es (no afirma)', /alguna de estas|cu[áa]l|es este/i.test(preg27), preg27);
 }
 
 // --- P28: a la SEGUNDA búsqueda vacía sí entra el asesor ---
@@ -1047,29 +1050,20 @@ console.log('\n── P54 · Control negativo: la batería sí puede fallar ─�
   check('P54 (control): la cifra REAL del catálogo sí pasa', /265\.000/.test(t2.cliTxt), t2.cliTxt.slice(0, 200));
 }
 
-// --- P55: PROMO — flag OFF protege el camino de siempre; flag ON la muestra ---
-// (18-ago, pedido del dueño: que el bot también mencione la promo del catálogo)
-console.log('\n── P55 · Promoción del catálogo (flag BOT_PROMO_CATALOGO) ──');
+// --- P55: (7-sep) el catálogo puede traer precioAntes (lo dejó la app) y el bot lo IGNORA ---
+// El dueño canceló las promos del todo ("no quiero nada de promos"): la ficha
+// dice el precio y nada más, aunque el documento traiga un precio viejo.
+console.log('\n── P55 · Un precioAntes en el catálogo no cambia la ficha (sin promos) ──');
 {
-  // ref '01' del fixture: precio 250.000, precioAntes 312.500 (20% real, viene
-  // de la app — nunca lo inventa Gemini, así que no debe caer en L3/P54).
   limpiar();
+  // se le mete un precioAntes al doc de la ref 01 SOLO para esta prueba
+  const doc01 = catalogoFixture.documents.find((d) => d.fields && d.fields.ref && d.fields.ref.stringValue === '01');
+  doc01.fields.precioAntes = { integerValue: '312500' };
   guionGemini = [{ tools: [{ name: 'mostrar_ficha', args: { ref: '01' } }] },
                  { texto: '¿Qué te parece?' }];
-  const tOff = await turno('hola, tienen las adidas ref 01?');
-  check('P55 flag OFF (default): precio de siempre, sin mención de promo',
-    /\$250\.000/.test(tOff.cliTxt) && !/antes|%/.test(tOff.cliTxt), tOff.cliTxt);
-
-  limpiar();
-  ENV.BOT_PROMO_CATALOGO = 'on';
-  guionGemini = [{ tools: [{ name: 'mostrar_ficha', args: { ref: '01' } }] },
-                 { texto: '¿Qué te parece?' }];
-  const tOn = await turno('hola, tienen las adidas ref 01?');
-  delete ENV.BOT_PROMO_CATALOGO;
-  check('P55 flag ON: dice el precio nuevo, el de antes y el %',
-    /\$250\.000/.test(tOn.cliTxt) && /312\.500/.test(tOn.cliTxt) && /-20%/.test(tOn.cliTxt), tOn.cliTxt);
-  check('P55 flag ON: el "%" real de la promo NO lo bloquea el veto anti-descuento-inventado',
-    !/asesor/i.test(tOn.cliTxt), tOn.cliTxt);
+  const t = await turno('hola, tienen las adidas ref 01?');
+  delete doc01.fields.precioAntes;
+  check('P55: solo el precio real, sin "antes" ni %', /\$250\.000/.test(t.cliTxt) && !/312\.500|antes|%/.test(t.cliTxt), t.cliTxt);
 }
 
 // --- P56: SIN-MODELO — un "hola"/"precio" nunca termina en "no lo encontré" ---
@@ -1179,6 +1173,58 @@ console.log('\n── P57 · Link de pago desde el 320 (flag BOT_LINK_320, encen
   const th = await turno('link 07 38', { wa_id: DUENO });
   delete ENV.BOT_LINK_320;
   check('P57h: con BOT_LINK_320=off no se arma el link', !/checkout\.wompi/.test(th.ownTxt) && pedidos().length === 0, th.ownTxt.slice(0, 200));
+}
+
+// --- P58: MENU-CANDIDATAS — dos fichas + botones, y el toque entra al cerebro ---
+// (7-sep, falla real: el cliente contestó CITANDO la ficha rosada y el bot no
+// entendió; con botones toca y listo)
+console.log('\n── P58 · Dos candidatas → botones; el toque elige la referencia ──');
+{
+  const botonesDe = (t) => { const m = t.cli.find((x) => x.type === 'interactive'); return m ? m.interactive : null; };
+  // (a) mostrar_candidatas manda 2 fotos + 1 menú con 3 botones; la pregunta va en el menú
+  limpiar();
+  sesion({ iaSaludo: '1' });
+  guionGemini = [{ tools: [{ name: 'mostrar_candidatas', args: { refs: ['40', '41'] } }] },
+                 { texto: '¿Cuál de las dos es la que buscas?' }];
+  const ta = await turno('las puma speedcat');
+  const ia = botonesDe(ta);
+  check('P58a: dos fotos + un menú de botones', ta.fotos === 2 && !!ia && ia.type === 'button', ta.cli.map((m) => m.type));
+  check('P58a: tres botones: las dos refs y "Ninguna de las dos"',
+    !!ia && ia.action.buttons.map((b) => b.reply.id).join(',') === 'cand:40,cand:41,cand:ninguna', ia && ia.action.buttons);
+  check('P58a: títulos distintos, con color y precio, ≤ 20 caracteres',
+    !!ia && ia.action.buttons.every((b) => b.reply.title.length <= 20) && /Roja/.test(ia.action.buttons[0].reply.title) && /Cafe|Café/i.test(ia.action.buttons[1].reply.title)
+      && ia.action.buttons[0].reply.title !== ia.action.buttons[1].reply.title, ia && ia.action.buttons.map((b) => b.reply.title));
+  check('P58a: la pregunta del modelo va en el cuerpo del menú, no en la última foto',
+    !!ia && /Cuál de las dos/.test(ia.body.text) && !/Cuál de las dos/.test(ta.cliTxt), { menu: ia && ia.body.text, fotos: ta.cliTxt });
+  // (b) el toque cand:41 entra al cerebro como texto y deja la ref activa
+  limpiar();
+  sesion({ iaSaludo: '1', iaFichasVistas: '40,41' });
+  const antes = llamadasGemini;
+  guionGemini = [{ texto: 'Perfecto. ¿En qué ciudad estás?' }];
+  const tb = await turno('', { tipo: 'interactive', inter_id: 'cand:41' });
+  const sesB = store.get('tiendas/varman/botSesiones/' + WA) || {};
+  check('P58b: el toque lo atiende el cerebro (Gemini recibe el turno)', llamadasGemini > antes && /ciudad/i.test(tb.cliTxt), tb.cliTxt);
+  check('P58b: la ref 41 queda activa en la sesión', !!(sesB.iaRef && sesB.iaRef.stringValue === '41'), Object.keys(sesB));
+  check('P58b: Gemini ve que eligió con el botón y el texto natural',
+    /eligio_con_boton: 41/.test(ultimoPromptGemini) && /Elijo la Puma speedcat cafe \(ref 41\)/.test(ultimoPromptGemini), ultimoPromptGemini.slice(0, 200));
+  check('P58b: no reenvía la ficha', tb.fotos === 0, tb.fotos);
+  // (c) "Ninguna de las dos"
+  limpiar();
+  sesion({ iaSaludo: '1', iaFichasVistas: '40,41' });
+  guionGemini = [{ texto: '¿Me mandas una foto del modelo que buscas?' }];
+  const tc = await turno('', { tipo: 'interactive', inter_id: 'cand:ninguna' });
+  check('P58c: "ninguna" entra como texto y Gemini lo sabe',
+    /Ninguna de las dos es la que busco/.test(ultimoPromptGemini) && /eligio_con_boton: NINGUNA/.test(ultimoPromptGemini) && /foto/i.test(tc.cliTxt), tc.cliTxt);
+  // (d) flag off: sin botones, la pregunta vuelve al pie de la última foto (como antes)
+  limpiar();
+  ENV.BOT_MENU_CANDIDATAS = 'off';
+  sesion({ iaSaludo: '1' });
+  guionGemini = [{ tools: [{ name: 'mostrar_candidatas', args: { refs: ['40', '41'] } }] },
+                 { texto: '¿Cuál de las dos es la que buscas?' }];
+  const td = await turno('las puma speedcat');
+  delete ENV.BOT_MENU_CANDIDATAS;
+  check('P58d: con BOT_MENU_CANDIDATAS=off no hay menú y la pregunta va en la foto',
+    td.fotos === 2 && !botonesDe(td) && /Cuál de las dos/.test(td.cliTxt), td.cli.map((m) => m.type));
 }
 
 // ============================================================================
