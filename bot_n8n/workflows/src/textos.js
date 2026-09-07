@@ -344,7 +344,7 @@ const TEXTOS = {
   adminListaTitulo: '📋 *Últimos {n} pedidos pendientes*\n\n{lineas}',
   adminPausado: '⏸ Bot en *mantenimiento*. A los clientes les responderé: «ya te escribimos». Escribe *activar* para reactivarlo.',
   adminActivo: '▶️ Bot *activo* de nuevo. Los clientes vuelven al flujo normal.',
-  adminAyuda: '🛠 *Comandos admin*\n• *pedidos* — últimos 5 pendientes\n• *pausar* — bot en mantenimiento\n• *activar* — reactivar el bot\n\n🔥 *Ventas* (con BOT_LEAD_CALIENTE)\n• *calientes* — quién está listo para comprar\n• *tomar 573001234567* — el bot se calla y cierras tú\n• *soltar 573001234567* — el bot retoma\n• *link 07 38 10* — arma el mensaje de pago (ref, talla, % opcional)\n\nCualquier otro mensaje tuyo pasa por el flujo normal de cliente (sirve para probar el bot).',
+  adminAyuda: '🛠 *Comandos admin*\n• *pedidos* — últimos 5 pendientes\n• *pausar* — bot en mantenimiento\n• *activar* — reactivar el bot\n\n💳 *Link de pago (Wompi)*\n• *link 07 38* — ref y talla\n• *link 07 38 10* — con 10% de descuento\n• *link 07 38 + 12 40* — dos pares en un link\n• o en palabras: "dame el link de wompi de la ref 07 talla 38"\n\n🔥 *Ventas* (con BOT_LEAD_CALIENTE)\n• *calientes* — quién está listo para comprar\n• *tomar 573001234567* — el bot se calla y cierras tú\n• *soltar 573001234567* — el bot retoma\n\nCualquier otro mensaje tuyo pasa por el flujo normal de cliente (sirve para probar el bot).',
 
   // --- [TEXTOS-SOCIO] FAQ pago contra entrega (reunión socios 22-jul, texto ---
   // APROBADO). Va en DOS burbujas (multi-mensaje) y dispara en CUALQUIER paso
@@ -746,6 +746,7 @@ const CUADERNO_IA = [
   '',
   '**Paso 1 · Saber qué quiere.** Llega con "hola", una foto o el nombre de un modelo. Averigua cuál es la referencia real. Si manda foto, **mírala** (la ves; si no la tienes delante, pide `ver_foto`). Si dudas entre dos, muéstrale los dos con `mostrar_candidatas` y pregunta cuál.',
   '- **Primer mensaje sin intención = saludo y pregunta, SIN ficha** (orden del dueño, 25-jul). Si abre con "Hola", "Precio" o "info": saludas por la franja, te presentas y preguntas en qué modelo está interesado. **Sin foto y sin cifra todavía.** Con anuncio puedes NOMBRAR el modelo como sugerencia, pero sin mandar la ficha.',
+  '- 🔴 **Si todavía no ha nombrado ningún modelo, marca ni color** (solo "hola", "hl", "hi", "oli", "buenas", "cómo vas", "precio", "info", "cuánto valen"…) **no hay nada que buscar: no uses `buscar_catalogo` y JAMÁS digas "no lo encontré" ni lo pases al asesor.** Saluda, preséntate y pregunta qué modelo busca. "No lo encontré" solo existe cuando el cliente pidió un modelo concreto que no apareció. `[SESIÓN]` te lo dice en `modelo_nombrado_por_el_cliente`.',
   '- **Pero si el cliente PREGUNTÓ algo, lo primero es responderle** — calidad, envíos, pagos, lo que sea. Saludar sin contestar lo que preguntó es de las cosas que más molestan.',
   '- **Si el primer mensaje ya trae intención** — marca, modelo, color, foto — atiendes ESO de una, sin pasos intermedios.',
   '- 🔴 **La marca que pide el cliente es SAGRADA.** Si pide Reebok y no aparece Reebok, jamás le ofrezcas Puma o Nike "parecidas".',
@@ -921,13 +922,17 @@ Object.assign(TEXTOS, {
   leadSoltarOk: '▶️ Listo, el bot vuelve a atender a +{wa}.',
   leadNumeroFalta: 'Dime el número: por ejemplo *tomar 573205710365*.',
   // comando `link` (el dueño arma el mensaje de pago de una referencia)
-  leadLinkUso: 'Se usa así 👇\n\n*link 07 38* — link de la Ref 07 talla 38\n*link 07 38 10* — con 10% de descuento\n\nTe devuelvo el mensaje listo para copiar y pegárselo al cliente.',
+  leadLinkUso: 'Se usa así 👇\n\n*link 07 38* — link de la Ref 07 talla 38\n*link 07 38 10* — con 10% de descuento\n*link 07 38 + 12 40* — dos pares en un solo link\n\nTambién en palabras: "dame el link de wompi de la ref 07 talla 38".\n\nTe devuelvo el mensaje listo para copiar y pegárselo al cliente.',
   leadLinkRefNo: 'No encontré la *Ref {ref}* en el catálogo 🙈',
   leadLinkFallo: 'No pude generar el link de Wompi ahora mismo 🙈 ({error})',
   leadLinkResumen: '💳 *Link listo* · Ref {ref} · Talla {talla}\n{modelo}\nPrecio: {precio}{lineaDto}\n*Total: {total}*\n\n👇 Copia de aquí para abajo y pégaselo al cliente:',
   leadLinkDto: '\nDescuento {pct}%: −{ahorro}',
   // ESTE es el mensaje que el dueño copia y pega — sale como burbuja aparte
-  leadLinkParaCliente: '¡Listo! Te comparto tu link de pago para que pagues con tarjeta, Nequi, llave o transferencia por *{total}*:\n\n👉 {url}\n\nEl envío ya va incluido. Apenas se acredite el pago dejamos tu pedido en alistamiento y te compartimos la guía de rastreo. 👟'
+  leadLinkParaCliente: '¡Listo! Te comparto tu link de pago para que pagues con tarjeta, Nequi, llave o transferencia por *{total}*:\n\n👉 {url}\n\nEl envío ya va incluido. Apenas se acredite el pago dejamos tu pedido en alistamiento y te compartimos la guía de rastreo. 👟',
+  // [LINK-320] varios pares en un solo link (7-sep): una línea por par
+  leadLinkLinea: '• Ref {ref} · Talla {talla} · {modelo} · {precio}',
+  leadLinkResumenVarios: '💳 *Link listo* · {n} pares\n{lineas}\nSubtotal: {precio}{lineaDto}\n*Total: {total}*\n\n👇 Copia de aquí para abajo y pégaselo al cliente:',
+  leadLinkParaClienteVarios: '¡Listo! Te comparto tu link de pago de tus *{n} pares* para que pagues con tarjeta, Nequi, llave o transferencia por *{total}*:\n\n👉 {url}\n\nEl envío ya va incluido. Apenas se acredite el pago dejamos tu pedido en alistamiento y te compartimos la guía de rastreo. 👟'
 });
 // Cuando los vetos dejan la respuesta del modelo irrecuperable, el cerebro NO
 // improvisa: cae a los textos ya aprobados del modo conversa (conversaFicha,

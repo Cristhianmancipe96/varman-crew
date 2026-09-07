@@ -14,7 +14,7 @@ const src = (f) => fs.readFileSync(path.join(DIR, 'src', f), 'utf8');
 const SALIDA = path.join(DIR, 'bot-varman.json');
 // Versión: cada valor nuevo deja su propio respaldo en respaldo/ para rollback.
 // Subir SOLO cuando haya un cambio que quieras poder revertir por separado.
-const VERSION = '12.0';
+const VERSION = '12.2';
 
 const wf = {
   // OJO: el id NO se cambia — importar-workflows.sh de la VM activa por id

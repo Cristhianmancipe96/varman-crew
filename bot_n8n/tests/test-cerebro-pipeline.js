@@ -1047,6 +1047,140 @@ console.log('\n── P54 · Control negativo: la batería sí puede fallar ─�
   check('P54 (control): la cifra REAL del catálogo sí pasa', /265\.000/.test(t2.cliTxt), t2.cliTxt.slice(0, 200));
 }
 
+// --- P55: PROMO — flag OFF protege el camino de siempre; flag ON la muestra ---
+// (18-ago, pedido del dueño: que el bot también mencione la promo del catálogo)
+console.log('\n── P55 · Promoción del catálogo (flag BOT_PROMO_CATALOGO) ──');
+{
+  // ref '01' del fixture: precio 250.000, precioAntes 312.500 (20% real, viene
+  // de la app — nunca lo inventa Gemini, así que no debe caer en L3/P54).
+  limpiar();
+  guionGemini = [{ tools: [{ name: 'mostrar_ficha', args: { ref: '01' } }] },
+                 { texto: '¿Qué te parece?' }];
+  const tOff = await turno('hola, tienen las adidas ref 01?');
+  check('P55 flag OFF (default): precio de siempre, sin mención de promo',
+    /\$250\.000/.test(tOff.cliTxt) && !/antes|%/.test(tOff.cliTxt), tOff.cliTxt);
+
+  limpiar();
+  ENV.BOT_PROMO_CATALOGO = 'on';
+  guionGemini = [{ tools: [{ name: 'mostrar_ficha', args: { ref: '01' } }] },
+                 { texto: '¿Qué te parece?' }];
+  const tOn = await turno('hola, tienen las adidas ref 01?');
+  delete ENV.BOT_PROMO_CATALOGO;
+  check('P55 flag ON: dice el precio nuevo, el de antes y el %',
+    /\$250\.000/.test(tOn.cliTxt) && /312\.500/.test(tOn.cliTxt) && /-20%/.test(tOn.cliTxt), tOn.cliTxt);
+  check('P55 flag ON: el "%" real de la promo NO lo bloquea el veto anti-descuento-inventado',
+    !/asesor/i.test(tOn.cliTxt), tOn.cliTxt);
+}
+
+// --- P56: SIN-MODELO — un "hola"/"precio" nunca termina en "no lo encontré" ---
+// (7-sep, falla real: "hola precio porfavor" → el modelo buscaba "precio", el
+// catálogo daba vacío y L4b lo despachaba con "no lo encontré" + traspaso)
+console.log('\n── P56 · Sin modelo nombrado: saluda y pregunta, jamás "no lo encontré" ──');
+{
+  const sinTraspaso = () => { const s = store.get('tiendas/varman/botSesiones/' + WA) || {}; return !s.enHandoffAt; };
+  // (a) el modelo busca "precio", da vacío y escribe que no lo encontró
+  limpiar();
+  guionGemini = [{ tools: [{ name: 'buscar_catalogo', args: { texto: 'precio' } }] },
+                 { texto: 'No lo encontré entre los modelos que tengo registrados.' }];
+  const ta = await turno('hola precio porfavor');
+  check('P56a: no le dice que no lo encontró', !/no lo encontr|no logr/i.test(ta.cliTxt), ta.cliTxt);
+  check('P56a: saluda y pregunta el modelo', /bienvenid/i.test(ta.cliTxt) && /modelo/i.test(ta.cliTxt) && /[?¿]/.test(ta.cliTxt), ta.cliTxt);
+  check('P56a: NO pasa al asesor ni avisa al 320', ta.ownTxt === '[]' && sinTraspaso(), ta.ownTxt.slice(0, 200));
+  check('P56a: sin foto ni cifra', ta.fotos === 0 && !/\d{3}[.,]\d{3}/.test(ta.cliTxt), ta.cliTxt);
+  // (b) "hl": el modelo intenta pasar_asesor por modelo_no_encontrado → rechazado
+  limpiar();
+  guionGemini = [{ tools: [{ name: 'pasar_asesor', args: { motivo: 'modelo_no_encontrado', que_quiere: 'hl', duda_abierta: '', ojo_con: '' } }],
+                   texto: 'No lo encontré, te paso con un asesor.' },
+                 { texto: 'Buenas tardes, bienvenido a VarMan Crew. Mi nombre es Cristian. ¿Qué modelo buscas?' }];
+  const tb = await turno('hl');
+  check('P56b: "hl" no termina en traspaso', tb.ownTxt === '[]' && sinTraspaso(), tb.ownTxt.slice(0, 200));
+  check('P56b: saluda y pregunta', /bienvenid/i.test(tb.cliTxt) && /[?¿]/.test(tb.cliTxt) && !/asesor|no lo encontr/i.test(tb.cliTxt), tb.cliTxt);
+  // (c) "como vas": el modelo responde bien y el pipeline lo deja pasar
+  limpiar();
+  guionGemini = [{ texto: 'Buenas tardes, bienvenido a VarMan Crew. Mi nombre es Cristian. ¿En qué modelo estás interesado?' }];
+  const tc = await turno('como vas');
+  check('P56c: saludo + pregunta, tal cual', /bienvenid/i.test(tc.cliTxt) && /modelo/i.test(tc.cliTxt) && tc.ownTxt === '[]', tc.cliTxt);
+  // (d) la excepción de siempre: si PREGUNTÓ algo, se responde (25-jul)
+  limpiar();
+  guionGemini = [{ texto: 'Son calidad 1.1, de la mejor calidad que se consigue. ¿Qué modelo buscas?' }];
+  const td = await turno('hola son originales?');
+  check('P56d: "¿son originales?" se sigue respondiendo', /calidad\s*1\.1/i.test(td.cliTxt) && !/no lo encontr/i.test(td.cliTxt), td.cliTxt);
+  // (e) control: un modelo concreto que NO existe SÍ se traspasa (L4b sigue vivo)
+  limpiar();
+  sesion({ iaSaludo: '1' });
+  guionGemini = [{ tools: [{ name: 'buscar_catalogo', args: { texto: 'jordan retro 99 moradas' } }] },
+                 { texto: 'Déjame ver.' }];
+  const te = await turno('tienen las jordan retro 99 moradas?');
+  check('P56e (control): pidió un modelo que no existe → "no lo encontré" + traspaso',
+    /no lo encontr/i.test(te.cliTxt) && te.ownTxt !== '[]' && !sinTraspaso(), { cli: te.cliTxt, own: te.ownTxt.slice(0, 120) });
+  // (f) con una referencia ya en juego, "precio?" no se traspasa: sale la ficha real
+  limpiar();
+  sesion({ iaRef: '10', iaSaludo: '1', iaFichasVistas: '10' });
+  guionGemini = [{ tools: [{ name: 'buscar_catalogo', args: { texto: 'precio' } }] },
+                 { texto: 'No lo encontré entre los modelos.' }];
+  const tf = await turno('precio?');
+  check('P56f: con ref activa, "precio?" responde el precio real y no traspasa',
+    /265\.000/.test(tf.cliTxt) && !/no lo encontr/i.test(tf.cliTxt) && tf.ownTxt === '[]', tf.cliTxt);
+}
+
+// --- P57: LINK-320 — el link de Wompi que el dueño pide desde el 320 ---
+// (7-sep: el comando vivía detrás de BOT_LEAD_CALIENTE, apagado en la VM)
+console.log('\n── P57 · Link de pago desde el 320 (flag BOT_LINK_320, encendido por defecto) ──');
+{
+  const pedidos = () => Array.from(store.keys()).filter((k) => k.indexOf('tiendas/varman/pedidos/') === 0);
+  const campo = (k, f) => { const d = store.get(k) || {}; const v = d[f] || {}; return v.stringValue != null ? v.stringValue : v.integerValue; };
+  // (a) el comando corto de siempre
+  limpiar();
+  const ta = await turno('link 07 38', { wa_id: DUENO });
+  check('P57a: al 320 le llega el link de Wompi', /checkout\.wompi\.co\/l\/link_test_ABC/.test(ta.ownTxt), ta.ownTxt.slice(0, 300));
+  check('P57a: resumen con ref, talla y total', /Ref 07/.test(ta.ownTxt) && /Talla 38/.test(ta.ownTxt) && /350\.000/.test(ta.ownTxt), ta.ownTxt.slice(0, 300));
+  check('P57a: el pedido queda registrado como Wompi pago_pendiente',
+    pedidos().length === 1 && campo(pedidos()[0], 'metodo_pago') === 'Wompi' && campo(pedidos()[0], 'estado') === 'pago_pendiente'
+      && String(campo(pedidos()[0], 'total')) === '350000', pedidos().map((k) => store.get(k)));
+  check('P57a: nada le llega al cliente de prueba', ta.cli.length === 0, ta.cliTxt);
+  // (b) en palabras, con descuento
+  limpiar();
+  const tb = await turno('dame el link de wompi de la ref 07 talla 38 con 10%', { wa_id: DUENO });
+  check('P57b: lenguaje natural + 10% → total 315.000', /315\.000/.test(tb.ownTxt) && /Descuento 10%/.test(tb.ownTxt) && /checkout\.wompi/.test(tb.ownTxt), tb.ownTxt.slice(0, 300));
+  // (c) dos pares en UN link
+  limpiar();
+  const tc = await turno('link 07 38 + 12 40', { wa_id: DUENO });
+  check('P57c: dos pares → un link por la suma (595.000)', /595\.000/.test(tc.ownTxt) && /2 pares/.test(tc.ownTxt) && (tc.ownTxt.match(/checkout\.wompi/g) || []).length === 1, tc.ownTxt.slice(0, 400));
+  check('P57c: UN solo pedido con cantidad 2 y refs 07+12',
+    pedidos().length === 1 && String(campo(pedidos()[0], 'cantidad')) === '2' && campo(pedidos()[0], 'ref') === '07+12' && campo(pedidos()[0], 'talla') === '38+40',
+    pedidos().map((k) => store.get(k)));
+  // (d) el tercer número suelto sigue siendo el descuento (formato v10.2) y se topa en 15
+  limpiar();
+  const td = await turno('link 07 38 12 40 15', { wa_id: DUENO });
+  check('P57d: dos pares + 15% → 505.750', /505\.750/.test(td.ownTxt), td.ownTxt.slice(0, 300));
+  limpiar();
+  const td2 = await turno('link 07 38 40', { wa_id: DUENO });
+  check('P57d: 40% se recorta al techo de 15% (297.500)', /297\.500/.test(td2.ownTxt) && /Descuento 15%/.test(td2.ownTxt), td2.ownTxt.slice(0, 300));
+  // (e) ref inexistente y comando incompleto
+  limpiar();
+  const te = await turno('link 99 38', { wa_id: DUENO });
+  check('P57e: ref que no existe → aviso, sin pedido', /No encontr/i.test(te.ownTxt) && pedidos().length === 0, te.ownTxt.slice(0, 200));
+  limpiar();
+  const te2 = await turno('link', { wa_id: DUENO });
+  check('P57e: "link" a secas → la ayuda', /Se usa así/.test(te2.ownTxt) && pedidos().length === 0, te2.ownTxt.slice(0, 200));
+  // (f) el dueño probando el bot como cliente NO dispara el link
+  limpiar();
+  guionGemini = [{ texto: 'Sí, puedes pagar con tarjeta, Nequi, llave o transferencia.' }];
+  const tf = await turno('puedo pagar por wompi?', { wa_id: DUENO });
+  check('P57f: "¿puedo pagar por wompi?" desde el 320 no arma ningún link', !/checkout\.wompi/.test(tf.ownTxt) && pedidos().length === 0, tf.ownTxt.slice(0, 200));
+  // (g) un CLIENTE que escriba "link 07 38" no recibe ningún link
+  limpiar();
+  guionGemini = [{ texto: '¿Qué modelo buscas?' }];
+  const tg = await turno('link 07 38');
+  check('P57g: un cliente escribiendo "link 07 38" no recibe link ni crea pedido', !/checkout\.wompi/.test(tg.cliTxt) && pedidos().length === 0, tg.cliTxt);
+  // (h) el flag apaga el comando (rollback sin rebuild)
+  limpiar();
+  ENV.BOT_LINK_320 = 'off';
+  const th = await turno('link 07 38', { wa_id: DUENO });
+  delete ENV.BOT_LINK_320;
+  check('P57h: con BOT_LINK_320=off no se arma el link', !/checkout\.wompi/.test(th.ownTxt) && pedidos().length === 0, th.ownTxt.slice(0, 200));
+}
+
 // ============================================================================
 //  MEDIDOR DE COSTO — qué pesa un turno de verdad (sin gastar un peso)
 // ----------------------------------------------------------------------------

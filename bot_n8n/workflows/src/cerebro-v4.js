@@ -70,6 +70,22 @@ const INTENCION_COMPRA = /\bl[oa]s?\s+(?:quiero|llevo|compro)\b|\bme\s+interesa\
 function fmtPrecio(n) {
   return '$' + String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 }
+// [PROMO 2026-08-18] Si el catálogo trae precioAntes > precio (promo puesta
+// desde la app), lo menciona junto al precio; si no, es BYTE A BYTE lo mismo
+// que fmtPrecio(p.precio) de toda la vida. Detrás de FLAG_PROMO_CATALOGO: con
+// el flag OFF (default) el catálogo puede traer precioAntes y no cambia nada.
+// Solo se usa en fichas que arma el CÓDIGO (mostrar_ficha, catálogo con
+// fotos...), nunca en los campos que el modelo VE y podría redactar él mismo
+// en texto libre — ese texto libre sí pasa por iaPrometeImposible/L3, que
+// bloquean cualquier "%" o cifra que Gemini invente (R4 del cuaderno: "nunca
+// da descuentos"), y un % legítimo del catálogo caería en el mismo bloqueo.
+function fmtPrecioPromo(p) {
+  const ahora = Number(p && p.precio) || 0;
+  const antes = Number(p && p.precioAntes) || 0;
+  if (!FLAG_PROMO_CATALOGO || !antes || antes <= ahora) return fmtPrecio(ahora);
+  const pct = Math.round((1 - ahora / antes) * 100);
+  return fmtPrecio(ahora) + ' (antes ' + fmtPrecio(antes) + ' · -' + pct + '%)';
+}
 // cantidad de pares que pide el cliente ("2 pares", "dos pares", "un par").
 // Default 1; tope 10 para no disparar totales absurdos por un typo.
 const NUM_PALABRA = { un: 1, uno: 1, una: 1, dos: 2, tres: 3, cuatro: 4, cinco: 5, seis: 6 };
@@ -83,6 +99,56 @@ function parseCantidad(texto) {
 }
 // total del pedido = precio unitario × cantidad (default 1)
 function totalSes(s) { return (Number(s.precio) || 0) * (Number(s.cantidad) || 1); }
+// [LINK-320] lee lo que el dueño pide desde el 320 y lo vuelve pares (ref,
+// talla) + descuento + número del cliente. Devuelve null si el mensaje NO es
+// una petición de link (así el dueño puede seguir probando el bot como cliente
+// desde el 320). Formatos que entiende:
+//   link 07 38            · link 07 38 10  (10 % de descuento; 3er número = %)
+//   link 07 38 + 12 40    · link 07 38, 12 40 15   (dos pares, 15 %)
+//   "dame el link de wompi de la ref 07 talla 38 con 10%"
+//   "link de pago 07 38 573001234567"  (el número de 10+ dígitos = cliente)
+// Sin ningún número no es una petición (salvo que empiece por link/enlace, que
+// devuelve la ayuda): "¿puedo pagar por wompi?" desde el 320 sigue siendo una
+// prueba de cliente.
+function leerPedidoLink(txt) {
+  let s = normTxtG(String(txt || '')).replace(/\s+/g, ' ').trim();
+  if (!s) return null;
+  const empieza = /^(link|enlace)\b/.test(s);
+  const nombra = /\bwompi\b/.test(s) || /\b(link|enlace)\s+(?:de\s+)?pago\b/.test(s);
+  if (!empieza && !nombra) return null;
+  if (!/\d/.test(s)) return empieza ? { pares: [] } : null;
+  let pct = '';
+  let wa = '';
+  // número del cliente: 10+ dígitos SEGUIDOS (con espacios se confundiría con
+  // "07 38 5730…": ref, talla y número pegados)
+  const mWa = s.match(/\+?\d{10,15}\b/);
+  if (mWa) { wa = mWa[0].replace(/\D/g, ''); s = s.replace(mWa[0], ' '); }
+  // descuento explícito: "10%", "10 %", "descuento 10", "con 10 de descuento"
+  const mPct = s.match(/\b(\d{1,2})\s*%/)
+    || s.match(/\b(?:descuento|dcto|dto|rebaja)\s*(?:de|del)?\s*(\d{1,2})\b/)
+    || s.match(/\b(\d{1,2})\s*(?:de|por)\s*(?:descuento|dcto|dto|ciento)\b/);
+  if (mPct) { pct = mPct[1]; s = s.replace(mPct[0], ' '); }
+  // números con su palabra clave delante, si la traen ("ref 07", "talla 38")
+  const toks = s.match(/\b(?:ref|referencia|talla|t)\s*\.?\s*\d{1,2}\b|\b\d{1,2}\b/g) || [];
+  const pares = [];
+  let sueltos = 0;
+  for (const tk of toks) {
+    const n = tk.replace(/\D/g, '');
+    const tipo = /^(ref|referencia)/.test(tk) ? 'ref' : /^t/.test(tk) ? 'talla' : '';
+    const ult = pares[pares.length - 1];
+    if (tipo === 'ref' || (!tipo && (!ult || ult.talla))) { pares.push({ ref: n, talla: '' }); if (!tipo) sueltos++; continue; }
+    if (tipo === 'talla' && !ult) { pares.push({ ref: '', talla: n }); continue; }
+    ult.talla = n;
+    if (!tipo) sueltos++;
+  }
+  // `link 07 38 10`: tres números sueltos = el tercero es el descuento (v10.2)
+  const ultimo = pares[pares.length - 1];
+  if (!pct && pares.length >= 2 && ultimo && ultimo.ref && !ultimo.talla && sueltos % 2 === 1) {
+    pct = ultimo.ref;
+    pares.pop();
+  }
+  return { pares, pct, wa };
+}
 // ---- conversión de tallas nacional/US → EUR (la que manejamos, 35-45) ----
 // Nacional→EUR: dama +1, hombre +2. US→EUR (aprox): dama +31, hombre +33.
 // La MATEMÁTICA la hace el código (no Gemini) para que siempre sea correcta.
@@ -713,9 +779,9 @@ function tandaCatalogo(to, items, offset, intro, masIdBase) {
   const fotos = [];
   for (const p of tanda) {
     const url = fotoUrlDe(p);
-    const caption = T(TEXTOS.fotoCaption, { ref: p.ref, detalle: detalleDe(p), precio: fmtPrecio(p.precio) });
+    const caption = T(TEXTOS.fotoCaption, { ref: p.ref, detalle: detalleDe(p), precio: fmtPrecioPromo(p) });
     if (url) fotos.push(msjImagen(to, url, caption));
-    else sinFoto.push(T(TEXTOS.fotoFallbackLinea, { ref: p.ref, detalle: detalleDe(p), precio: fmtPrecio(p.precio) }));
+    else sinFoto.push(T(TEXTOS.fotoFallbackLinea, { ref: p.ref, detalle: detalleDe(p), precio: fmtPrecioPromo(p) }));
   }
   if (FLAG_FLUIDEZ_CATALOGO) {
     // [F-CATALOGO] menos burbujas de golpe (fluidez F1): sin burbuja de intro
@@ -1291,6 +1357,19 @@ const FLAG_ELIGE_PAGO = /^(on|1|true|si|s[ií])$/i.test(String($env.BOT_ELIGE_PA
 // Con el flag ON, esa reescritura CONSERVA la línea de Bogotá delante del
 // pedido de dato. Con el flag OFF: exactamente el comportamiento de hoy.
 const FLAG_BOGOTA_CE = /^(on|1|true|si|s[ií])$/i.test(String($env.BOT_BOGOTA_CE || '').trim());
+// [PROMO-CATALOGO] (pedido del dueño, 18-ago) menciona la promoción de una
+// referencia (precioAntes/precio del catálogo, la misma que ya se ve en la
+// app y en la web) en las fichas que arma el CÓDIGO — no toca lo que el
+// modelo redacta libre. Flag OFF (default): el precio se ve exactamente
+// igual que siempre, aunque el catálogo ya traiga precioAntes.
+const FLAG_PROMO_CATALOGO = /^(on|1|true|si|s[ií])$/i.test(String($env.BOT_PROMO_CATALOGO || '').trim());
+// [LINK-320] (pedido del dueño, 7-sep) el comando `link` del 320 vivía detrás
+// de BOT_LEAD_CALIENTE, que en la VM quedó en `off` (el .env lo trae dos veces
+// y gana la última): el dueño pedía el link de Wompi y el bot lo trataba como
+// un cliente más. Este flag separa el comando del puntaje de leads. AUSENTE =
+// ENCENDIDO a propósito: solo lo usa el 320 y no toca a ningún cliente, así
+// que no exige editar el .env; `BOT_LINK_320=off` lo apaga sin rebuild.
+const FLAG_LINK_320 = !/^(off|0|false|no)$/i.test(String($env.BOT_LINK_320 || '').trim());
 // [CIERRE-ASESOR] (flag BOT_CIERRE_ASESOR, pedido del dueño 3-ago tras ver al
 // cerebro-IA delirar en vivo): el bot NO cierra la venta solo. Flujo fijo:
 // ficha+precio → ciudad → info de pago de esa ciudad → "¿procedemos a alistar
@@ -1748,23 +1827,18 @@ async function principal() {
   if (FLAG_LEAD_CALIENTE && esDueno) {
     const mL = texto.trim().match(/^(calientes|tomar|soltar)\b\s*(\+?[\d\s-]{0,20})$/i);
     if (mL) { await modoLeads(mL[1].toLowerCase(), String(mL[2] || '').replace(/\D/g, '')); return; }
-    // `link <ref> <talla> [pct] [wa]` — arma el mensaje de pago para que el dueño
-    // lo copie y se lo pegue él mismo al cliente. Vive DENTRO de principal() a
-    // propósito: crearLinkWompi() es una función anidada aquí.
-    // Se parte por espacios en vez de un regex con 4 grupos opcionales: así el
-    // número del cliente (10-13 dígitos) nunca se confunde con el descuento.
-    if (/^link\b/i.test(texto.trim())) {
-      const pz = texto.trim().split(/\s+/).slice(1).map((x) => x.replace(/\D/g, '')).filter(Boolean);
-      let refL = '', tallaL = '', pctL = '', waL = '';
-      for (const p of pz) {
-        if (p.length >= 10) { waL = p; continue; }
-        if (!refL) { refL = p; continue; }
-        if (!tallaL) { tallaL = p; continue; }
-        if (!pctL) { pctL = p; }
-      }
-      await modoLinkAdmin(refL, tallaL, pctL, waL);
-      return;
-    }
+  }
+  // ---- [LINK-320] el link de pago de Wompi que el dueño pide desde el 320 ----
+  // `link 07 38`, `link 07 38 10` (10% de descuento), `link 07 38 + 12 40` (dos
+  // pares en UN link) o en palabras: "dame el link de wompi de la ref 07 talla
+  // 38". Arma el mensaje de pago para que el dueño lo copie y se lo pegue él
+  // mismo al cliente. Vive DENTRO de principal() a propósito: crearLinkWompi()
+  // es una función anidada aquí. Antes (v10.2) solo existía con
+  // BOT_LEAD_CALIENTE, que en la VM quedó apagado; ahora también con
+  // FLAG_LINK_320 (encendido por defecto).
+  if ((FLAG_LEAD_CALIENTE || FLAG_LINK_320) && esDueno) {
+    const pl = leerPedidoLink(texto);
+    if (pl) { await modoLinkAdmin(pl); return; }
   }
 
   // ---- [MANCIPIOLA] botón de pánico para PROBAR (dueño, 25-jul) ----------
@@ -1936,7 +2010,7 @@ async function principal() {
     // (conversación espaciada, no un bloque de información de golpe).
     const nomFC = String(p.marca || '').trim();
     const tituloFC = nomFC ? nomFC.charAt(0).toUpperCase() + nomFC.slice(1) : (CAT_LABEL[p.cat] || 'Nuestro modelo');
-    const capFC = T(TEXTOS.conversaFicha, { nombre: tituloFC, precio: fmtPrecio(p.precio) });
+    const capFC = T(TEXTOS.conversaFicha, { nombre: tituloFC, precio: fmtPrecioPromo(p) });
     const urlsFC = (Array.isArray(p.fotos) ? p.fotos : []).map(fotoUrlDeId).filter(Boolean);
     // [CIUDAD-UNA-VEZ] la ciudad se pregunta UNA sola vez: si ya la dio
     // (convCiudad) o ya se le preguntó (convCiudadPreg), la ficha cierra con
@@ -1968,7 +2042,7 @@ async function principal() {
     if (!conFoto.length) return false;
     mensajes.push(msjTexto(to, intro || TEXTOS.conversaSondeoFotosIntro));
     conFoto.forEach((pS, i) => {
-      let capS = T(TEXTOS.conversaFicha, { nombre: String(pS.marca || '').trim() || (CAT_LABEL[pS.cat] || ''), precio: fmtPrecio(pS.precio) });
+      let capS = T(TEXTOS.conversaFicha, { nombre: String(pS.marca || '').trim() || (CAT_LABEL[pS.cat] || ''), precio: fmtPrecioPromo(pS) });
       if (i === conFoto.length - 1) capS += '\n\n' + TEXTOS.conversaSondeoCual;
       mensajes.push(msjImagen(to, fotoUrlDe(pS), capS));
     });
@@ -2780,7 +2854,7 @@ async function principal() {
       { ref: p.ref, precio: p.precio, cantidad, nombrePerfil: parsed.nombre || '' },
       tallaM ? { estado: 'datos', talla: tallaM[1] } : { estado: 'talla' }
     ));
-    const ficha = T(TEXTOS.fichaCaption, { ref: p.ref, info: infoRef(p), precio: fmtPrecio(p.precio) });
+    const ficha = T(TEXTOS.fichaCaption, { ref: p.ref, info: infoRef(p), precio: fmtPrecioPromo(p) });
     const url = fotoUrlDe(p);
     // [PAUTA-CATALOGO] invita a ver el resto del catálogo cuando el cliente
     // llegó de un anuncio (al final, como mensaje aparte). Flag OFF → no corre.
@@ -2913,48 +2987,69 @@ async function principal() {
     if (!id) throw new Error('Wompi no devolvió id de link');
     return { id, url: 'https://checkout.wompi.co/l/' + id };
   }
-  // ---- [LEAD-CALIENTE] `link <ref> <talla> [pct] [wa]` desde el 320 ----------
+  // ---- [LINK-320] el link de pago que el dueño pide desde el 320 ------------
   // El dueño está cerrando la venta él mismo por su WhatsApp y necesita el link
   // de pago sin tener que abrir Wompi. Le devuelve DOS burbujas: el resumen con
   // las cifras (para él) y el mensaje ya redactado (para copiar y pegar).
   // El pedido se registra ANTES de mandar el link — si no, entraría plata sin
   // pedido asociado y el webhook de Wompi no tendría qué confirmar.
-  async function modoLinkAdmin(ref, talla, pct, waCliente) {
-    if (!ref || !talla) { mensajes.push(msjTexto(to, TEXTOS.leadLinkUso)); return; }
-    const refN = String(ref).padStart(2, '0');
-    const p = catalogo.find((x) => x.ref === refN);
-    if (!p) { mensajes.push(msjTexto(to, T(TEXTOS.leadLinkRefNo, { ref: refN }))); return; }
+  // Varios pares (7-sep): UN solo link con la suma y UN solo pedido con
+  // cantidad = pares, ref "07+12" y talla "38+40". Un pedido por par NO sirve:
+  // el webhook de Wompi busca UN pedido por link (limit 1) y el otro quedaría
+  // en pago_pendiente para siempre en la app.
+  async function modoLinkAdmin(pl) {
+    const pares = (pl && pl.pares) || [];
+    if (!pares.length || pares.some((x) => !x.ref || !x.talla)) { mensajes.push(msjTexto(to, TEXTOS.leadLinkUso)); return; }
+    const items = [];
+    for (const par of pares) {
+      const refN = String(par.ref).padStart(2, '0');
+      const p = catalogo.find((x) => x.ref === refN);
+      if (!p) { mensajes.push(msjTexto(to, T(TEXTOS.leadLinkRefNo, { ref: refN }))); return; }
+      items.push({ ref: refN, talla: String(par.talla), precio: Number(p.precio) || 0, modelo: p.marca || p.nombre || '' });
+    }
     // el descuento lo calcula el CÓDIGO (el dueño solo dice el porcentaje) y se
     // topa en 15%, que es el techo de la casa (R4 del cuaderno)
-    const pctN = Math.min(15, Math.max(0, parseInt(pct, 10) || 0));
-    const base = Number(p.precio) || 0;
+    const pctN = Math.min(15, Math.max(0, parseInt(pl.pct, 10) || 0));
+    const base = items.reduce((a, x) => a + x.precio, 0);
     const total = Math.round(base * (100 - pctN) / 100);
-    const s = { ref: refN, talla: String(talla), precio: total, cantidad: 1 };
+    const refTxt = items.map((x) => x.ref).join('+');
+    const tallaTxt = items.map((x) => x.talla).join('+');
+    const s = { ref: refTxt, talla: tallaTxt, precio: total, cantidad: 1 };
     let link;
     try {
       link = await crearLinkWompi(s);
     } catch (e) {
-      await logError(tok, 'wompi-link-admin', e, { wa_id: to, contexto: 'ref=' + refN + ' talla=' + talla });
+      await logError(tok, 'wompi-link-admin', e, { wa_id: to, contexto: 'ref=' + refTxt + ' talla=' + tallaTxt });
       mensajes.push(msjTexto(to, T(TEXTOS.leadLinkFallo, { error: String(e && e.message || e).slice(0, 80) })));
       return;
     }
     const pedidoPath = await fsAdd(tok, 'tiendas/varman/pedidos', {
-      cliente_nombre: '', cliente_wa: waCliente || '', datos_envio: '',
-      ref: refN, talla: String(talla), cantidad: 1, total,
+      cliente_nombre: '', cliente_wa: pl.wa || '', datos_envio: '',
+      ref: refTxt, talla: tallaTxt, cantidad: items.length, total,
+      // detalle legible por par (toFs no guarda arreglos): "Ref 07 talla 38, Ref 12 talla 40"
+      detalle: items.length > 1 ? items.map((x) => 'Ref ' + x.ref + ' talla ' + x.talla).join(', ') : undefined,
       metodo_pago: 'Wompi', wompi_payment_link_id: link.id,
       estado: 'pago_pendiente', canal: 'manual-320',
       fuente: 'cierre-manual', creado: new Date().toISOString()
     });
-    mensajes.push(msjTexto(to, T(TEXTOS.leadLinkResumen, {
-      ref: refN, talla: String(talla),
-      modelo: p.marca || p.nombre || '',
-      precio: fmtPrecio(base),
-      lineaDto: pctN ? T(TEXTOS.leadLinkDto, { pct: pctN, ahorro: fmtPrecio(base - total) }) : '',
-      total: fmtPrecio(total)
+    const lineaDto = pctN ? T(TEXTOS.leadLinkDto, { pct: pctN, ahorro: fmtPrecio(base - total) }) : '';
+    if (items.length === 1) {
+      // un par: byte a byte el mensaje de siempre
+      mensajes.push(msjTexto(to, T(TEXTOS.leadLinkResumen, {
+        ref: items[0].ref, talla: items[0].talla, modelo: items[0].modelo,
+        precio: fmtPrecio(base), lineaDto, total: fmtPrecio(total)
+      }) + '\n\n_Pedido: ' + pedidoPath + '_'));
+      mensajes.push(msjTexto(to, T(TEXTOS.leadLinkParaCliente, { total: fmtPrecio(total), url: link.url })));
+      return;
+    }
+    mensajes.push(msjTexto(to, T(TEXTOS.leadLinkResumenVarios, {
+      n: items.length,
+      lineas: items.map((x) => T(TEXTOS.leadLinkLinea, { ref: x.ref, talla: x.talla, modelo: x.modelo, precio: fmtPrecio(x.precio) })).join('\n'),
+      precio: fmtPrecio(base), lineaDto, total: fmtPrecio(total)
     }) + '\n\n_Pedido: ' + pedidoPath + '_'));
     // burbuja aparte: el dueño la mantiene presionada, copia y pega. Va limpia,
     // sin nada suyo delante, para que se pueda reenviar tal cual.
-    mensajes.push(msjTexto(to, T(TEXTOS.leadLinkParaCliente, { total: fmtPrecio(total), url: link.url })));
+    mensajes.push(msjTexto(to, T(TEXTOS.leadLinkParaClienteVarios, { n: items.length, total: fmtPrecio(total), url: link.url })));
   }
   async function pagarConWompi(s) {
     let link;
@@ -3500,7 +3595,7 @@ async function principal() {
         await recordarFuente();
         for (const pF of itemsF.slice(0, 5)) {
           const urlF = fotoUrlDe(pF);
-          if (urlF) mensajes.push(msjImagen(to, urlF, T(TEXTOS.fotoCaption, { ref: pF.ref, detalle: detalleDe(pF), precio: fmtPrecio(pF.precio) })));
+          if (urlF) mensajes.push(msjImagen(to, urlF, T(TEXTOS.fotoCaption, { ref: pF.ref, detalle: detalleDe(pF), precio: fmtPrecioPromo(pF) })));
         }
         mensajes.push(listaFotoRefs(to, itemsF));
         if (dueno && dueno !== to) {
@@ -3971,6 +4066,10 @@ async function principal() {
         return pv ? (r + ' ' + iaNombreDe(pv)) : r;
       }).join(' | ')),
       'ya_salude: ' + d(st.saludado ? 'sí' : '') + ' · genero_ya_preguntado: ' + d(st.generoPreguntado ? 'sí' : ''),
+      // [SIN-MODELO] el dato que evita el "no lo encontré" a un simple "hola"
+      'modelo_nombrado_por_el_cliente: ' + (st.sinModelo
+        ? 'NO (en este mensaje no dijo ningún modelo, marca ni color: no busques nada, no digas que no lo encontraste; saluda si falta y pregunta qué modelo busca)'
+        : 'sí'),
       'fuente_titulo: ' + d(fuenteDet && fuenteDet.titulo),
       'ref_mapeada: ' + d(st.refMapeada) + ' · refPauta: ' + d(st.refPauta),
       'refs_publicacion: ' + d((st.refsPauta || []).map((r) => {
@@ -4061,6 +4160,17 @@ async function principal() {
     s = s.replace(/\b(quiero|quisiera|queria|busco|buscando|buscas|necesito|tienes|tienen|tiene|manejas|manejan|muestrame|muestra|mostrar|enviame|mandame|ver|unas|unos|una|uno|las|los|para|con|por|del|algo|modelo|modelos|zapatos|zapato|tenis|calzado|par|pares|color|colores|mismo|misma|mismos|mismas|esas|esos|estas|estos|ese|esa|que|mas|favor|porfavor|porfabor|profavor|gracias|hola|precio|precios|cuanto|vale|valen|disponible|disponibles|talla|tallas|numero|tono)\b/g, ' ');
     s = s.replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
     return s;
+  }
+  // [SIN-MODELO] ¿el mensaje trae ALGO que se pueda buscar? Aplica la misma
+  // limpieza del buscador y además tumba saludos, muletillas y palabras de
+  // "precio/info" que no nombran nada: "hl", "oli", "buenas", "cómo vas",
+  // "cuánto valen", "info porfa" → false. Un número (una ref) o cualquier
+  // palabra real ("samba", "rojas") → true.
+  function iaTieneContenido(txt) {
+    const RUIDO = /^(?:buen[oa]s?|dias?|tardes?|noches?|saludos?|hey+|ey+|hello|hi|holi[s]?|oli[s]?|ola+|h+o+l+a+|como|van|vas|esta[ns]?|todo|bien|hubo|onda|tal|info|informacion|cotizar|cotizacion|quisiera|saber|interesa|interesan|valor|cuesta|cuestan|costo|costos|disponibilidad|hay|bueno|buena|senor|senora|don|dona|amigo|amiga|disculpa|disculpe|perdon|oye|oiga|porfa|porfis|gracias|quiero|kiero|necesito|deseo|dame|puede|pueden|puedo|podria|podrian|ayuda|ayudar|pregunta|consulta|duda|manejan|venden|vende|ofrecen|tengo|estoy|soy|hola)$/;
+    const pal = iaLimpiarBusqueda(txt).split(/\s+/).filter(Boolean)
+      .filter((w) => /^\d+$/.test(w) || (w.length >= 3 && !RUIDO.test(w)));
+    return pal.length > 0;
   }
   function iaMarcasConocidas() {
     return ['nike', 'adidas', 'puma', 'reebok', 'jordan', 'vans', 'converse',
@@ -4187,6 +4297,7 @@ async function principal() {
       fichaRepetida: '',
       busquedaVacia: false,
       saludoPendiente: false,
+      sinModelo: false,     // [SIN-MODELO] el mensaje no trae nada que buscar
       fallos: 0,
       estado: {}            // campos de sesión a persistir al final
     };
@@ -4236,7 +4347,7 @@ async function principal() {
         const gF = iaGeneroDe(p);
         if (gF) { st.genero = gF; mv.estado.iaGenero = gF; }
       }
-      const cap = T(TEXTOS.conversaFicha, { nombre: iaNombreDe(p), precio: fmtPrecio(p.precio) });
+      const cap = T(TEXTOS.conversaFicha, { nombre: iaNombreDe(p), precio: fmtPrecioPromo(p) });
       if (yaVista) {
         mv.fichaRepetida = cap;
         return Object.assign(iaFichaJson(p), { foto_ya_enviada: true,
@@ -4275,6 +4386,15 @@ async function principal() {
             : 'Este modelo solo lo manejamos en el color de la foto. Díselo tal cual y sigue la venta. NO le ofrezcas otra marca.',
           modelo: pAct ? iaNombreDe(pAct) : '' };
       }
+      // [SIN-MODELO] no se busca lo que nadie pidió: un "precio", "info" o "hola"
+      // convertido en búsqueda daba vacío y terminaba en "no lo encontré".
+      if (mv.sinModelo) {
+        const pSin = iaRefValida(st.refActiva);
+        return { encontrado: false, resultados: [], nada_que_buscar: true,
+          nota: pSin
+            ? ('El cliente no nombró ningún modelo nuevo: sigue con el que está mirando (' + iaNombreDe(pSin) + '). No digas que no encontraste nada.')
+            : 'El cliente TODAVÍA no ha dicho ningún modelo, marca ni color: no hay nada que buscar y NO digas que no lo encontraste. Salúdalo si no lo has saludado y pregúntale qué modelo busca.' };
+      }
       const items = iaBuscarCatalogo(args.texto);
       if (!items.length) { mv.busquedaVacia = true; return { encontrado: false, resultados: [] }; }
       for (const p of items) mv.precios.push(Number(p.precio) || 0);
@@ -4310,7 +4430,7 @@ async function principal() {
       mv.contenido++;
       for (const p of conFoto) {
         mv.precios.push(Number(p.precio) || 0);
-        const cap = T(TEXTOS.conversaFicha, { nombre: iaNombreDe(p), precio: fmtPrecio(p.precio) });
+        const cap = T(TEXTOS.conversaFicha, { nombre: iaNombreDe(p), precio: fmtPrecioPromo(p) });
         if (!mv.fichaTexto) mv.fichaTexto = cap;
         if (iaAgregarFoto(mv, fotoUrlDe(p), cap)) iaMarcarFichaVista(p.ref, st, mv);
       }
@@ -4355,6 +4475,14 @@ async function principal() {
     }
     if (nombre === 'pasar_asesor') {
       const motivo = iaMotivosHandoff().indexOf(String(args.motivo || '')) >= 0 ? String(args.motivo) : 'pide_humano';
+      // [SIN-MODELO] un primer "hola"/"precio" no se pasa al asesor por "no
+      // encontrado" ni por "sin avance": no hay nada que pasar todavía. Los
+      // motivos del cliente (pide humano, comprobante, desconfía…) siguen vivos.
+      if (mv.sinModelo && mv.saludoPendiente
+          && ['modelo_no_encontrado', 'sin_avance', 'no_puedo_responder'].indexOf(motivo) >= 0) {
+        return { ok: false, motivo: 'nada_que_pasar',
+          nota: 'El cliente apenas saludó y no ha pedido ningún modelo: no hay nada que pasar al asesor. Salúdalo, preséntate en una línea y pregúntale qué modelo busca.' };
+      }
       mv.handoff = true;
       mv.traspaso = {
         motivo,
@@ -4707,6 +4835,17 @@ async function principal() {
       const hayIntencion = !!imagenTurno || !!iaMarcaPedida(entrada)
         || iaBuscarCatalogo(entrada).length > 0;
       mv.saludoPendiente = sinHistorial && !hayIntencion;
+      // ---- [SIN-MODELO] el cliente todavía no nombró nada que se pueda buscar ----
+      // Falla real (7-sep): "hola precio porfavor" → el modelo llamaba a
+      // buscar_catalogo("precio"), el catálogo devolvía vacío y L4b lo despachaba
+      // con "no lo encontré" + traspaso, sin que nadie hubiera pedido un modelo.
+      // Si el mensaje no trae marca, modelo, color, foto ni pide el catálogo, NO
+      // hay nada que buscar ni que no-encontrar: lo único correcto es saludar y
+      // preguntar qué modelo busca. Gemini sigue conduciendo (decisión del dueño:
+      // "siempre con Gemini"); esto solo le cierra la puerta al "no lo encontré".
+      mv.sinModelo = !imagenTurno && !iaMarcaPedida(entrada) && !iaTieneContenido(entrada)
+        && !PIDE_CATALOGO.test(String(entrada));
+      st.sinModelo = mv.sinModelo;
 
       // ---- capturas deterministas (alimentan [SESIÓN], nunca a Gemini) ----
       const nEnt = normTxtG(entrada);
@@ -4814,8 +4953,21 @@ async function principal() {
         await iaTraspasar(mv, st, hist, entrada, cuerpo);
         return true;
       }
+      // ---- [SIN-MODELO] "no lo encontré" sin que nadie pidiera nada ----
+      // El cliente solo saludó o pidió "precio"/"info" a secas: si el modelo aun
+      // así escribió que no lo encontró (o prometió un asesor), esas frases se
+      // caen y queda la pregunta por el modelo. Con una referencia ya en juego
+      // se deja el cuerpo vacío a propósito: el respaldo de abajo contesta con
+      // la ficha real ([PRECIO-TRAS-VETO]), que es lo que pedía.
+      if (mv.sinModelo && cuerpo && (iaDiceNoHallado(cuerpo) || (mv.saludoPendiente && iaPrometeHumano(cuerpo)))) {
+        const utiles = iaFrases(cuerpo).filter((f) => !iaDiceNoHallado(f) && !(mv.saludoPendiente && iaPrometeHumano(f)));
+        cuerpo = utiles.join(' ').replace(/\s+/g, ' ').trim();
+        if (!st.refActiva && (!cuerpo || !/[?¿]/.test(cuerpo))) {
+          cuerpo = (cuerpo + ' ' + TEXTOS.conversaSaludoPreg).trim();
+        }
+      }
       // ---- L4b · "no lo encontré" sin nada mostrado ⇒ D1 + traspaso real ----
-      if (mv.busquedaVacia && !mv.contenido && !mv.fichaTexto && !mv.fichaRepetida) {
+      if (mv.busquedaVacia && !mv.sinModelo && !mv.contenido && !mv.fichaTexto && !mv.fichaRepetida) {
         const d1 = iaDiceNoHallado(cuerpo) ? cuerpo : iaTextoNoEncontrado();
         mv.traspaso = { motivo: 'modelo_no_encontrado',
           quiere: String(entrada).replace(/\s+/g, ' ').slice(0, 160),
@@ -4940,7 +5092,7 @@ async function principal() {
         // del catálogo. Quedarse callado justo aquí es lo que no se puede hacer.
         const pPrecio = iaRefValida(st.refActiva);
         if (pPrecio && Number(pPrecio.precio) > 0 && !mv.saludoPendiente) {
-          cuerpo = T(TEXTOS.conversaFicha, { nombre: iaNombreDe(pPrecio), precio: fmtPrecio(pPrecio.precio) })
+          cuerpo = T(TEXTOS.conversaFicha, { nombre: iaNombreDe(pPrecio), precio: fmtPrecioPromo(pPrecio) })
             + (st.ciudad ? ' ¿Te la dejamos lista?' : ' ¿En qué ciudad estás ubicado?');
         } else if (mv.saludoPendiente) {
           cuerpo = T(TEXTOS.iaAperturaSaludo, { saludo: iaSaludoFranja(), asesor: iaNombreAsesor() })

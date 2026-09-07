@@ -1,0 +1,54 @@
+SUBIR EL BOT v12.2 (saludo sin "no lo encontre" + link de Wompi desde el 320)
+=============================================================================
+7-sep-2026. Esta version NO toca el .env. Cambia UN nodo (el Cerebro).
+Artefacto: bot-varman-PARA-SUBIR-v12.2-2026-09-07.json - 636.570 bytes, 13 nodos.
+Palabra que solo existe en esta version: BOT_LINK_320.
+
+Que cambia:
+  1. SALUDO. "hola precio porfavor", "hl", "hi", "oli", "como vas"... ya no
+     terminan en "no lo encontre entre los modelos" + traspaso. Gemini sigue
+     conduciendo (decision del dueno: "siempre con Gemini"), pero el codigo le
+     cierra esa puerta cuando el cliente NO ha nombrado ningun modelo:
+     buscar_catalogo no busca nada, pasar_asesor por "no encontrado" se
+     rechaza, y la frase "no lo encontre" se cae y queda la pregunta por el
+     modelo. "No lo encontre" solo existe si pidio un modelo concreto
+     (control: "jordan retro 99 moradas" sigue traspasando).
+  2. LINK DE WOMPI DESDE TU 320 (flag BOT_LINK_320, encendido por defecto):
+       link 07 38                 -> Ref 07 talla 38
+       link 07 38 10              -> con 10% de descuento (tope 15)
+       link 07 38 + 12 40         -> DOS pares en UN solo link (un pedido,
+                                     cantidad 2, ref "07+12", talla "38+40")
+       "dame el link de wompi de la ref 07 talla 38 con 10%"  -> tambien
+     Te devuelve dos burbujas: el resumen (para ti) y el mensaje listo para
+     copiar y pegarle al cliente. El pedido queda en Firestore ANTES del link
+     (pago_pendiente, canal manual-320) y el webhook de Wompi lo confirma solo.
+     Antes vivia detras de BOT_LEAD_CALIENTE, que en el .env de la VM quedo
+     en off (esta dos veces y gana la ultima).
+  3. Incluye la promo del catalogo de la v12.1 (18-ago), detras de
+     BOT_PROMO_CATALOGO, que esta APAGADO: no cambia nada hasta encenderlo.
+
+Pruebas: bateria offline 146 PASS / 0 FAIL ($0 de Gemini): P56 (saludo,
+6 casos con control negativo) y P57 (link, 11 casos incl. flag off).
+
+DESPLIEGUE (remoto desde el PC, con gcloud):
+  scp del JSON a /home/andre/bot-varman-v12.2.json + desplegar-v12.2.sh
+  bash /home/andre/desplegar-v12.2.sh
+     parar n8n -> exportar de la BASE el que corre (rollback real) -> copiar
+     -> verificar 636570 bytes + BOT_LINK_320 + 1 reloj -> import -> publish
+     por comando -> start
+  bash /home/andre/verificar-webhook.sh   ("token invalido" = ACTIVO)
+
+PRUEBA EN VIVO (desde un TERCER numero, no el 320):
+  1. mancipiola
+  2. "hola precio porfavor"  -> debe saludar y preguntar que modelo, SIN
+     "no lo encontre" y SIN avisarte a ti.
+  3. "hl" (nueva conversacion tras mancipiola) -> lo mismo.
+  4. "tienen jordan retro 99 moradas" -> "no lo encontre" + te llega el aviso.
+DESDE TU 320:
+  5. link 07 38          -> resumen + mensaje con el link
+  6. link 07 38 + 12 40  -> un solo link por la suma, "2 pares"
+
+ROLLBACK (un comando, en la VM):
+  cd ~/varman-bot && cp ~/bot-varman-ANTES-DE-v12.2-2026-09-07.json workflows/bot-varman.json && docker compose stop n8n && docker compose run --rm --no-deps -u node n8n import:workflow --input=/workflows/bot-varman.json && docker compose run --rm --entrypoint n8n n8n publish:workflow --id=VarmanBotV4Ped01 && docker compose start n8n
+Solo apagar el link (sin volver atras):
+  echo "BOT_LINK_320=off" >> ~/varman-bot/.env && docker compose up -d
