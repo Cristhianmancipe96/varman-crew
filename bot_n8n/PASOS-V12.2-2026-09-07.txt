@@ -49,6 +49,16 @@ DESDE TU 320:
   6. link 07 38 + 12 40  -> un solo link por la suma, "2 pares"
 
 ROLLBACK (un comando, en la VM):
-  cd ~/varman-bot && cp ~/bot-varman-ANTES-DE-v12.2-2026-09-07.json workflows/bot-varman.json && docker compose stop n8n && docker compose run --rm --no-deps -u node n8n import:workflow --input=/workflows/bot-varman.json && docker compose run --rm --entrypoint n8n n8n publish:workflow --id=VarmanBotV4Ped01 && docker compose start n8n
+  cd ~/varman-bot && cp ~/bot-varman-ARCHIVO-ANTES-DE-v12.2-2026-09-07.json workflows/bot-varman.json && docker compose stop n8n && docker compose run --rm --no-deps -u node n8n import:workflow --input=/workflows/bot-varman.json && docker compose run --rm --entrypoint n8n n8n publish:workflow --id=VarmanBotV4Ped01 && docker compose start n8n
 Solo apagar el link (sin volver atras):
   echo "BOT_LINK_320=off" >> ~/varman-bot/.env && docker compose up -d
+
+HECHO el 7-sep-2026 11:19-11:30 (remoto, desde el PC):
+  - import + publish limpios; n8n listo a las 11:21; handshake "token invalido"
+    a las 11:29 (8 min despues del arranque, como dicen las notas); salud 7/7.
+  - Base de n8n ANTES: 606.523 bytes de nodos, sin promo (= v12.0; la v12.1
+    del 18-ago NUNCA se importo). DESPUES: 621.542 bytes, con promo y link.
+  - Respaldo real del que corria: ~/bot-varman-ARCHIVO-ANTES-DE-v12.2-2026-09-07.json
+    (621.262 bytes = v12.0). El `export:workflow` a /workflows/ fallo con EROFS:
+    esa carpeta esta montada SOLO LECTURA en el contenedor. Si se quiere exportar
+    de la base, hay que apuntar --output a otra ruta montada con escritura.
