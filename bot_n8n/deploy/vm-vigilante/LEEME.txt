@@ -1,0 +1,31 @@
+VIGILANTE DEL BOT EN LA VM (puesto el 10-sep-2026 por el PM)
+=============================================================
+Copia de lo que corre en la VM varman-bot (los originales viven en /home/andre/ y en el crontab de ROOT).
+
+Qué había: el bot "se paraba" hasta que el dueño entraba a n8n y cancelaba ejecuciones zombis
+(en "running" por 25 h). Las zombis ocupan los 5 cupos del runner de código; lo demás hace cola,
+Meta recibe 502 y el cliente no recibe respuesta. /healthz seguía en 200 (por eso el healthcheck
+de Docker no servía). Debajo: VM de 1 GB con swap constante y base SQLite de 3 GB (87 % aire).
+
+Qué corre ahora (crontab de root, `sudo crontab -l`):
+  */5 * * * *  vigilante-bot.sh      handshake con token falso + conteo de zombis; reinicia n8n solo si
+                                      el webhook falla 2 chequeos seguidos o hay >=2 zombis en 2 chequeos.
+                                      Frenos: 20 min entre reinicios, máx. 4/día. Log: /var/log/varman-vigilante.log
+  30 2 * * 0   compactar-base.sh     domingos 2:30; solo actúa si la base tiene >30 % de aire (VACUUM INTO,
+                                      la vieja queda 7 días de respaldo). Log: /home/andre/compactar.log
+  30 2 11 9 *  FORZAR=1 compactar    UNA vez, 11-sep-2026 2:30 (3 GB -> ~0,4 GB). Se borra sola al terminar.
+  /etc/sysctl.d/99-varman-swap.conf  vm.swappiness=10 (antes 60): que el kernel no mande el runner a swap.
+
+Ver cómo va:      sudo tail -30 /var/log/varman-vigilante.log
+Apagar vigilante: sudo crontab -e  -> comentar la línea de vigilante-bot.sh
+Cancelar la compactación del 11-sep: sudo crontab -e -> borrar la línea con FORZAR=1
+Reinstalar todo:  scp los .sh a /home/andre/ y  sudo bash /home/andre/instalar-vigilante.sh  (idempotente)
+Diagnóstico solo lectura: sudo env HOME=/tmp bash /home/andre/diagnostico-bot.sh
+
+Ojo: el handshake del vigilante deja una ejecución chiquita cada 5 min (hub.challenge=VIGILANTE);
+al filtrar conversaciones en el barrido, ignorar las ejecuciones sin mensajes.
+
+Desde el PC (gcloud portable, ver ESTADO 9-ago):
+  gcloud compute scp archivo.sh varman-bot:/home/andre/ --zone=us-central1-a --quiet --scp-flag="-batch"
+  gcloud compute ssh varman-bot --zone=us-central1-a --quiet --ssh-flag="-batch" --command="sudo bash /home/andre/archivo.sh"
+  (los comandos largos van en un .sh: gcloud desde bash/PowerShell rompe las comillas)
