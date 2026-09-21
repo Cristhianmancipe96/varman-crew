@@ -81,6 +81,15 @@ const fbReady = () => !!db;
 const colRef = (name) => db.collection("tiendas").doc(TIENDA).collection(name);
 const metaRef = () => db.collection("tiendas").doc(TIENDA);
 
+// La venta de un LOCAL aliado nunca sube con costo: el local lee sus propias
+// ventas, y el costo es justo lo que no debe ver (en los celulares del equipo
+// se completa en memoria, ver conCostoLocal).
+const paraNube = (name, n) => {
+  if (name !== "sales" || !n || !n.local || !("costo" in n)) return n;
+  const { costo, ...sinCosto } = n;
+  return sinCosto;
+};
+
 // Escribe en la nube SOLO lo que cambió entre dos listas (no pisa lo de los demás)
 async function fbSyncList(name, oldArr, newArr) {
   if (!db) return;
@@ -91,7 +100,7 @@ async function fbSyncList(name, oldArr, newArr) {
   const ops = [];
   Object.keys(newById).forEach((id) => {
     const o = oldById[id], n = newById[id];
-    if (!o || JSON.stringify(o) !== JSON.stringify(n)) ops.push(colRef(name).doc(String(id)).set(n));
+    if (!o || JSON.stringify(o) !== JSON.stringify(n)) ops.push(colRef(name).doc(String(id)).set(paraNube(name, n)));
   });
   Object.keys(oldById).forEach((id) => {
     if (!newById[id]) ops.push(colRef(name).doc(String(id)).delete());
@@ -275,6 +284,52 @@ function telExportPedido(wa) {
 // reglas de Firestore bloquean la colección "gastos" para cualquier otro
 // usuario (el vendedor no puede leerla ni por medios técnicos).
 const SOCIOS_CAJA = ["c.mancipe.96@gmail.com", "andresvargasm91@gmail.com"];
+
+// ---------- Locales aliados (exhiben mercancía de VarMan) — 2026-09-21 ----------
+// Un LOCAL es un punto de venta ajeno que exhibe pares de VarMan. Entra con su
+// propio correo y SOLO tiene dos pestañas: Inventario (consulta: stock y precio
+// de venta) y Ventas (registra los pares de VarMan que vendió HOY; cada venta
+// descuenta el stock). NUNCA ve lo que le costó el par a VarMan: el local no
+// lee `products` sino `vitrina`, una copia del inventario SIN el costo que
+// mantienen al día los celulares del equipo (ver "Vitrina" más abajo). La
+// protección real son las reglas de Firestore, no esta app.
+// Sus ventas quedan en `sales` con `local: <correo>`; los socios las ven en la
+// Caja (detalle del día, con 🏬) y cuentan en Stats como cualquier venta.
+// Para dar acceso a un local nuevo (3 pasos):
+//   1) Firebase Console → Authentication → agregar usuario (correo + contraseña).
+//   2) Poner el correo (en minúsculas) y el nombre del local aquí.
+//   3) Poner el MISMO correo en esLocal() de reglas-firestore.txt y republicar.
+const LOCALES = {
+  "larolastore1@gmail.com": "La Rola Store", // primer local aliado (2026-09-19)
+};
+const localDe = (email) => LOCALES[(email || "").toLowerCase()] || null;
+
+// Lo ÚNICO de un producto que puede ver un local. Lista cerrada a propósito:
+// un campo nuevo en `products` no llega a la vitrina hasta que se agregue aquí
+// (así nunca se cuela un dato privado por descuido). El costo NO está.
+const VITRINA_COL = "vitrina";
+const VITRINA_CAMPOS = ["id", "referencia", "modelo", "color", "talla", "precio", "stock"];
+const fichaVitrina = (p) => {
+  const o = {};
+  VITRINA_CAMPOS.forEach((k) => { if (p[k] !== undefined) o[k] = p[k]; });
+  return o;
+};
+// Comparar dos fichas sin depender del orden en que Firestore devuelve los campos
+const fichaCanon = (o) => JSON.stringify(Object.keys(o || {}).sort().map((k) => [k, o[k]]));
+
+// Las ventas de un local se guardan SIN costo (el local lee sus propias ventas:
+// si el costo estuviera ahí, lo vería). En los celulares del equipo el costo se
+// completa en memoria desde el inventario, para que ganancia y Stats cuadren.
+const conCostoLocal = (lista, prods) => {
+  if (!lista || !lista.some((s) => s && s.local && s.costo == null)) return lista;
+  const porId = {};
+  (prods || []).forEach((p) => { porId[p.id] = p; });
+  return lista.map((s) =>
+    s && s.local && s.costo == null && porId[s.productoId]
+      ? { ...s, costo: Number(porId[s.productoId].costo) || 0 }
+      : s
+  );
+};
 
 // Saldo REAL verificado por los socios en su Excel al cierre del 22/06/2026.
 // Todo lo anterior a esa fecha ya quedó cuadrado dentro de este número: el
@@ -797,6 +852,13 @@ function VarmanApp() {
   const [tab, setTab] = useState("inventario");
   const [products, setProducts] = useState([]);
   const [sales, setSales] = useState([]);
+  // Vitrina: copia del inventario SIN costo que leen los locales aliados.
+  // null = todavía no llegó de la nube (no se concilia a ciegas).
+  const [vitrina, setVitrina] = useState(null);
+  const productsRef = useRef([]);
+  productsRef.current = products;
+  const prodsDeNube = useRef(false);   // ¿`products` ya vino de Firestore (y no de la caché)?
+  const vitrinaEscritas = useRef({});  // fusible: escrituras por ficha en esta sesión
   const [logo, setLogo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
@@ -873,6 +935,10 @@ function VarmanApp() {
   // La pestaña Búnker (el local del socio) solo existe para SOCIOS_BUNKER.
   // Sin Firebase (modo local de prueba) se muestra para poder revisarla.
   const esBunker = !auth || !!(user && SOCIOS_BUNKER.indexOf((user.email || "").toLowerCase()) !== -1);
+
+  // Un LOCAL aliado (correo en LOCALES): solo Inventario (consulta) y SUS ventas de hoy.
+  const nombreLocal = auth && user ? localDe(user.email) : null;
+  const esLocal = !!nombreLocal;
 
   // Con 7 pestañas la barra de abajo ya no cabe en un celular de 375px y se
   // desliza. Sin esto, la pestaña activa puede quedar FUERA de la pantalla
@@ -965,9 +1031,38 @@ function VarmanApp() {
   useEffect(() => {
     // Con login activo, esperar a tener sesión antes de cargar/sincronizar
     if (auth && !user) return;
-    let unsubP, unsubS, unsubM, unsubF, unsubG, unsubPed, unsubOcultos, unsubCnt, localData = null;
+    let unsubP, unsubS, unsubM, unsubF, unsubG, unsubPed, unsubOcultos, unsubCnt, unsubVit, localData = null;
     let unsubBk = []; // suscripciones del Local Búnker (una por colección)
     (async () => {
+      // 0) LOCAL ALIADO: no toca la caché de este celular (puede tener datos de
+      //    VarMan de otra sesión) ni ninguna colección del equipo. Lee SOLO la
+      //    vitrina (inventario sin costo), SUS ventas, las fotos y el logo; las
+      //    reglas de Firestore le rechazan todo lo demás.
+      if (esLocal) {
+        if (!fbReady()) { setLoading(false); return; }
+        unsubP = colRef(VITRINA_COL).onSnapshot((snap) => {
+          setProducts(snap.docs.map((d) => d.data()));
+          setLoading(false);
+        }, (err) => { console.warn("Firestore vitrina:", err && err.message); setLoading(false); });
+        // La consulta DEBE filtrar por su correo: sin el filtro Firestore la rechaza entera.
+        unsubS = colRef("sales").where("local", "==", (user.email || "").toLowerCase()).onSnapshot((snap) => {
+          setSales(snap.docs.map((d) => d.data()));
+        }, (err) => console.warn("Firestore sales (local):", err && err.message));
+        unsubM = metaRef().onSnapshot((doc) => {
+          const d = doc.data();
+          if (d && Object.prototype.hasOwnProperty.call(d, "logo")) setLogo(d.logo || null);
+        }, (err) => console.warn("Firestore tienda:", err && err.message));
+        unsubF = colRef("fotos").onSnapshot((snap) => {
+          const next = {};
+          snap.forEach((doc) => {
+            const x = doc.data();
+            if (x && x.data) next[(x && x.key) || decodeURIComponent(doc.id)] = x.data;
+          });
+          setFotos(next);
+        }, (err) => console.warn("Firestore fotos:", err && err.message));
+        return;
+      }
+
       // 1) Cache local: muestra algo al instante y sirve de respaldo offline
       try {
         const raw = await store.get(STORAGE_KEY);
@@ -1030,13 +1125,22 @@ function VarmanApp() {
       //    Si la nube está vacía (primer arranque) no pisamos lo local; el
       //    sembrado de abajo la llena.
       unsubP = colRef("products").onSnapshot((snap) => {
-        if (!snap.empty) setProducts(snap.docs.map((d) => d.data()));
+        if (!snap.empty) { prodsDeNube.current = true; setProducts(snap.docs.map((d) => d.data())); }
         setLoading(false);
       }, (err) => { console.warn("Firestore products:", err && err.message); setLoading(false); });
 
       unsubS = colRef("sales").onSnapshot((snap) => {
-        if (!snap.empty) setSales(snap.docs.map((d) => d.data()));
+        if (!snap.empty) setSales(conCostoLocal(snap.docs.map((d) => d.data()), productsRef.current));
       }, (err) => console.warn("Firestore sales:", err && err.message));
+
+      // Vitrina (lo que ven los locales aliados): el equipo la escucha para
+      // poder mantenerla igual al inventario (ver el efecto "Vitrina" abajo).
+      // Se acepta el snapshot vacío: la primera vez ES vacía y hay que llenarla.
+      unsubVit = colRef(VITRINA_COL).onSnapshot((snap) => {
+        const m = {};
+        snap.forEach((d) => { m[d.id] = d.data(); });
+        setVitrina(m);
+      }, (err) => console.warn("Firestore vitrina:", err && err.message));
 
       unsubM = metaRef().onSnapshot((doc) => {
         const d = doc.data();
@@ -1149,7 +1253,7 @@ function VarmanApp() {
         } catch (e) { console.warn("Error subiendo datos iniciales:", e && e.message); }
       })();
     })();
-    return () => { unsubP && unsubP(); unsubS && unsubS(); unsubM && unsubM(); unsubF && unsubF(); unsubG && unsubG(); unsubPed && unsubPed(); unsubOcultos && unsubOcultos(); unsubCnt && unsubCnt(); unsubBk.forEach((u) => u && u()); };
+    return () => { unsubP && unsubP(); unsubS && unsubS(); unsubM && unsubM(); unsubF && unsubF(); unsubG && unsubG(); unsubPed && unsubPed(); unsubOcultos && unsubOcultos(); unsubCnt && unsubCnt(); unsubVit && unsubVit(); unsubBk.forEach((u) => u && u()); };
   }, [user]);
 
   // Asignar / quitar foto a un grupo modelo+color.
@@ -1189,6 +1293,114 @@ function VarmanApp() {
       fbSyncList("sales", prevSales, nextSales);
       if (nextLogo !== prevLogo) metaRef().set({ logo: nextLogo }, { merge: true });
     }
+  };
+
+  // ---------- Vitrina: el inventario SIN costo que ven los locales aliados ----------
+  // Un local no puede leer `products` (ahí viaja el costo): lee `vitrina`. Esta
+  // copia la mantiene igual al inventario CUALQUIER celular del equipo que tenga
+  // la app abierta: cada vez que cambia el inventario (una venta del Búnker, el
+  // bot, un ajuste de stock, una referencia nueva) se corrige solo lo distinto.
+  // Es idempotente — dos celulares a la vez escriben lo mismo — y se espera 1,5 s
+  // para no escribir a mitad de una ráfaga de cambios.
+  useEffect(() => {
+    if (esLocal || !auth || !user || !fbReady()) return;
+    if (vitrina === null || !prodsDeNube.current) return;
+    if (typeof navigator !== "undefined" && navigator.onLine === false) return;
+    const t = setTimeout(() => {
+      const ops = [];
+      const vistos = {};
+      products.forEach((p) => {
+        if (!p || p.id == null) return;
+        const id = String(p.id);
+        vistos[id] = true;
+        const ficha = fichaVitrina(p);
+        if (fichaCanon(ficha) !== fichaCanon(vitrina[id])) ops.push({ id, ficha });
+      });
+      Object.keys(vitrina).forEach((id) => { if (!vistos[id]) ops.push({ id, borrar: true }); });
+      // Fusible: si una ficha se reescribe demasiadas veces en la misma sesión
+      // algo anda mal (dos versiones peleando); se deja de insistir con ESA ficha
+      // en vez de gastar escrituras sin fin.
+      const validas = ops.filter((o) => (vitrinaEscritas.current[o.id] = (vitrinaEscritas.current[o.id] || 0) + 1) <= 40);
+      for (let i = 0; i < validas.length; i += 400) {
+        const batch = db.batch();
+        validas.slice(i, i + 400).forEach((o) => {
+          const ref = colRef(VITRINA_COL).doc(o.id);
+          if (o.borrar) batch.delete(ref); else batch.set(ref, o.ficha);
+        });
+        batch.commit().catch((e) => console.warn("Error actualizando la vitrina:", e && e.message));
+      }
+    }, 1500);
+    return () => clearTimeout(t);
+  }, [products, vitrina, user]);
+
+  // Las ventas de los locales llegan sin costo: completarlo cuando el inventario
+  // llega DESPUÉS que las ventas (si no hay nada que completar, no cambia nada).
+  useEffect(() => {
+    if (esLocal) return;
+    setSales((prev) => conCostoLocal(prev, products));
+  }, [products]);
+
+  // ---------- Ventas de un LOCAL aliado ----------
+  // El local NO usa persist(): escribe directo, en UN batch atómico, para que las
+  // reglas de Firestore verifiquen todo junto: la venta lleva su correo y la
+  // fecha de HOY; en el producto solo cambia `stock` (incremento atómico, nunca
+  // negativo) y `movLocal` = id de la venta — con eso las reglas comprueban que
+  // el stock baja EXACTAMENTE lo vendido y solo si la venta existe. La vitrina
+  // (su copia sin costo) se mueve igual para que vea el stock nuevo al instante.
+  // No se espera la promesa: con la persistencia offline el cambio se ve de una
+  // y sube al volver la red (igual que actualizarPedido).
+  const registrarVentaLocal = (venta, prod) => {
+    if (!fbReady() || !user || !prod) {
+      showToast("Sin conexión con la nube: no se pudo guardar.", true);
+      return false;
+    }
+    const cantidad = Math.max(1, Math.floor(Number(venta.cantidad) || 1));
+    const id = "s" + Date.now() + Math.floor(Math.random() * 999);
+    const doc = {
+      id,
+      productoId: String(prod.id),
+      fecha: hoyLocal(),
+      cliente: venta.cliente || "",
+      modelo: prod.modelo || "",
+      talla: prod.talla != null ? String(prod.talla) : "",
+      precio: Math.round(Number(venta.precio) || 0),
+      cantidad,
+      canal: "local",
+      origen: "manual",
+      local: (user.email || "").toLowerCase(),
+      localNombre: nombreLocal,
+    };
+    const inc = firebase.firestore.FieldValue.increment(-cantidad);
+    const batch = db.batch();
+    batch.set(colRef("sales").doc(id), doc);
+    batch.update(colRef("products").doc(String(prod.id)), { stock: inc, movLocal: id });
+    batch.update(colRef(VITRINA_COL).doc(String(prod.id)), { stock: inc });
+    batch.commit().catch((e) => {
+      console.warn("Error registrando venta del local:", e && e.message);
+      showToast("No se pudo registrar la venta (puede que ese par ya no esté). Revisa el stock e intenta de nuevo.", true);
+    });
+    return true;
+  };
+
+  // Borrar una venta PROPIA del local hecha HOY (devuelve el par). Las reglas
+  // solo dejan borrar ventas suyas, de hoy y que VarMan no haya anulado.
+  const eliminarVentaLocal = (s) => {
+    if (!fbReady() || !user || !s || !s.productoId) {
+      showToast("No se pudo eliminar. Escríbele a VarMan para corregirla.", true);
+      return false;
+    }
+    const cantidad = Math.max(1, Math.floor(Number(s.cantidad) || 1));
+    const inc = firebase.firestore.FieldValue.increment(cantidad);
+    const pid = String(s.productoId);
+    const batch = db.batch();
+    batch.delete(colRef("sales").doc(String(s.id)));
+    batch.update(colRef("products").doc(pid), { stock: inc, movLocal: String(s.id) });
+    if (products.some((p) => String(p.id) === pid)) batch.update(colRef(VITRINA_COL).doc(pid), { stock: inc });
+    batch.commit().catch((e) => {
+      console.warn("Error eliminando venta del local:", e && e.message);
+      showToast("No se pudo eliminar la venta. Escríbele a VarMan para corregirla.", true);
+    });
+    return true;
   };
 
   // Guardar los gastos de la caja (respaldo local + nube; solo socios)
@@ -1457,7 +1669,7 @@ function VarmanApp() {
           env(safe-area-inset-top) baja la cabecera para que quede cómoda de tocar. */}
       <header style={{ padding: "18px 20px 0", paddingTop: "calc(env(safe-area-inset-top, 0px) + 26px)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div>
-          <div style={eyebrow()}>control de bodega</div>
+          <div style={eyebrow()}>{esLocal ? "🏬 " + nombreLocal : "control de bodega"}</div>
           {logo ? (
             <img
               src={logo}
@@ -1524,17 +1736,20 @@ function VarmanApp() {
           <div style={eyebrow("rgba(255,255,255,.55)")}>ventas de hoy</div>
           <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginTop: 4 }}>
             <span style={display(34, "#fff")}>{fmt(totalHoy)}</span>
-            <span style={{ fontSize: 13, fontWeight: 700, color: "#5BD692" }}>+{fmt(gananciaHoy)} ganancia</span>
+            {/* La ganancia sale del costo: un local aliado no la ve (ni la tiene) */}
+            {!esLocal && <span style={{ fontSize: 13, fontWeight: 700, color: "#5BD692" }}>+{fmt(gananciaHoy)} ganancia</span>}
           </div>
           <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
             <MiniStat label="Pares vendidos" value={paresVendidosHoy} />
             <MiniStat label="Pares en stock" value={totalPares} />
-            <MiniStat
-              label="Por agotarse"
-              value={agotados}
-              warn={agotados > 0}
-              onClick={agotados > 0 ? () => { setLowOnly(true); setTab("inventario"); } : undefined}
-            />
+            {!esLocal && (
+              <MiniStat
+                label="Por agotarse"
+                value={agotados}
+                warn={agotados > 0}
+                onClick={agotados > 0 ? () => { setLowOnly(true); setTab("inventario"); } : undefined}
+              />
+            )}
           </div>
         </div>
       </div>
@@ -1547,6 +1762,24 @@ function VarmanApp() {
             <div key={i} style={{ ...cardStyle({ height: 84, marginBottom: 10 }), animation: "vmPulse 1.4s ease infinite" }} />
           ))}
         </div>
+      ) : esLocal ? (
+        <>
+          {/* LOCAL ALIADO: dos pantallas propias y nada más. No se reusa el
+              Inventario ni las Ventas del equipo a propósito: esas pantallas
+              editan, exportan y muestran costos. */}
+          {tab !== "ventas" && <InventarioLocal products={products} fotos={fotos} />}
+          {tab === "ventas" && (
+            <VentasLocal
+              nombreLocal={nombreLocal}
+              products={products}
+              sales={sales}
+              fotos={fotos}
+              registrarVenta={registrarVentaLocal}
+              eliminarVenta={eliminarVentaLocal}
+              showToast={showToast}
+            />
+          )}
+        </>
       ) : (
         <>
           {tab === "inventario" && !verConteo && (
@@ -1656,13 +1889,20 @@ function VarmanApp() {
             de crear pedidos. Ninguno de los dos componentes se borró — solo
             perdieron su botón — así que los datos viejos siguen intactos y el
             código puede reactivarse con solo devolver estas dos líneas. */}
-        {[
-          { id: "inventario", label: "Inventario", icon: IconBox },
-          { id: "stats", label: "Stats", icon: IconStats },
-          { id: "tienda", label: "Tienda", icon: IconStore },
-          ...(esSocio ? [{ id: "caja", label: "Caja", icon: IconCash }] : []),
-          ...(esBunker ? [{ id: "bunker", label: "Búnker", icon: IconBunker }] : []),
-        ].map((t) => {
+        {(esLocal
+          ? [
+              // Local aliado: consulta el inventario y registra sus ventas de hoy. Nada más.
+              { id: "inventario", label: "Inventario", icon: IconBox },
+              { id: "ventas", label: "Ventas", icon: IconChart },
+            ]
+          : [
+              { id: "inventario", label: "Inventario", icon: IconBox },
+              { id: "stats", label: "Stats", icon: IconStats },
+              { id: "tienda", label: "Tienda", icon: IconStore },
+              ...(esSocio ? [{ id: "caja", label: "Caja", icon: IconCash }] : []),
+              ...(esBunker ? [{ id: "bunker", label: "Búnker", icon: IconBunker }] : []),
+            ]
+        ).map((t) => {
           const active = tab === t.id;
           const Icon = t.icon;
           const lado = esSocio ? 46 : 50;
@@ -6842,6 +7082,8 @@ function Caja({ sales, gastos, persistGastos, addGasto, showToast, products = []
                         </div>
                         <div style={{ fontSize: 11.5, color: C.muted, marginTop: 2, fontWeight: 600 }}>
                           {talla ? "talla " + talla : "sin talla"}{cant > 1 ? " · " + cant + " pares" : ""}
+                          {/* Venta que registró un local aliado desde su propio acceso */}
+                          {s.localNombre ? " · 🏬 " + s.localNombre : ""}
                         </div>
                       </div>
                       {/* El precio es el de la bodega (lo que te pagan) y debajo lo
@@ -8864,6 +9106,373 @@ function BunkerGraficas({ ventasR, filasSaldo, porMedio, totalVenta, utilidadBru
             </div>
           ))}
         </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+// LOCAL ALIADO — las dos únicas pantallas de un local que exhibe pares de
+// VarMan (correo en LOCALES). Trabajan sobre la VITRINA (el inventario SIN
+// costo), así que aquí no hay costo que esconder: sencillamente no llega.
+// ============================================================
+
+// Agrupa las filas del inventario (una por talla) en modelos, por referencia
+// base; sin referencia, por modelo+color.
+const agruparParaLocal = (lista) => {
+  const grupos = [];
+  const idx = {};
+  lista.forEach((p) => {
+    const clave = refBase(p.referencia) || fotoKey(p.modelo, p.color);
+    let g = idx[clave];
+    if (!g) {
+      g = idx[clave] = { clave, modelo: p.modelo, color: p.color, ref: refBase(p.referencia).toUpperCase(), tallas: [] };
+      grupos.push(g);
+    }
+    g.tallas.push(p);
+  });
+  grupos.forEach((g) => {
+    g.tallas.sort((a, b) => (Number(a.talla) || 0) - (Number(b.talla) || 0));
+    g.pares = g.tallas.reduce((a, p) => a + (Number(p.stock) || 0), 0);
+    const precios = g.tallas.map((p) => Number(p.precio) || 0).filter((x) => x > 0);
+    g.precioMin = precios.length ? Math.min.apply(null, precios) : 0;
+    g.precioMax = precios.length ? Math.max.apply(null, precios) : 0;
+  });
+  return grupos;
+};
+
+// Inventario de CONSULTA: qué hay, en qué tallas y a qué precio se vende.
+// No edita, no exporta, no muestra costos ni márgenes.
+function InventarioLocal({ products, fotos = {} }) {
+  const [q, setQ] = useState("");
+  const [soloConStock, setSoloConStock] = useState(true);
+  const palabras = normTxt(q).split(" ").filter(Boolean);
+  const filtrados = products.filter((p) => {
+    if (soloConStock && (Number(p.stock) || 0) <= 0) return false;
+    if (!palabras.length) return true;
+    const texto = normTxt(p.referencia + " " + p.modelo + " " + p.color + " " + p.talla);
+    return palabras.every((w) => texto.includes(w));
+  });
+  const grupos = agruparParaLocal(filtrados).sort((a, b) => (a.ref || a.modelo || "").localeCompare(b.ref || b.modelo || ""));
+
+  return (
+    <div style={{ padding: "16px 16px 0" }} className="vm-fade">
+      <div style={{ padding: "0 4px", marginBottom: 10 }}>
+        <div style={display(19)}>Inventario</div>
+        <div style={{ fontSize: 12, color: C.muted, fontWeight: 600, marginTop: 2 }}>Solo consulta · pares de VarMan y su precio de venta</div>
+      </div>
+      <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar referencia, modelo o talla…" style={inputStyle({ borderRadius: 14, flex: 1 })} />
+        <button onClick={() => setSoloConStock(!soloConStock)} style={btnGhost({ borderRadius: 14, padding: "0 12px", fontSize: 12, whiteSpace: "nowrap" })}>
+          {soloConStock ? "Con stock" : "Todo"}
+        </button>
+      </div>
+
+      {grupos.length === 0 && (
+        <EmptyState
+          icon={<IconBox big />}
+          title={products.length ? "Nada coincide" : "Aún no hay inventario para mostrar"}
+          text={products.length ? "Prueba con otra referencia, o toca el botón de al lado para ver también lo agotado." : "Si sigue vacío en unos minutos, avísale a VarMan."}
+        />
+      )}
+
+      {grupos.map((g) => {
+        const foto = fotoDeProd(fotos, g.tallas[0]);
+        return (
+          <div key={g.clave} style={cardStyle({ padding: 14, marginBottom: 10 })}>
+            <div style={{ display: "flex", gap: 12 }}>
+              {foto ? (
+                <img src={foto} alt="" style={{ width: 64, height: 64, borderRadius: 14, objectFit: "cover", flexShrink: 0, border: `1px solid ${C.line}`, background: C.bg }} />
+              ) : (
+                <div style={{ width: 64, height: 64, borderRadius: 14, background: C.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, flexShrink: 0, border: `1px solid ${C.line}` }}>👟</div>
+              )}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 800, fontSize: 14.5, lineHeight: 1.25 }}>
+                  {g.ref && <span style={{ background: C.accentSoft, color: C.accent, fontWeight: 800, fontSize: 10.5, padding: "2px 7px", borderRadius: 99, marginRight: 6, verticalAlign: "middle" }}>{g.ref}</span>}
+                  {g.modelo}{g.color ? " " + g.color : ""}
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: 5, gap: 8 }}>
+                  <span style={{ fontWeight: 800, fontSize: 15 }}>
+                    {g.precioMin && g.precioMin !== g.precioMax ? fmt(g.precioMin) + " – " + fmt(g.precioMax) : fmt(g.precioMax)}
+                  </span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: g.pares > 0 ? C.muted : C.red }}>
+                    {g.pares > 0 ? g.pares + (g.pares === 1 ? " par" : " pares") : "Agotado"}
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 11 }}>
+              {g.tallas.map((p) => {
+                const st = Number(p.stock) || 0;
+                return (
+                  <div key={p.id} style={{ border: `1.5px solid ${C.line}`, background: C.bg, borderRadius: 10, padding: "6px 9px", display: "flex", flexDirection: "column", alignItems: "center", gap: 1, minWidth: 50, opacity: st > 0 ? 1 : 0.45 }}>
+                    <span style={{ ...display(15), lineHeight: 1 }}>{p.talla || "—"}</span>
+                    <span style={{ fontSize: 9, fontWeight: 700, color: st <= 1 ? C.red : C.muted, letterSpacing: "0.04em" }}>{st} {st === 1 ? "PAR" : "PARES"}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// Ventas del local: registra los pares de VarMan que vendió HOY (referencia del
+// inventario → descuenta el stock) y puede eliminar una venta de hoy si se
+// equivocó. Los días anteriores solo se consultan: ni la app ni las reglas de
+// Firestore dejan registrar o borrar ventas con otra fecha.
+const emptyVentaLocal = () => ({ productoId: "", precio: "", cantidad: 1, cliente: "" });
+
+function VentasLocal({ nombreLocal, products, sales, fotos = {}, registrarVenta, eliminarVenta, showToast }) {
+  const [verFecha, setVerFecha] = useState(hoyLocal());
+  const [showForm, setShowForm] = useState(false);
+  const [draft, setDraft] = useState(emptyVentaLocal());
+  const [pq, setPq] = useState("");
+  const [actionSale, setActionSale] = useState(null);
+  const [confirmDel, setConfirmDel] = useState(false);
+
+  const hoy = hoyLocal();
+  const esHoy = verFecha === hoy;
+  const shiftFecha = (iso, n) => {
+    const [y, m, d] = iso.split("-").map(Number);
+    const dt = new Date(y, m - 1, d + n);
+    const p = (x) => String(x).padStart(2, "0");
+    return dt.getFullYear() + "-" + p(dt.getMonth() + 1) + "-" + p(dt.getDate());
+  };
+  const prodPorId = {};
+  products.forEach((p) => { prodPorId[String(p.id)] = p; });
+  const fotoVenta = (s) => (prodPorId[String(s.productoId)] ? fotoDeProd(fotos, prodPorId[String(s.productoId)]) : null);
+  const pares = (s) => Math.max(1, Math.floor(Number(s.cantidad) || 1));
+
+  // Todas las ventas que llegan son suyas (la nube solo le entrega las suyas)
+  const ventasDia = sales.filter((s) => s.fecha === verFecha).sort((a, b) => (a.id < b.id ? 1 : -1));
+  const validas = ventasDia.filter((s) => !s.anulada);
+  const paresDia = validas.reduce((a, s) => a + pares(s), 0);
+  const totalDia = validas.reduce((a, s) => a + (Number(s.precio) || 0) * pares(s), 0);
+
+  // Buscador: solo referencias con stock
+  const palabras = normTxt(pq).split(" ").filter(Boolean);
+  const grupos = !palabras.length
+    ? []
+    : agruparParaLocal(
+        products.filter((p) => {
+          if ((Number(p.stock) || 0) <= 0) return false;
+          const texto = normTxt(p.referencia + " " + p.modelo + " " + p.color + " " + p.talla);
+          return palabras.every((w) => texto.includes(w));
+        })
+      ).slice(0, 12);
+
+  const prodSel = draft.productoId ? prodPorId[String(draft.productoId)] || null : null;
+  const stockDisp = prodSel ? Number(prodSel.stock) || 0 : 0;
+  const cant = Math.max(1, Math.floor(Number(draft.cantidad) || 1));
+
+  const pickProduct = (id) => {
+    const p = prodPorId[String(id)];
+    setDraft(p ? { ...draft, productoId: p.id, precio: p.precio } : { ...draft, productoId: "" });
+    setPq("");
+  };
+
+  const guardarVenta = () => {
+    if (!prodSel) return showToast("Elige la referencia y la talla que se vendió.", true);
+    if (!(Number(draft.precio) > 0)) return showToast("Escribe el precio de venta.", true);
+    if (cant > stockDisp) return showToast("Solo hay " + stockDisp + (stockDisp === 1 ? " par" : " pares") + " en stock.", true);
+    if (!registrarVenta({ precio: draft.precio, cantidad: cant, cliente: draft.cliente }, prodSel)) return;
+    setShowForm(false);
+    setDraft(emptyVentaLocal());
+    showToast("Venta registrada · " + cant + (cant === 1 ? " par descontado" : " pares descontados") + " ✓");
+  };
+
+  return (
+    <div style={{ padding: "16px 16px 0" }} className="vm-fade">
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 4px", marginBottom: 10, gap: 8 }}>
+        <div>
+          <div style={display(19)}>Ventas</div>
+          <div style={{ fontSize: 12, color: C.muted, fontWeight: 600, marginTop: 2 }}>🏬 {nombreLocal} · solo pares de VarMan</div>
+        </div>
+        {esHoy && (
+          <button onClick={() => { setDraft(emptyVentaLocal()); setPq(""); setShowForm(true); }} style={btnPrimary({ padding: "12px 16px", borderRadius: 12, fontSize: 13 })}>
+            + Venta
+          </button>
+        )}
+      </div>
+
+      {/* Selector de día: los días anteriores solo se consultan */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14, padding: "0 4px" }}>
+        <button onClick={() => setVerFecha(shiftFecha(verFecha, -1))} aria-label="Día anterior" style={btnGhost({ padding: "10px 14px", borderRadius: 12, fontSize: 17, lineHeight: 1 })}>‹</button>
+        <input type="date" value={verFecha} max={hoy} onChange={(e) => { if (e.target.value && e.target.value <= hoy) setVerFecha(e.target.value); }} style={inputStyle({ borderRadius: 12, textAlign: "center", fontWeight: 700, flex: 1 })} />
+        <button onClick={() => setVerFecha(shiftFecha(verFecha, 1))} disabled={esHoy} aria-label="Día siguiente" style={btnGhost({ padding: "10px 14px", borderRadius: 12, fontSize: 17, lineHeight: 1, opacity: esHoy ? 0.4 : 1 })}>›</button>
+        {!esHoy && <button onClick={() => setVerFecha(hoy)} style={btnPrimary({ padding: "10px 14px", borderRadius: 12, fontSize: 12.5 })}>Hoy</button>}
+      </div>
+
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8, padding: "0 4px" }}>
+        <div style={{ ...eyebrow(C.ink2), fontSize: 11.5 }}>{formatDate(verFecha)}{esHoy ? " · hoy" : ""}</div>
+        {ventasDia.length > 0 && (
+          <div style={{ fontSize: 12, color: C.muted, fontWeight: 600 }}>
+            {paresDia} par{paresDia !== 1 ? "es" : ""} · <b style={{ color: C.ink }}>{fmt(totalDia)}</b>
+          </div>
+        )}
+      </div>
+      {ventasDia.length === 0 ? (
+        <EmptyState
+          icon={<IconChart big />}
+          title={esHoy ? "Aún no hay ventas hoy" : "Sin ventas ese día"}
+          text={esHoy ? "Registra cada par de VarMan que vendas con el botón + Venta." : "Las ventas solo se registran el mismo día."}
+        />
+      ) : (
+        <div style={cardStyle({ overflow: "hidden" })}>
+          {ventasDia.map((s, i) => {
+            const foto = fotoVenta(s);
+            const tocable = esHoy && !s.anulada;
+            return (
+              <div
+                key={s.id}
+                onClick={tocable ? () => { setConfirmDel(false); setActionSale(s); } : undefined}
+                style={{ padding: "12px 14px", display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: i > 0 ? `1px solid ${C.line}` : "none", cursor: tocable ? "pointer" : "default", opacity: s.anulada ? 0.55 : 1 }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 11, minWidth: 0 }}>
+                  <div style={{ width: 38, height: 38, borderRadius: 11, background: C.bg, flexShrink: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", ...display(13) }}>
+                    {foto ? <img src={foto} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : (s.talla || "👟")}
+                  </div>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, fontSize: 14, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textDecoration: s.anulada ? "line-through" : "none" }}>{s.modelo}</div>
+                    <div style={{ fontSize: 11.5, color: C.muted, marginTop: 1 }}>
+                      {s.anulada && <span style={{ background: C.redSoft, color: C.red, fontWeight: 800, fontSize: 9.5, padding: "1px 6px", borderRadius: 99, marginRight: 5 }}>ANULADA POR VARMAN</span>}
+                      {s.talla ? <>Talla {s.talla}</> : null}
+                      {pares(s) > 1 && <> · {s.cantidad} pares × {fmt(s.precio)}</>}
+                      {s.cliente ? <> · {s.cliente}</> : null}
+                    </div>
+                  </div>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0, marginLeft: 8 }}>
+                  <div style={{ fontWeight: 800, fontSize: 14.5, textDecoration: s.anulada ? "line-through" : "none" }}>{fmt((Number(s.precio) || 0) * pares(s))}</div>
+                  {tocable && <span style={{ color: C.muted, fontSize: 18, lineHeight: 1 }}>›</span>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      <div style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.5, padding: "10px 4px 0" }}>
+        Cada venta descuenta el par del inventario de VarMan y VarMan la ve al instante. Si te equivocaste hoy, toca la venta y elimínala (devuelve el par).
+      </div>
+
+      {/* ---- Registrar venta ---- */}
+      {showForm && (
+        <Sheet title="Registrar venta de hoy" onClose={() => setShowForm(false)}>
+          {/* El Sheet se pinta fuera del contenedor de la app (portal): sin esto el texto suelto sale en la letra por defecto del navegador */}
+          <div style={{ fontFamily: "Inter, system-ui, sans-serif" }}>
+          <Field label="Referencia de VarMan *">
+            {prodSel ? (
+              (() => {
+                const fotoSel = fotoDeProd(fotos, prodSel);
+                return (
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: C.greenSoft, border: `1.5px solid ${C.green}`, borderRadius: 12, padding: "10px 13px" }}>
+                    {fotoSel && <img src={fotoSel} alt="" style={{ width: 44, height: 44, borderRadius: 10, objectFit: "cover", flexShrink: 0, border: `1px solid ${C.line}` }} />}
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ fontWeight: 800, fontSize: 14, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{prodSel.modelo}{prodSel.color ? " " + prodSel.color : ""}</div>
+                      <div style={{ fontSize: 11.5, color: C.green, fontWeight: 700, marginTop: 1 }}>
+                        {prodSel.referencia ? "Ref " + prodSel.referencia + " · " : ""}{prodSel.talla ? "talla " + prodSel.talla + " · " : ""}stock {stockDisp}
+                      </div>
+                    </div>
+                    <button onClick={() => pickProduct("")} style={btnGhost({ padding: "7px 11px", borderRadius: 10, fontSize: 12, flexShrink: 0 })}>Quitar</button>
+                  </div>
+                );
+              })()
+            ) : (
+              <div>
+                <input value={pq} onChange={(e) => setPq(e.target.value)} placeholder="Escribe la referencia, modelo o talla…" style={inputStyle()} autoFocus />
+                {palabras.length > 0 && (
+                  <div style={{ marginTop: 6, background: C.card, border: `1.5px solid ${C.line}`, borderRadius: 12, maxHeight: 300, overflowY: "auto" }}>
+                    {grupos.length === 0 && (
+                      <div style={{ padding: "12px 13px", fontSize: 12.5, color: C.muted }}>Ninguna referencia con stock coincide.</div>
+                    )}
+                    {grupos.map((g, i) => {
+                      const foto = fotoDeProd(fotos, g.tallas[0]);
+                      return (
+                        <div key={g.clave} style={{ padding: "11px 13px", borderTop: i > 0 ? `1px solid ${C.line}` : "none", display: "flex", gap: 10 }}>
+                          {foto ? (
+                            <img src={foto} alt="" style={{ width: 54, height: 54, borderRadius: 11, objectFit: "cover", flexShrink: 0, border: `1px solid ${C.line}`, background: C.bg }} />
+                          ) : (
+                            <div style={{ width: 54, height: 54, borderRadius: 11, background: C.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0, border: `1px solid ${C.line}` }}>👟</div>
+                          )}
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontWeight: 700, fontSize: 13.5, color: C.ink, lineHeight: 1.25 }}>
+                              {g.ref && <span style={{ background: C.accentSoft, color: C.accent, fontWeight: 800, fontSize: 10.5, padding: "2px 7px", borderRadius: 99, marginRight: 6 }}>{g.ref}</span>}
+                              {g.modelo}{g.color ? " " + g.color : ""}
+                            </div>
+                            <div style={{ ...eyebrow(C.muted), fontSize: 9.5, margin: "7px 0 5px" }}>Toca la talla que se vendió</div>
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                              {g.tallas.map((p) => (
+                                <button key={p.id} onClick={() => pickProduct(p.id)} style={{ border: `1.5px solid ${C.line}`, background: C.bg, borderRadius: 10, padding: "8px 10px", cursor: "pointer", fontFamily: "Inter, sans-serif", display: "flex", flexDirection: "column", alignItems: "center", gap: 1, minWidth: 54, minHeight: 44 }}>
+                                  <span style={{ ...display(15), lineHeight: 1 }}>{p.talla || "—"}</span>
+                                  <span style={{ fontSize: 9, fontWeight: 700, color: Number(p.stock) <= 1 ? C.red : C.muted, letterSpacing: "0.04em" }}>{p.stock} {Number(p.stock) === 1 ? "PAR" : "PARES"}</span>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                <div style={{ fontSize: 11, color: C.muted, marginTop: 5 }}>Solo se pueden registrar pares que estén en el inventario de VarMan.</div>
+              </div>
+            )}
+          </Field>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <Field label="Precio de venta *">
+              <input type="number" min="0" inputMode="numeric" value={draft.precio} onChange={(e) => setDraft({ ...draft, precio: e.target.value })} placeholder="200000" style={inputStyle()} />
+            </Field>
+            <Field label="Cliente">
+              <input value={draft.cliente} onChange={(e) => setDraft({ ...draft, cliente: e.target.value })} placeholder="Nombre (opcional)" style={inputStyle()} />
+            </Field>
+          </div>
+          <Field label="Pares vendidos *">
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ display: "flex", alignItems: "center", background: C.bg, borderRadius: 12, padding: 3 }}>
+                <button type="button" onClick={() => setDraft({ ...draft, cantidad: Math.max(1, cant - 1) })} style={btnStep()}>−</button>
+                <input type="number" min="1" inputMode="numeric" value={draft.cantidad} onChange={(e) => setDraft({ ...draft, cantidad: e.target.value })} style={inputStyle({ width: 56, textAlign: "center", fontWeight: 800, border: "none", background: "transparent", padding: "8px 4px" })} />
+                <button type="button" onClick={() => setDraft({ ...draft, cantidad: prodSel ? Math.min(Math.max(1, stockDisp), cant + 1) : cant + 1 })} style={btnStep()}>+</button>
+              </div>
+              <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.4 }}>
+                <div>Total: <b style={{ color: C.ink }}>{fmt((Number(draft.precio) || 0) * cant)}</b></div>
+                {prodSel && <div>Hay {stockDisp} par{stockDisp === 1 ? "" : "es"} en stock</div>}
+              </div>
+            </div>
+          </Field>
+          <button onClick={guardarVenta} style={btnPrimary({ width: "100%", marginTop: 14, padding: "15px", fontSize: 15 })}>✓ Registrar venta</button>
+          </div>
+        </Sheet>
+      )}
+
+      {/* ---- Venta tocada: eliminar (solo las de hoy) ---- */}
+      {actionSale && (
+        <Sheet title="Venta" onClose={() => { setActionSale(null); setConfirmDel(false); }}>
+          <div style={{ fontFamily: "Inter, system-ui, sans-serif" }}>
+          <div style={{ background: C.card, border: `1.5px solid ${C.line}`, borderRadius: 14, padding: "14px 16px", marginBottom: 16 }}>
+            <div style={{ fontWeight: 800, fontSize: 16 }}>{actionSale.modelo}</div>
+            <div style={{ fontSize: 13, color: C.muted, marginTop: 5, lineHeight: 1.6 }}>
+              {actionSale.talla ? <>Talla {actionSale.talla} · </> : null}
+              {pares(actionSale)} par{pares(actionSale) === 1 ? "" : "es"} · <b style={{ color: C.ink }}>{fmt((Number(actionSale.precio) || 0) * pares(actionSale))}</b>
+              {actionSale.cliente ? <><br />{actionSale.cliente}</> : null}
+            </div>
+          </div>
+          {confirmDel ? (
+            <button onClick={() => { if (eliminarVenta(actionSale)) { setActionSale(null); setConfirmDel(false); showToast("Venta eliminada y par devuelto al inventario ✓"); } }} style={{ width: "100%", padding: "14px", fontSize: 15, borderRadius: 13, border: "none", background: C.red, color: "#fff", fontWeight: 800, fontFamily: "Inter, sans-serif", cursor: "pointer" }}>
+              Sí, eliminar (devuelve el par)
+            </button>
+          ) : (
+            <button onClick={() => setConfirmDel(true)} style={btnGhost({ width: "100%", padding: "14px", fontSize: 15, color: C.red, border: `1.5px solid ${C.redSoft}` })}>
+              🗑️  Eliminar venta
+            </button>
+          )}
+          <div style={{ fontSize: 11, color: C.muted, marginTop: 10, textAlign: "center", lineHeight: 1.4 }}>
+            Para corregir precio o talla: elimina la venta y regístrala de nuevo.
+          </div>
+          </div>
+        </Sheet>
       )}
     </div>
   );

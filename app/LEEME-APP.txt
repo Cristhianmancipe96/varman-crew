@@ -46,6 +46,44 @@ CÓMO SE ACTUALIZA LA APP EN INTERNET (2 minutos):
   En el celular: cerrar y volver a abrir la app (o F5) para ver lo nuevo.
 
 ----------------------------------------------------------
+HECHO EL 2026-09-21 (LOCAL ALIADO — La Rola Store):
+  - QUÉ ES: un local ajeno que exhibe pares de VarMan entra con SU correo
+    (larolastore1@gmail.com) y ve SOLO dos pestañas:
+      · Inventario: consulta (referencia, foto, tallas, stock y PRECIO DE
+        VENTA). No edita, no exporta, no ve costos ni márgenes.
+      · Ventas: registra los pares de VarMan que vendió HOY (descuenta el
+        stock) y puede eliminar una venta de HOY si se equivocó (devuelve el
+        par). Los días anteriores solo se consultan.
+  - EL COSTO NO LE LLEGA NI POR MEDIOS TÉCNICOS: el local no lee `products`
+    sino `vitrina`, una copia del inventario SIN el costo. La mantienen al
+    día los celulares del equipo: cada vez que alguien del equipo tiene la
+    app abierta y cambia el inventario, la app corrige en la vitrina solo lo
+    distinto (efecto "Vitrina" en app.jsx). La PRIMERA vez se llena sola al
+    abrir la app con una cuenta del equipo (unos segundos). Sus ventas
+    también se guardan sin costo; en los celulares del equipo el costo se
+    completa en memoria desde el inventario para que ganancia y Stats cuadren.
+  - "SOLO LO DEL DÍA" LO IMPONEN LAS REGLAS, no la app: la fecha se compara
+    con el reloj del servidor en hora de Colombia. Y el stock solo se mueve
+    atado a una venta suya: baja exactamente lo vendido, nunca queda negativo.
+  - DÓNDE VEN LOS SOCIOS ESAS VENTAS: en la Caja, al abrir el día, cada par
+    vendido por el local sale con "🏬 La Rola Store". Cuentan en Stats y en
+    el panel de hoy como cualquier venta.
+  - DAR ACCESO A OTRO LOCAL (3 pasos): usuario en Firebase → Authentication;
+    su correo + nombre en LOCALES (inicio de app.jsx); el mismo correo en
+    esLocal() de reglas-firestore.txt y republicar.
+  - ORDEN AL SUBIR ESTA VERSIÓN: 1) pegar las reglas, 2) desplegar app\,
+    3) abrir la app como socio y esperar ~10 s (se llena la vitrina),
+    4) entrar como el local y registrar + eliminar una venta de prueba.
+  - PRUEBAS: ..\despliegue\pruebas-local-aliado\ (57 casos de reglas contra
+    el simulador oficial de Firebase, sin publicarlas; y la app real corriendo
+    con un Firebase de mentira para verla como local / socio / vendedor).
+  - LÍMITES CONOCIDOS: (a) si ningún celular del equipo abre la app, la
+    vitrina no se entera de lo que vendió el bot o el Búnker; el local vería
+    un par que ya no está, pero al registrarlo las reglas lo rechazan (el
+    stock real manda). (b) la ganancia de una venta de local usa el costo
+    ACTUAL del producto, no el del día de la venta.
+
+----------------------------------------------------------
 HECHO EL 2026-08-31 (CANTIDAD EDITABLE + PDF DEL INVENTARIO):
   - ESCRIBIR LA CANTIDAD: en la ficha del modelo (tocar la tarjeta
     en Inventario), el NÚMERO de pares de cada talla ahora es un

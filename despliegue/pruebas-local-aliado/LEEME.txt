@@ -1,0 +1,24 @@
+PRUEBAS DEL LOCAL ALIADO (2026-09-21) — no se despliegan, no tocan la nube
+================================================================================
+
+1) probar-reglas.js — prueba app\reglas-firestore.txt SIN publicarlas.
+   Usa la API oficial de Firebase (firebaserules `projects:test`): compila las
+   reglas y simula 57 casos (lo que el local puede, lo que no puede, y que el
+   equipo siga igual). Solo lectura: no cambia nada en el proyecto.
+
+     TOKEN=$(gcloud auth print-access-token) node probar-reglas.js
+     → debe decir  casos: 57 · OK: 57 · FALLAN: 0
+
+   Correrlo SIEMPRE antes de pegar reglas nuevas en la consola. Si se agrega una
+   regla, agregarle su caso aquí (uno que deba pasar y uno que deba fallar).
+
+2) servidor.js + fake-firebase.js — la app REAL (carpeta app\) corriendo en el
+   navegador con un Firebase de mentira en memoria y datos inventados.
+
+     node servidor.js   →   http://localhost:8077/?como=local
+                            http://localhost:8077/?como=socio&vitrina=vacia
+                            http://localhost:8077/?como=vendedor
+
+   El Firebase de mentira también hace de reglas para el local: si la app del
+   local pide algo prohibido queda anotado en window.__negados (debe estar
+   vacío). window.__store es la "nube" y window.__escrituras lo que se escribió.

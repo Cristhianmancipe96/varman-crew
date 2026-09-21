@@ -1,4 +1,11 @@
-REGLAS DE FIRESTORE — VarMan Crew (actualizadas 2026-08-27: se agregó la
+REGLAS DE FIRESTORE — VarMan Crew (actualizadas 2026-09-21: LOCALES ALIADOS —
+un local ajeno que exhibe pares de VarMan [primero: La Rola Store] entra con su
+correo y SOLO puede: ver la `vitrina` (el inventario SIN el costo), las fotos y
+el logo, y registrar/eliminar SUS ventas con fecha de HOY, que descuentan el
+stock exactamente en lo vendido. No puede leer `products` (ahí va el costo), ni
+ventas de VarMan, ni pedidos, caja, Búnker, conteos ni nada más. Detalle abajo
+en "LOCALES ALIADOS". Hay que volver a pegar TODO el bloque.
+Antes 2026-08-27: se agregó la
 colección `conteos` — el DÍA DE INVENTARIO, la sesión de conteo físico de la
 bodega. La escribe todo el EQUIPO: cualquiera cuenta y cualquiera cierra, por
 decisión del dueño; el acta guarda quién lo hizo. SIN ESTA REGLA el conteo
@@ -45,6 +52,29 @@ PARA QUÉ:
   puede volver a mostrar). NO toca el documento del pedido: se guarda en una
   colección aparte `pedidosOcultos`, solo de socios (igual que `gastos`). Hay
   que volver a pegar TODO el bloque.
+
+- NUEVO (2026-09-21): LOCALES ALIADOS (esLocal). Un local ajeno que exhibe
+  pares de VarMan tiene su propio correo. Con estas reglas SOLO puede:
+    · LEER la colección `vitrina`: una copia del inventario SIN el costo
+      (referencia, modelo, color, talla, precio de venta y stock). La mantienen
+      al día los celulares del equipo cada vez que abren la app. El local NO
+      puede leer `products`, así que lo que le costó el par a VarMan no le llega
+      ni por medios técnicos. Tampoco viaja en sus ventas (se guardan sin costo).
+    · LEER las fotos y el logo.
+    · CREAR y BORRAR únicamente SUS ventas (`local` = su correo) y solo con
+      fecha de HOY (hora de Colombia; la fecha la comprueba el servidor, no el
+      celular). Una venta de ayer no se puede registrar ni borrar.
+    · Tocar en un producto SOLO el `stock`, y solo junto con una venta suya: las
+      reglas comprueban que baja EXACTAMENTE lo vendido (o sube exactamente lo
+      de la venta que borra) y que nunca queda negativo. No puede "inventarse"
+      un stock.
+  NO puede ver ni tocar: ventas de VarMan, pedidos (datos de clientes),
+  comprobantes, caja, Búnker, conteos, catálogo privado, config del bot.
+  No puede editar ni anular ventas; si VarMan anula una, él la ve tachada.
+  Para dar acceso a un local: (1) Firebase → Authentication → agregar usuario,
+  (2) su correo en esLocal() aquí, (3) el mismo correo en LOCALES al inicio de
+  app.jsx. Para quitárselo: borrarlo de los dos sitios, republicar y deshabilitar
+  el usuario en Authentication.
 
 CÓMO PEGARLAS (2 minutos):
 1. Entra a https://console.firebase.google.com → proyecto "varman-crew"
@@ -99,9 +129,51 @@ service cloud.firestore {
         ];
     }
 
+    // ── LOCALES ALIADOS 2026-09-21 ──
+    // Puntos de venta ajenos que exhiben pares de VarMan. Entran con su correo
+    // y solo tocan lo suyo (ver arriba). Al dar acceso a un local nuevo: su
+    // correo (en minúsculas) aquí Y en LOCALES al inicio de app.jsx, y republicar.
+    function esLocal() {
+      return request.auth != null
+        && request.auth.token.email in [
+          'larolastore1@gmail.com'   // La Rola Store, primer local aliado (2026-09-19)
+        ];
+    }
+
+    // La fecha de HOY en Colombia como 'AAAA-MM-DD' (UTC-5, sin horario de
+    // verano), calculada con el reloj del SERVIDOR: el local no puede registrar
+    // ni borrar ventas de otro día cambiándole la fecha al celular.
+    function hoyBogota() {
+      let t = timestamp.value(request.time.toMillis() - 18000000);
+      let m = t.month();
+      let d = t.day();
+      return string(t.year()) + '-' + (m < 10 ? '0' : '') + string(m)
+                              + '-' + (d < 10 ? '0' : '') + string(d);
+    }
+
     match /tiendas/{tienda} {
-      // Documento de la tienda (guarda el logo)
-      allow read, write: if esEquipo();
+      // Documento de la tienda (guarda el logo). El local solo lo lee.
+      allow read: if esEquipo() || esLocal();
+      allow write: if esEquipo();
+
+      // Un local solo mueve el stock de un producto JUNTO con una venta suya,
+      // en la misma escritura atómica. `movLocal` es el id de esa venta:
+      //  · venta NUEVA  (no existía y después sí)  → el stock baja lo vendido
+      //  · venta BORRADA (existía y después no)    → el stock sube lo devuelto
+      function movLocalValido(prodId) {
+        let v = /databases/$(database)/documents/tiendas/$(tienda)/sales/$(request.resource.data.movLocal);
+        return (
+            !exists(v) && existsAfter(v)
+            && getAfter(v).data.local == request.auth.token.email
+            && getAfter(v).data.productoId == prodId
+            && request.resource.data.stock == resource.data.stock - getAfter(v).data.cantidad
+          ) || (
+            exists(v) && !existsAfter(v)
+            && get(v).data.local == request.auth.token.email
+            && get(v).data.productoId == prodId
+            && request.resource.data.stock == resource.data.stock + get(v).data.cantidad
+          );
+      }
 
       // Catálogo público de la página web (la página lee SIN login)
       match /catalogo/{doc} {
@@ -118,9 +190,38 @@ service cloud.firestore {
         allow read, write: if esSocio();
       }
 
-      // Inventario y fotos: todo el equipo con login (incluye vendedor)
-      match /products/{doc} { allow read, write: if esEquipo(); }
-      match /fotos/{doc}    { allow read, write: if esEquipo(); }
+      // Inventario y fotos: todo el equipo con login (incluye vendedor).
+      // Un LOCAL aliado NO lee `products` (ahí viaja el costo): solo puede
+      // cambiarle el `stock`, atado a una venta suya (movLocalValido) y sin
+      // dejarlo nunca negativo. Las fotos sí las lee.
+      match /products/{doc} {
+        allow read, write: if esEquipo();
+        allow update: if esLocal()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stock', 'movLocal'])
+          && request.resource.data.movLocal is string
+          && resource.data.stock is int
+          && request.resource.data.stock is int
+          && request.resource.data.stock >= 0
+          && movLocalValido(doc);
+      }
+      match /fotos/{doc} {
+        allow read: if esEquipo() || esLocal();
+        allow write: if esEquipo();
+      }
+
+      // VITRINA (2026-09-21): copia del inventario SIN costo para los locales
+      // aliados. La escribe el equipo (la app la mantiene igual al inventario);
+      // el local la lee y solo le mueve el `stock` al vender, para ver el
+      // número nuevo al instante. Si la desordenara, solo se engaña a sí mismo:
+      // el stock de verdad es el de `products` y la app del equipo la corrige.
+      match /vitrina/{doc} {
+        allow read: if esEquipo() || esLocal();
+        allow write: if esEquipo();
+        allow update: if esLocal()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stock'])
+          && request.resource.data.stock is int
+          && request.resource.data.stock >= 0;
+      }
 
       // VENTAS: todo el equipo registra/edita/borra ventas normales, pero
       // ANULAR (los campos anulada*) es solo de socios. Las reglas se suman
@@ -135,6 +236,35 @@ service cloud.firestore {
                ['anulada', 'anulada_fecha', 'anulada_por', 'anulada_motivo']);
         // …y solo puede borrar ventas que NO estén anuladas
         allow delete: if esEquipo() && !('anulada' in resource.data);
+
+        // LOCAL aliado: solo SUS ventas (campo `local` = su correo). Para leer
+        // la lista, la app consulta con where('local','==',correo); sin ese
+        // filtro Firestore rechaza la consulta completa (así debe ser).
+        allow read: if esLocal() && resource.data.local == request.auth.token.email;
+        // Crear: suya, con fecha de HOY, sin costo ni campos de anulación (lista
+        // cerrada de campos), y descontando el par en la misma escritura.
+        allow create: if esLocal()
+          && request.resource.data.local == request.auth.token.email
+          && request.resource.data.id == doc
+          && request.resource.data.fecha == hoyBogota()
+          && request.resource.data.keys().hasOnly(
+               ['id', 'productoId', 'fecha', 'cliente', 'modelo', 'talla', 'precio',
+                'cantidad', 'canal', 'origen', 'local', 'localNombre'])
+          && request.resource.data.productoId is string
+          && request.resource.data.cantidad is int
+          && request.resource.data.cantidad >= 1
+          && request.resource.data.precio is number
+          && request.resource.data.precio > 0
+          && getAfter(/databases/$(database)/documents/tiendas/$(tienda)/products/$(request.resource.data.productoId)).data.movLocal == doc;
+        // Borrar: suya, de HOY, que VarMan no haya anulado, y devolviendo el par
+        // en la misma escritura. (No hay "editar": se borra y se registra de nuevo.)
+        allow delete: if esLocal()
+          && resource.data.local == request.auth.token.email
+          && resource.data.fecha == hoyBogota()
+          && !('anulada' in resource.data)
+          && getAfter(/databases/$(database)/documents/tiendas/$(tienda)/products/$(resource.data.productoId)).data.movLocal == doc
+          && getAfter(/databases/$(database)/documents/tiendas/$(tienda)/products/$(resource.data.productoId)).data.stock
+             == get(/databases/$(database)/documents/tiendas/$(tienda)/products/$(resource.data.productoId)).data.stock + resource.data.cantidad;
       }
 
       // PEDIDOS DEL BOT DE WHATSAPP: todo el equipo con login los ve y los
@@ -220,5 +350,10 @@ IMPORTANTE:
   (y SOCIOS_BUNKER si también debe ver el Local Búnker).
 - El Local Búnker NO se puede probar hasta publicar estas reglas: la pestaña
   aparece, pero Firestore rechaza la lectura y todo sale en cero.
+- Lo mismo con un LOCAL aliado: su correo va en esLocal() aquí Y en LOCALES
+  al inicio de app.jsx (con el nombre del local).
+- El local ve el inventario desde `vitrina`. Esa copia se llena SOLA la primera
+  vez que alguien del equipo abre la app ya actualizada (tarda unos segundos).
+  Si el local ve el inventario vacío: abrir la app con una cuenta del equipo.
 - El vendedor sigue usando la app normal (inventario, ventas, tienda) sin
   ningún cambio; simplemente no ve ni puede leer la pestaña Caja.
